@@ -811,7 +811,7 @@
             let subjectChart = null, courtChart = null;
             let lastProc = [], lastUpdateDate = null, searchTimeout = null, courtSearchTerm = '';
             
-            let prazoConfig = { normal_max: 60, atencao_max: 120, atrasado_min: 121 };
+            let prazoConfig = { normal_max: 60, atencao_max: 120, atrasado_min: 121, destaque_assunto: 60 };
 
             async function loadConfiguracoes() {
                 try {
@@ -820,6 +820,7 @@
                         if (item.chave === 'prazo_normal_max') prazoConfig.normal_max = parseInt(item.valor);
                         if (item.chave === 'prazo_atencao_max') prazoConfig.atencao_max = parseInt(item.valor);
                         if (item.chave === 'prazo_atrasado_min') prazoConfig.atrasado_min = parseInt(item.valor);
+                        if (item.chave === 'prazo_destaque_assunto' && parseInt(item.valor) > 0) prazoConfig.destaque_assunto = parseInt(item.valor);
                     });
                 } catch(e) { console.log(e); }
             }
@@ -976,6 +977,15 @@
                     const isExp = expandedSubjects.has(subjectId);
                     const total = filteredNames.reduce((s, c) => s + filtered[c].length, 0);
                     html += `<div class="section-card"><div class="section-header" onclick="toggleSubject('${subjectId}')"><div class="section-info"><div class="section-badge" style="background:#1a4a6e"></div><span class="section-name">${escapeHtml(subject)}</span><span class="section-count">${total}</span></div><div class="toggle-icon" id="${subjectId}-icon">${isExp ? '−' : '+'}</div></div><div class="section-content ${isExp ? 'expanded' : ''}" id="${subjectId}-content">`;
+                    // Primeira linha do assunto: processos acima de N dias (prazo configurável em Cadastros), de todas as varas
+                    const limite = prazoConfig.destaque_assunto;
+                    const acima = [];
+                    filteredNames.forEach(c => filtered[c].forEach(p => { if (p.diasChegada > limite) acima.push(p); }));
+                    acima.sort((a, b) => b.diasChegada - a.diasChegada);
+                    const acimaId = `${subjectId}-acima`;
+                    html += `<div class="sub-card sub-acima${acima.length ? '' : ' vazio'}"><div class="sub-header"${acima.length ? ` onclick="toggleCourt('${acimaId}')"` : ''}><div class="sub-info"><div class="sub-icon"></div><span class="sub-name">Acima de ${limite} dias - todas as varas</span><span class="sub-count">${acima.length}</span></div><div class="sub-toggle" id="${acimaId}-icon">${acima.length ? '+' : ''}</div></div><div class="sub-content" id="${acimaId}-content"><div class="process-table">`;
+                    acima.forEach(p => { html += `<div class="process-row"><div class="process-number"><span>${escapeHtml(p.numeroProcesso)}</span><button class="copy-btn" onclick="copyToClipboard('${escapeHtml(p.numeroProcesso)}', this)">⎘</button></div><div class="process-days"><span class="days-badge ${getDaysBadgeClass(p.diasChegada)}">${getDaysLabel(p.diasChegada)}</span></div><div class="process-orgao">${escapeHtml(p.orgaoJulgador)}</div></div>`; });
+                    html += `</div></div></div>`;
                     filteredNames.forEach((court, ci) => {
                         const courtId = `${subjectId}-court-${ci}`;
                         const procs = filtered[court];

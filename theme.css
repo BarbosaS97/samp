@@ -410,3 +410,12 @@ body.rolou .filter-panel::before { opacity: 1; }
 .sp-anexo-l li { margin-bottom: 1px; }
 .sp-copiar { display: block; margin-top: 8px; background: none; border: none; padding: 0; color: var(--muted); font-size: .7rem; cursor: pointer; text-decoration: underline; }
 .sp-copiar:hover { color: var(--navy); }
+
+/* Assuntos: primeira linha "Acima de N dias" */
+.sub-acima > .sub-header { background: #fbf4e4 !important; border-left: 3px solid var(--warn); }
+.sub-acima > .sub-header:hover { background: #f8eed8 !important; }
+.sub-acima .sub-name { font-weight: 600; color: #7a5a14; }
+.sub-acima .sub-count { background: #f3e2bb !important; color: #7a5a14 !important; font-weight: 600; }
+.sub-acima .sub-icon { background: var(--warn) !important; }
+.sub-acima.vazio > .sub-header { cursor: default; opacity: .6; background: #f7f8fa !important; border-left-color: var(--line); }
+.sub-acima.vazio .sub-name { color: var(--muted); font-weight: 400; }

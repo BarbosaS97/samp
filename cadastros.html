@@ -140,6 +140,7 @@
       <div class="field"><label>Normal (verde) - até</label><input type="number" id="pNormal" min="1" max="365"></div>
       <div class="field"><label>Atenção (amarelo) - até</label><input type="number" id="pAtencao" min="1" max="365"></div>
       <div class="field"><label>Atrasado (vermelho) - a partir de</label><input type="number" id="pAtrasado" min="1" max="365"></div>
+      <div class="field"><label title="Linha 'Acima de X dias' exibida no topo de cada assunto, na aba Assuntos da Análise de Processos">Assuntos: listar acima de (dias)</label><input type="number" id="pDestaque" min="1" max="3650"></div>
       <button class="btn btn-primary" id="salvarPrazos">Salvar prazos</button>
     </div>
     <div class="msg" id="prazoMsg"></div>
@@ -360,17 +361,19 @@
   /* ---------- PRAZOS ---------- */
   async function carregarPrazos() {
     const { data } = await sb.from('configuracoes').select('chave, valor');
-    const m = { normal: 60, atencao: 120, atrasado: 121 };
+    const m = { normal: 60, atencao: 120, atrasado: 121, destaque: 60 };
     (data || []).forEach((i) => {
       if (i.chave === 'prazo_normal_max') m.normal = parseInt(i.valor);
       if (i.chave === 'prazo_atencao_max') m.atencao = parseInt(i.valor);
       if (i.chave === 'prazo_atrasado_min') m.atrasado = parseInt(i.valor);
+      if (i.chave === 'prazo_destaque_assunto' && parseInt(i.valor) > 0) m.destaque = parseInt(i.valor);
     });
-    $('pNormal').value = m.normal; $('pAtencao').value = m.atencao; $('pAtrasado').value = m.atrasado;
+    $('pNormal').value = m.normal; $('pAtencao').value = m.atencao; $('pAtrasado').value = m.atrasado; $('pDestaque').value = m.destaque;
   }
   $('salvarPrazos').onclick = async () => {
-    const p = { normal_max: +$('pNormal').value, atencao_max: +$('pAtencao').value, atrasado_min: +$('pAtrasado').value };
+    const p = { normal_max: +$('pNormal').value, atencao_max: +$('pAtencao').value, atrasado_min: +$('pAtrasado').value, destaque_assunto: +$('pDestaque').value };
     if (!(p.normal_max < p.atencao_max && p.atencao_max < p.atrasado_min)) return msg('prazoMsg', 'Os valores devem ser crescentes: Normal < Atenção < Atrasado.', 'err');
+    if (!Number.isInteger(p.destaque_assunto) || p.destaque_assunto < 1 || p.destaque_assunto > 3650) return msg('prazoMsg', 'Informe, em "Assuntos: listar acima de", um número de dias entre 1 e 3650.', 'err');
     try { await api('prazos_salvar', { prazos: p }); msg('prazoMsg', 'Prazos salvos.', 'ok'); toast('Prazos salvos.', 'ok'); }
     catch (e) { msg('prazoMsg', e.message, 'err'); }
   };
