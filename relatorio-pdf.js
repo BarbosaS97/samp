@@ -76,6 +76,10 @@
     const quando = new Date().toLocaleString('pt-BR');
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...COR.muted);
     doc.text(t(`Gerado por ${usuario ? usuario.nome + ' (matrícula ' + usuario.matricula + ')' : 'usuário SAMP'} em ${quando}`), M, y + 1);
+    if (spec.interpretacao) {
+      y += 5.5; doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(...COR.ink);
+      const esc = doc.splitTextToSize(t('Escopo: ' + spec.interpretacao), util); doc.text(esc, M, y); y += (esc.length - 1) * 4.2;
+    }
     y += 5; doc.setDrawColor(...COR.line); doc.line(M, y, W - M, y); y += 7;
 
     const espaco = (h) => { if (y + h > H - RODAPE) { doc.addPage(); y = TOPO; } };

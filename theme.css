@@ -402,3 +402,11 @@ body.rolou .filter-panel::before { opacity: 1; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   .reveal { opacity: 1; transform: none; }
 }
+
+/* Sampinha v2: andamento, escopo do relatório e copiar */
+.sp-st { animation: th-brilho 1s ease-in-out infinite alternate; }
+.sp-anexo-i { font-size: .78rem; color: var(--ink); background: #fff; border: 1px solid #d5deea; border-radius: 3px; padding: 6px 9px; margin: 6px 0 4px; line-height: 1.4; }
+.sp-anexo-l { margin: 2px 0 8px 16px; padding: 0; font-size: .74rem; color: var(--muted); }
+.sp-anexo-l li { margin-bottom: 1px; }
+.sp-copiar { display: block; margin-top: 8px; background: none; border: none; padding: 0; color: var(--muted); font-size: .7rem; cursor: pointer; text-decoration: underline; }
+.sp-copiar:hover { color: var(--navy); }

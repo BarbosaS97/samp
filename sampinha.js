@@ -12,7 +12,8 @@
       'Dê um resumo geral da base de processos',
       'Liste 5 processos com o mesmo assunto e o mesmo advogado',
       'Quais processos estão atrasados?',
-      'Quais advogados têm mais processos?'
+      'Quais advogados têm mais processos?',
+      'O que você consegue fazer?'
     ],
     inicio: [
       'O que eu consigo fazer no SAMP?',
@@ -24,7 +25,8 @@
       'Resuma o desempenho do período mais recente',
       'Compare Varas Comuns e JEF',
       'Em que mês o acervo foi maior?',
-      'Qual a média de calculados nos últimos 6 meses?'
+      'Qual a média de calculados nos últimos 6 meses?',
+      'O que você consegue fazer?'
     ]
   };
 
@@ -55,6 +57,63 @@
     if (r.status === 401) { window.SAMP_AUTH.sair(); throw new Error('Sessão expirada'); }
     if (!r.ok) { const err = new Error(j.error || ('Erro ' + r.status)); err.status = r.status; throw err; }
     return j;
+  }
+  // o que o usuário está vendo agora (ajuda a Sampinha a entender "essa vara", "esse período", "isso"...)
+  function contextoTela() {
+    const c = {};
+    try {
+      if (pagina === 'analise') {
+        const aba = document.querySelector('.tab.active');
+        if (aba) {
+          c.aba = aba.textContent.trim();
+          const ids = { assuntos: 'searchInput', poloPassivo: 'poloSearchInput', advogadoAtivo: 'advogadoSearchInput' };
+          const inp = ids[aba.dataset.tab] && document.getElementById(ids[aba.dataset.tab]);
+          if (inp && inp.value.trim()) c.busca = inp.value.trim();
+        }
+      } else if (pagina === 'metricas') {
+        const i = document.getElementById('dataInicialSelect'), f = document.getElementById('dataFinalSelect');
+        if (i && f && i.value !== '' && f.value !== '') c.filtro = i.selectedOptions[0].textContent + ' a ' + f.selectedOptions[0].textContent;
+        const per = document.querySelector('#metaPeriodo .chip b');
+        if (per) c.periodo = per.textContent.trim();
+      }
+    } catch (e) {}
+    return c;
+  }
+
+  // envia a pergunta e acompanha a resposta em fluxo: recebe o andamento ("Buscando processos...") antes do resultado final
+  async function chatStream(corpo, aoAndamento) {
+    const sessao = window.SAMP_AUTH.get();
+    if (!sessao) { window.SAMP_AUTH.irLogin(); throw new Error('Sessão expirada'); }
+    const r = await fetch(window.APP_CONFIG.SUPABASE_URL + '/functions/v1/sampinha-function', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: window.APP_CONFIG.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.APP_CONFIG.SUPABASE_ANON_KEY },
+      body: JSON.stringify({ token: sessao.token, modulo: pagina, contexto: contextoTela(), stream: true, ...corpo })
+    });
+    if (!(r.headers.get('content-type') || '').includes('text/event-stream')) {   // erro comum, em JSON
+      let j = {}; try { j = await r.json(); } catch (e) {}
+      if (r.status === 401) { window.SAMP_AUTH.sair(); throw new Error('Sessão expirada'); }
+      if (r.ok && j.resposta) return j;   // compatibilidade com a versão anterior da função
+      throw new Error(j.error || (r.ok ? 'A Sampinha não devolveu uma resposta. Tente novamente (se persistir, atualize a página com Ctrl+F5).' : 'Erro ' + r.status));
+    }
+    const leitor = r.body.getReader(), dec = new TextDecoder();
+    let buf = '', final = null;
+    for (;;) {
+      const { done, value } = await leitor.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let k;
+      while ((k = buf.indexOf('\n\n')) >= 0) {
+        const bloco = buf.slice(0, k); buf = buf.slice(k + 2);
+        const linha = bloco.split('\n').find((l) => l.startsWith('data: '));
+        if (!linha) continue;
+        let ev; try { ev = JSON.parse(linha.slice(6)); } catch (e) { continue; }
+        if (ev.t === 'status') aoAndamento(ev.m);
+        else if (ev.t === 'fim') final = ev;
+        else if (ev.t === 'erro') throw new Error(ev.error);
+      }
+    }
+    if (!final) throw new Error('A resposta foi interrompida. Tente novamente.');
+    return final;
   }
   const msgErro = (e) => (e.message === 'Failed to fetch' ? 'Não consegui contatar o servidor. Tente novamente.' : e.message);
 
@@ -116,13 +175,19 @@
     return html + (lista ? '</ul>' : '');
   }
   function separarSugestoes(texto) {
+    texto = String(texto == null ? '' : texto);
     const m = texto.match(/\n?\s*SUGEST(?:Õ|O)ES:\s*(.+)\s*$/i);
     if (!m) return { corpo: texto, sugestoes: [] };
-    return { corpo: texto.slice(0, m.index).trim(), sugestoes: m[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 3) };
+    return { corpo: texto.slice(0, m.index).trim(), sugestoes: m[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 5) };
   }
   function bolha(papel, texto) {
     const b = el('div', 'sp-msg sp-' + papel, papel === 'user' ? `<p>${esc(texto)}</p>` : formatar(texto));
     $msgs.appendChild(b); $msgs.scrollTop = $msgs.scrollHeight; return b;
+  }
+  function adicionarAcoes(bolhaEl, texto) {
+    const b = el('button', 'sp-copiar'); b.type = 'button'; b.textContent = 'Copiar resposta';
+    b.onclick = () => navigator.clipboard.writeText(texto).then(() => { b.textContent = 'Copiado'; setTimeout(() => (b.textContent = 'Copiar resposta'), 1400); });
+    bolhaEl.appendChild(b);
   }
   function mostrarChips(lista) {
     $chips.innerHTML = '';
@@ -130,7 +195,7 @@
   }
   function boasVindas() {
     mensagens = []; $msgs.innerHTML = '';
-    bolha('bot', `Olá, ${usuario.nome.split(' ')[0]}! Eu sou a Sampinha. Posso consultar os dados do SAMP e responder perguntas sobre os processos e as metas processuais. Veja alguns exemplos ou escreva a sua pergunta.`);
+    bolha('bot', `Olá, ${usuario.nome.split(' ')[0]}! Eu sou a Sampinha. Eu consulto os processos e as metas, gero relatórios em PDF e abro telas e filtros para você. Se eu tiver dúvida sobre o que você quer, pergunto antes de responder. Escolha um exemplo ou escreva a sua pergunta.`);
     mostrarChips(SUGESTOES[pagina] || SUGESTOES.analise);
   }
   function desenharMensagens() {
@@ -138,7 +203,7 @@
     let ultimas = [];
     mensagens.forEach((m) => {
       if (m.role === 'user') bolha('user', m.content);
-      else { const s = separarSugestoes(m.content); const b = bolha('bot', s.corpo); if (m.anexo && m.anexo.relatorio) anexarRelatorio(b, m.anexo.relatorio); ultimas = s.sugestoes; }
+      else { const s = separarSugestoes(m.content); const b = bolha('bot', s.corpo); if (m.anexo && m.anexo.relatorio) anexarRelatorio(b, m.anexo.relatorio); adicionarAcoes(b, s.corpo); ultimas = s.sugestoes; }
     });
     mostrarChips(ultimas);
   }
@@ -236,15 +301,17 @@
     if (!mensagens.length) $msgs.innerHTML = '';   // sai a tela de boas-vindas ao começar a conversa
     bolha('user', texto);
     const espera = bolha('bot', '');
-    espera.classList.add('sp-wait'); espera.innerHTML = '<span class="sp-dots"><i></i><i></i><i></i></span> Consultando os dados...';
+    espera.classList.add('sp-wait'); espera.innerHTML = '<span class="sp-dots"><i></i><i></i><i></i></span><span class="sp-st">Entendendo o seu pedido...</span>';
     $txt.value = ''; ajustarAltura();
     try {
-      const j = await api({ action: 'chat', conversa_id: atualId, mensagem: texto });
+      const j = await chatStream({ action: 'chat', conversa_id: atualId, mensagem: texto }, (m) => { const st = espera.querySelector('.sp-st'); if (st) st.textContent = m; });
+      if (!j || !j.resposta) throw new Error('A Sampinha não devolveu uma resposta. Tente novamente.');
       atualId = j.conversa_id; guardarAtiva();
       mensagens.push({ role: 'user', content: texto }, { role: 'assistant', content: j.resposta, anexo: j.relatorio ? { relatorio: j.relatorio } : undefined });
       const s = separarSugestoes(j.resposta);
       espera.classList.remove('sp-wait'); espera.innerHTML = formatar(s.corpo);
       if (j.relatorio) anexarRelatorio(espera, j.relatorio);
+      adicionarAcoes(espera, s.corpo);
       mostrarChips(s.sugestoes);
       if (j.acoes && j.acoes.length) executarAcoes(j.acoes);
     } catch (e) {
@@ -268,9 +335,13 @@
   }
   function anexarRelatorio(bolhaEl, spec) {
     const tabelas = spec.secoes.filter((x) => x.tipo === 'tabela').length, graficos = spec.secoes.filter((x) => x.tipo === 'grafico').length;
+    const ROT = { texto: 'Texto', kpis: 'Indicadores', tabela: 'Tabela', grafico: 'Gráfico' };
+    const itens = spec.secoes.slice(0, 8).map((x) => `<li>${ROT[x.tipo] || x.tipo}${x.titulo ? ': ' + esc(x.titulo) : ''}</li>`).join('');
     const card = el('div', 'sp-anexo',
       `<div class="sp-anexo-t">${esc(spec.titulo)}</div>` +
+      (spec.interpretacao ? `<div class="sp-anexo-i"><b>Entendi:</b> ${esc(spec.interpretacao)}</div>` : '') +
       `<div class="sp-anexo-s">Relatório com ${spec.secoes.length} seção(ões)${tabelas ? ', ' + tabelas + ' tabela(s)' : ''}${graficos ? ', ' + graficos + ' gráfico(s)' : ''}</div>` +
+      `<ul class="sp-anexo-l">${itens}</ul>` +
       '<div class="sp-anexo-b"><button type="button" data-a="pdf">Baixar PDF</button><button type="button" data-a="csv" class="sp-sec">Baixar dados (CSV)</button></div>');
     card._spec = spec;
     bolhaEl.appendChild(card);
@@ -356,6 +427,11 @@
   /* ---------- eventos ---------- */
   function ajustarAltura() { $txt.style.height = 'auto'; $txt.style.overflowY = $txt.scrollHeight > 110 ? 'auto' : 'hidden'; $txt.style.height = Math.min($txt.scrollHeight, 110) + 'px'; }
   $txt.addEventListener('input', ajustarAltura);
+  $txt.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowUp' || $txt.value.trim()) return;
+    const ultima = [...mensagens].reverse().find((m) => m.role === 'user');
+    if (ultima) { e.preventDefault(); $txt.value = ultima.content; ajustarAltura(); }
+  });
   $txt.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $form.requestSubmit(); } });
   $form.addEventListener('submit', (e) => { e.preventDefault(); enviar($txt.value); });
   $msgs.addEventListener('click', (e) => {
