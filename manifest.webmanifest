@@ -1,0 +1,55 @@
+{
+  "name": "SAMP - Sistema de Acompanhamento e Métricas Processuais",
+  "short_name": "SAMP",
+  "description": "Acompanhamento de processos, metas processuais e produção individual.",
+  "lang": "pt-BR",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f2f4f7",
+  "theme_color": "#0c2540",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Análise de Processos",
+      "short_name": "Análise",
+      "url": "analise.html"
+    },
+    {
+      "name": "Metas Processuais",
+      "short_name": "Metas",
+      "url": "metricas.html"
+    },
+    {
+      "name": "Produção Individual",
+      "short_name": "Produção",
+      "url": "producao.html"
+    }
+  ]
+}

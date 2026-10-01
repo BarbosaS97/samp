@@ -813,3 +813,21 @@ dialog.tn2-dlg { margin: auto; }
 @keyframes sp-frase-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes sp-corre { 0% { transform: translateX(-110%); } 100% { transform: translateX(290%); } }
 @media (prefers-reduced-motion: reduce) { .sp-bar i { animation: none; } .sp-frase.on { animation: none; opacity: 1; } }
+
+/* Barra de navegação: aba ativa em arco (curva dourada que envolve o item e desliza entre as abas) */
+.app-bar nav { position: relative; align-self: stretch; align-items: stretch; gap: 14px; }
+.app-bar nav a { position: relative; z-index: 1; display: inline-flex; align-items: center; padding: 0 16px !important; min-height: 46px; margin-bottom: 0 !important; border-bottom: 0 !important; border-radius: 0; transition: color .2s, transform .25s; }
+.app-bar nav a:hover { background: transparent !important; color: #fff; }
+.app-bar nav a:not(.active):hover { transform: translateY(-1px); }
+.app-bar nav a.active { color: #fff; font-weight: 600; text-shadow: 0 0 10px rgba(166,138,78,.55); }
+.app-bar nav .user, .app-bar nav .logout { align-self: center; position: relative; z-index: 1; }
+.nav-bump { position: absolute; top: auto; pointer-events: none; z-index: 0; overflow: visible; }
+.nav-bump .nb-base { fill: var(--navy-dark); }
+.nav-bump .nb-glow { fill: url(#nbG); }
+.nav-bump .nb-line { fill: none; stroke: var(--gold); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px rgba(166,138,78,.7)); }
+@media (max-width: 720px) { .app-bar nav a { padding: 0 12px !important; min-height: 42px; } }
+@media (max-width: 720px) { .app-bar nav { scrollbar-width: none; } .app-bar nav::-webkit-scrollbar { display: none; } }
+
+/* marca com ícone na barra superior */
+.app-bar .brand { display: inline-flex; align-items: center; gap: 10px; }
+.app-bar .brand-ico { width: 28px; height: 28px; border-radius: 7px; box-shadow: 0 0 0 1px rgba(255,255,255,.14); flex: none; }

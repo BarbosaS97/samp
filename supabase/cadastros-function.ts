@@ -22,7 +22,7 @@ function igual(a: string, b: string) {
 }
 
 const CAMPOS = ["recebidos", "calculados", "acervo", "tempo"];
-const TABELAS = ["processos", "configuracoes", "config_periodos", "dados_processos", "processos_fotos", "processos_fotos_assuntos", "producao_resumo"];
+const TABELAS = ["processos", "configuracoes", "config_periodos", "dados_processos", "processos_fotos", "processos_fotos_assuntos", "producao_resumo", "producao_calendario", "producao_apelidos"];
 const SESSAO_MS = 8 * 60 * 60 * 1000; // 8 horas
 const nums = (v: unknown, n: number) =>
   Array.isArray(v) && v.length === n && v.every((x) => typeof x === "number" && isFinite(x));
@@ -400,6 +400,35 @@ async function recalcularPessoa(db: any, pessoa: string, arquivo?: string | null
   if (error) throw new Error(error.message);
   return r.total;
 }
+
+/* ---------- calendário de ausências (planilha CALENDÁRIO SECAJ) ---------- */
+// categorias: f férias, l licença (inclui licença saúde, sempre mostrada de forma genérica), t treinamento/licença capacitação,
+// x falta, r recesso/eleitoral. Textos de observação que revelem motivo de saúde ou questões disciplinares viram só "Ausência".
+const CAT_CAL = ["f", "l", "t", "x", "r"];
+const NOTA_SENSIVEL = /atestado|sa[uú]de|m[eé]dic|doen[cç]a|cirurg|exame|\bcid\b|falta injustificada|d[eé]bito|advert|disciplin|puni[cç]/i;
+function limparCalendario(d: any) {
+  const out: Record<string, any> = {};
+  const m = d?.m && typeof d.m === "object" ? d.m : {};
+  const n = (x: unknown) => { const t = Math.round(Number(x)); return Number.isFinite(t) && t >= 0 && t <= 31 ? t : 0; };
+  for (const [k, v] of Object.entries<any>(m)) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(k) || !v || typeof v !== "object") continue;
+    const item: any = { u: n(v.u), f: n(v.f), l: n(v.l), t: n(v.t), x: n(v.x), r: n(v.r), p: [], n: [] };
+    for (const p of Array.isArray(v.p) ? v.p.slice(0, 20) : []) {
+      if (Array.isArray(p) && CAT_CAL.includes(p[0]) && ISO.test(String(p[1])) && ISO.test(String(p[2]))) item.p.push([p[0], p[1], p[2], n(p[3])]);
+    }
+    for (const x of Array.isArray(v.n) ? v.n.slice(0, 10) : []) {
+      if (!Array.isArray(x)) continue;
+      const dia = n(x[0]);
+      let t = String(x[1] ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+      if (NOTA_SENSIVEL.test(t)) t = "Ausência";
+      if (dia >= 1 && t) item.n.push([dia, t]);
+    }
+    if (item.u || item.f || item.l || item.t || item.x || item.r || item.p.length || item.n.length) out[k] = item;
+  }
+  return out;
+}
+const chaveNomeCal = (x: unknown) =>
+  String(x ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 80);
 const nomePessoa = (x: unknown) => String(x ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
 
 Deno.serve(async (req) => {
@@ -758,6 +787,43 @@ Deno.serve(async (req) => {
         return json({ ok: true, pessoas: n });
       }
 
+      case "calendario_salvar": {   // substitui o calendário de ausências inteiro (e guarda a correspondência de nomes)
+        const pessoas = Array.isArray(b.pessoas) ? b.pessoas.slice(0, 80) : [];
+        if (!pessoas.length) return json({ error: "Nenhuma pessoa com dados no calendário" }, 400);
+        const { data: existentes, error: eR } = await db.from("producao_resumo").select("pessoa");
+        if (eR) return falha(eR);
+        const validas = new Set((existentes ?? []).map((x: any) => x.pessoa));
+        const arquivo = String(b.arquivo ?? "").slice(0, 200) || null;
+        const linhas: any[] = [];
+        for (const p of pessoas) {
+          const nome = nomePessoa(p?.pessoa);
+          if (!validas.has(nome)) continue;   // só pessoas que já têm produção importada
+          const m = limparCalendario(p?.dados);
+          if (!Object.keys(m).length) continue;
+          linhas.push({ pessoa: nome, dados: { m }, arquivo, atualizado_em: new Date().toISOString() });
+        }
+        if (!linhas.length) return json({ error: "Nenhuma pessoa do calendário corresponde a uma pessoa da produção importada" }, 400);
+        const { error: eU } = await db.from("producao_calendario").upsert(linhas, { onConflict: "pessoa" });
+        if (eU) return falha(eU);
+        const novas = new Set(linhas.map((l) => l.pessoa));
+        const { data: antigas, error: eA } = await db.from("producao_calendario").select("pessoa");
+        if (eA) return falha(eA);
+        for (const a of antigas ?? []) if (!novas.has(a.pessoa)) await db.from("producao_calendario").delete().eq("pessoa", a.pessoa);
+        // correspondência de nomes (substitui a anterior)
+        const apelidos = (Array.isArray(b.apelidos) ? b.apelidos.slice(0, 300) : []).map((a: any) => ({
+          chave: chaveNomeCal(a?.nome), nome: String(a?.nome ?? "").trim().slice(0, 80), pessoa: validas.has(nomePessoa(a?.pessoa)) ? nomePessoa(a?.pessoa) : null,
+        })).filter((a: any) => a.chave);
+        await db.from("producao_apelidos").delete().neq("chave", "");
+        if (apelidos.length) { const { error: eP } = await db.from("producao_apelidos").insert(apelidos); if (eP) return falha(eP); }
+        return json({ ok: true, pessoas: linhas.length });
+      }
+
+      case "calendario_excluir": {
+        const { error: e1 } = await db.from("producao_calendario").delete().neq("pessoa", "");
+        if (e1) return falha(e1);
+        return json({ ok: true });
+      }
+
       case "producao_excluir_pessoa": {
         const pessoa = nomePessoa(b.pessoa);
         if (!pessoa) return json({ error: "Pessoa inválida" }, 400);
@@ -765,6 +831,7 @@ Deno.serve(async (req) => {
         if (e1) return falha(e1);
         const { error: e2 } = await db.from("producao_resumo").delete().eq("pessoa", pessoa);
         if (e2) return falha(e2);
+        await db.from("producao_calendario").delete().eq("pessoa", pessoa);
         return json({ ok: true });
       }
 

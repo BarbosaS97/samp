@@ -613,6 +613,40 @@ function periodoProd(a: any) {
   if (MES_RX.test(a.mes_final ?? "")) fim = Math.min(fim, ymProd(+a.mes_final.slice(0, 4), +a.mes_final.slice(5)));
   return { ini, fim };
 }
+
+// Calendário de ausências (planilha CALENDÁRIO SECAJ): por pessoa e mês, dias úteis e dias úteis de férias (f), licença (l, inclui
+// licença médica, sempre tratada de forma genérica), treinamento/licença (t), falta (x) e recesso/eleitoral (r).
+async function carregarCalendario(db: any, matricula: string, ps: PessoaProd[]): Promise<Map<string, any>> {
+  const out = new Map<string, any>();
+  try {
+    const { data, error } = await db.from("producao_calendario").select("pessoa,dados");
+    if (error) return out;
+    const visiveis = new Set(ps.map((p) => p.pessoa));
+    for (const x of data ?? []) if (visiveis.has(x.pessoa) && podeVerProducao(matricula, x.pessoa) && x.dados?.m) out.set(x.pessoa, x.dados.m);
+  } catch { /* sem calendário */ }
+  return out;
+}
+// meses do calendário de uma pessoa dentro do intervalo pedido e entre o primeiro e o último lançamento dela
+function mesesCal(p: PessoaProd, cal: Map<string, any>, ini: number, fim: number, descontaTrein: boolean) {
+  const c = cal.get(p.pessoa);
+  if (!c || !p.primeira) return [];
+  const k0 = ymProd(+p.primeira.slice(0, 4), +p.primeira.slice(5, 7)), k1 = ymProd(+p.ultima.slice(0, 4), +p.ultima.slice(5, 7));
+  const prod = new Map<number, number>();
+  for (const x of p.m) { const k = ymProd(x[0], x[1]); prod.set(k, (prod.get(k) ?? 0) + x[5]); }
+  const lista: any[] = [];
+  for (const [chave, it] of Object.entries<any>(c)) {
+    const k = ymProd(+chave.slice(0, 4), +chave.slice(5, 7));
+    if (k < Math.max(k0, ini) || k > Math.min(k1, fim)) continue;
+    const marc = it.f + it.l + it.t + it.x + it.r, aus = it.f + it.l + it.x + it.r + (descontaTrein ? it.t : 0);
+    lista.push({ k, u: it.u, marc, aus, disp: Math.max(0, it.u - aus), f: it.f, l: it.l, t: it.t, x: it.x, r: it.r, prod: prod.get(k) ?? 0, per: it.p ?? [] });
+  }
+  return lista;
+}
+function somaCal(meses: any[]) {
+  const a = { u: 0, marc: 0, aus: 0, disp: 0, f: 0, l: 0, t: 0, x: 0, r: 0, prod: 0 };
+  for (const m of meses) for (const c of Object.keys(a) as (keyof typeof a)[]) a[c] += m[c];
+  return a;
+}
 function acharPessoasProd(ps: PessoaProd[], termo: unknown): { lista: PessoaProd[]; setor: boolean; erro?: any } {
   const t = norm(String(termo ?? "")).trim();
   if (!t || /^(setor|todos|todas|geral|secaj|equipe)$/.test(t)) return { lista: ps, setor: true };
@@ -635,8 +669,10 @@ function agregarProd(lista: PessoaProd[], ini: number, fim: number) {
   }
   return o;
 }
+const NOME_CAT: Record<string, string> = { f: "Férias", l: "Licença", t: "Treinamento/licença", x: "Falta", r: "Recesso/eleitoral" };
+const AVISO_AUS = "Ausências vêm do calendário (dias úteis). Licença médica aparece só como licença. Dias disponíveis = dias úteis menos ausências; treinamento/licença NÃO é descontado, a menos que descontar_treinamento seja true. O calendário não registra meio período.";
 const totMes = (a?: number[]) => (a ? a[0] + a[1] + a[2] : 0);
-function calcProducao(a: any, ps: PessoaProd[]): any {
+function calcProducao(a: any, ps: PessoaProd[], cal: Map<string, any> = new Map()): any {
   if (!ps.length) return { erro: "Nenhuma produção foi importada ainda (Cadastros > Produção Individual)." };
   const alvo = acharPessoasProd(ps, a.pessoa);
   if (alvo.erro) return alvo.erro;
@@ -648,6 +684,8 @@ function calcProducao(a: any, ps: PessoaProd[]): any {
     observacao: "Dados das planilhas individuais, só meses fechados. Meta e acervo vêm da coluna TIPO preenchida nas planilhas; o que está em branco aparece como sem classificação." };
   const ag = agregarProd(alvo.lista, ini, fim);
   const ks = [...ag.porMes.keys()].sort((x, y) => x - y);
+  const descontaT = a.descontar_treinamento === true;
+  const calMeses = (lista: PessoaProd[]) => lista.flatMap((p) => mesesCal(p, cal, ini, fim, descontaT));
 
   if (visao === "pessoas") {
     return { ...base, pessoas: ps.map((p) => ({ pessoa: p.pessoa, processos: p.total, primeiro_lancamento: p.primeira, ultimo_lancamento: p.ultima })) };
@@ -656,14 +694,27 @@ function calcProducao(a: any, ps: PessoaProd[]): any {
     const ult = ultimoGeral ? ymProd(+ultimoGeral.slice(0, 4), +ultimoGeral.slice(5, 7)) : 0;
     const linhas = ps.map((p) => {
       const x = agregarProd([p], ini, fim), cl = x.meta + x.acervo, n = x.porMes.size;
-      return { pessoa: p.pessoa, processos: x.total, media_mensal: n ? r1(x.total / n) : 0, meses_com_producao: n, ultimo_mes: totMes(x.porMes.get(ult)), pct_meta: cl ? r1((x.meta / cl) * 100) : null, prioritarios: x.sim + x.p60 + x.legal, tempo_medio_dias: x.nd ? Math.round(x.soma / x.nd) : null };
+      const cm = somaCal(calMeses([p]));
+      return { pessoa: p.pessoa, processos: x.total, media_mensal: n ? r1(x.total / n) : 0, meses_com_producao: n, ultimo_mes: totMes(x.porMes.get(ult)), pct_meta: cl ? r1((x.meta / cl) * 100) : null, prioritarios: x.sim + x.p60 + x.legal, tempo_medio_dias: x.nd ? Math.round(x.soma / x.nd) : null,
+        ...(cal.has(p.pessoa) ? { dias_uteis_de_ausencia: cm.marc, producao_por_dia_disponivel: cm.disp > 0 ? r1(cm.prod / cm.disp) : null } : {}) };
     }).filter((x) => x.processos > 0).sort((x, y) => y.processos - x.processos);
     return { ...base, escopo: "Ranking por pessoa", mes_do_ultimo: rotYM(ult), total_pessoas: linhas.length, total_setor: linhas.reduce((t, x) => t + x.processos, 0), ranking: linhas.slice(0, top),
       aviso: "Compare com cautela: a produção depende do tipo e da complexidade dos processos, do tempo de cada pessoa na seção e de afastamentos. Média mensal considera só os meses em que a pessoa produziu." };
   }
   if (visao === "mensal") {
     const cheio: number[] = []; if (ks.length) for (let k = ks[0]; k <= ks[ks.length - 1]; k++) cheio.push(k);
-    return { ...base, meses: cheio.slice(-120).map((k) => { const v = ag.porMes.get(k) ?? [0, 0, 0]; return { mes: isoYM(k), total: totMes(v), meta: v[0], acervo: v[1], sem_classificacao: v[2] }; }) };
+    const cm = new Map<number, any>();
+    for (const m of calMeses(alvo.lista)) {
+      const o = cm.get(m.k) ?? { u: 0, marc: 0, disp: 0, prod: 0, f: 0, l: 0, t: 0, x: 0, r: 0, per: [] as any[] };
+      for (const c of ["u", "marc", "disp", "prod", "f", "l", "t", "x", "r"]) o[c] += m[c];
+      if (!alvo.setor) for (const q of m.per) if (q[3] > 0) o.per.push(`${NOME_CAT[q[0]]} ${q[1].slice(8)}/${q[1].slice(5, 7)}${q[1] !== q[2] ? " a " + q[2].slice(8) + "/" + q[2].slice(5, 7) : ""}`);
+      cm.set(m.k, o);
+    }
+    return { ...base, ...(cm.size ? { aviso_ausencias: AVISO_AUS } : {}), meses: cheio.slice(-120).map((k) => {
+      const v = ag.porMes.get(k) ?? [0, 0, 0], o = cm.get(k);
+      return { mes: isoYM(k), total: totMes(v), meta: v[0], acervo: v[1], sem_classificacao: v[2],
+        ...(o ? { dias_uteis: o.u, dias_uteis_de_ausencia: o.marc, ferias: o.f, licenca: o.l, treinamento_licenca: o.t, falta: o.x, recesso: o.r, dias_disponiveis: o.disp, producao_por_dia_disponivel: o.disp > 0 && o.prod ? r1(o.prod / o.disp) : null, ...(o.per.length ? { periodos: o.per.slice(0, 5) } : {}) } : {}) };
+    }) };
   }
   if (visao === "anos") {
     const por = new Map<number, number[]>();
@@ -699,20 +750,29 @@ function calcProducao(a: any, ps: PessoaProd[]): any {
     ultimo_mes: ult === null ? null : { mes: isoYM(ult), processos: ultQtd, variacao_vs_media_pct: media ? r1(((ultQtd - media) / media) * 100) : null },
     meta: ag.meta, acervo: ag.acervo, sem_classificacao: ag.nc, pct_meta_entre_classificados: cl ? r1((ag.meta / cl) * 100) : null,
     prioritarios: { prioridade_sim: ag.sim, acima_de_60_dias: ag.p60, prioridade_legal: ag.legal }, tempo_medio_do_recebimento_ao_calculo_dias: ag.nd ? Math.round(ag.soma / ag.nd) : null, lancamentos_em_hora_extra: ag.he,
+    ...(() => {
+      const ms = calMeses(alvo.lista);
+      if (!ms.length) return {};
+      const c = somaCal(ms), pes = new Set(alvo.lista.filter((p) => cal.has(p.pessoa)).map((p) => p.pessoa));
+      return { ausencias: { pessoas_com_calendario: pes.size, meses_considerados: new Set(ms.map((m) => m.k)).size, dias_uteis: c.u, dias_uteis_de_ausencia: c.marc, ferias: c.f, licenca: c.l, treinamento_licenca: c.t, falta: c.x, recesso_eleitoral: c.r,
+        dias_disponiveis: c.disp, producao_por_dia_util: c.u ? r1(c.prod / c.u) : null, producao_por_dia_disponivel: c.disp > 0 ? r1(c.prod / c.disp) : null, aviso: AVISO_AUS } };
+    })(),
     ...(alvo.setor ? { pessoas_com_producao: alvo.lista.filter((p) => agregarProd([p], ini, fim).total > 0).length } : { processos_refeitos: alvo.lista[0].r?.refeitos ?? 0, primeiro_lancamento: alvo.lista[0].primeira, ultimo_lancamento: alvo.lista[0].ultima }) };
 }
 async function consultarProducao(a: any, db: any, ctx?: Ctx) {
-  return calcProducao(a, await carregarProducao(db, ctx?.matricula ?? ""));
+  const ps = await carregarProducao(db, ctx?.matricula ?? "");
+  return calcProducao(a, ps, await carregarCalendario(db, ctx?.matricula ?? "", ps));
 }
 
 // seções de relatório da Produção Individual (kpis, tabelas e gráficos), com números calculados pelo servidor
 async function secaoProducao(sec: any, db: any, ctx: Ctx | undefined, ehGrafico: boolean, kpis: boolean): Promise<any> {
   const ps = await carregarProducao(db, ctx?.matricula ?? "");
+  const cal = await carregarCalendario(db, ctx?.matricula ?? "", ps);
   const pedido = { pessoa: sec.pessoa, ano: sec.ano, mes_inicial: sec.mes_inicial, mes_final: sec.mes_final, top: sec.top };
   const fonte = String(sec.fonte);
   const escopo = (r: any) => String(r.escopo ?? "");
   if (kpis || fonte === "producao_resumo") {
-    const r = calcProducao({ ...pedido, visao: "resumo" }, ps);
+    const r = calcProducao({ ...pedido, visao: "resumo" }, ps, cal);
     if (r.erro) return { aviso: r.erro };
     return { tipo: "kpis", titulo: sec.titulo ?? `Produção: ${escopo(r)}`, itens: [
       { rotulo: "Processos no período", valor: fmtN(r.total_processos) }, { rotulo: "Média mensal", valor: fmtN(r.media_mensal) },
@@ -722,32 +782,37 @@ async function secaoProducao(sec: any, db: any, ctx: Ctx | undefined, ehGrafico:
       { rotulo: "Prioritários", valor: fmtN(r.prioritarios.prioridade_sim + r.prioritarios.acima_de_60_dias + r.prioritarios.prioridade_legal) },
       { rotulo: "Tempo médio até calcular (dias)", valor: r.tempo_medio_do_recebimento_ao_calculo_dias === null ? "-" : fmtN(r.tempo_medio_do_recebimento_ao_calculo_dias) },
       { rotulo: "Hora extra (lançamentos)", valor: fmtN(r.lancamentos_em_hora_extra) },
+      ...(r.ausencias ? [{ rotulo: "Dias úteis de ausência", valor: fmtN(r.ausencias.dias_uteis_de_ausencia) }, { rotulo: "Produção por dia disponível", valor: r.ausencias.producao_por_dia_disponivel === null ? "-" : fmtN(r.ausencias.producao_por_dia_disponivel) }] : []),
     ] };
   }
   if (fonte === "producao_mensal") {
-    const r = calcProducao({ ...pedido, visao: "mensal" }, ps);
+    const r = calcProducao({ ...pedido, visao: "mensal" }, ps, cal);
     if (r.erro) return { aviso: r.erro };
     if (ehGrafico) return { tipo: "grafico", grafico: sec.tipo_grafico ?? "barras", titulo: sec.titulo ?? `Produção mensal: ${escopo(r)}`, rotulos: r.meses.map((x: any) => rotulo(x.mes)),
       series: [{ nome: "Meta", dados: r.meses.map((x: any) => x.meta) }, { nome: "Acervo", dados: r.meses.map((x: any) => x.acervo) }, { nome: "Sem classificação", dados: r.meses.map((x: any) => x.sem_classificacao) }] };
-    return { tipo: "tabela", titulo: sec.titulo ?? `Produção mensal: ${escopo(r)}`, colunas: ["Mês", "Total", "Meta", "Acervo", "Sem classificação"],
-      linhas: r.meses.map((x: any) => [rotulo(x.mes), fmtN(x.total), fmtN(x.meta), fmtN(x.acervo), fmtN(x.sem_classificacao)]).slice(0, 200), nota: r.observacao };
+    const comCal = r.meses.some((x: any) => x.dias_uteis !== undefined);
+    return { tipo: "tabela", titulo: sec.titulo ?? `Produção mensal: ${escopo(r)}`, colunas: ["Mês", "Total", "Meta", "Acervo", "Sem classificação", ...(comCal ? ["Dias úteis de ausência", "Por dia disponível"] : [])],
+      linhas: r.meses.map((x: any) => [rotulo(x.mes), fmtN(x.total), fmtN(x.meta), fmtN(x.acervo), fmtN(x.sem_classificacao), ...(comCal ? [x.dias_uteis === undefined ? "-" : fmtN(x.dias_uteis_de_ausencia), x.producao_por_dia_disponivel == null ? "-" : fmtN(x.producao_por_dia_disponivel)] : [])]).slice(0, 200),
+      nota: r.observacao + (comCal ? " " + AVISO_AUS : "") };
   }
   if (fonte === "producao_ranking") {
-    const r = calcProducao({ ...pedido, visao: "ranking" }, ps);
+    const r = calcProducao({ ...pedido, visao: "ranking" }, ps, cal);
     if (r.erro) return { aviso: r.erro };
     if (ehGrafico) return { tipo: "grafico", grafico: sec.tipo_grafico ?? "barras_horizontais", titulo: sec.titulo ?? "Produção por pessoa", rotulos: r.ranking.map((x: any) => cortar(x.pessoa, 40)), series: [{ nome: "Processos", dados: r.ranking.map((x: any) => x.processos) }] };
-    return { tipo: "tabela", titulo: sec.titulo ?? "Produção por pessoa", colunas: ["Pessoa", "Processos", "Média/mês", `Último mês (${r.mes_do_ultimo})`, "% meta", "Prioritários", "Tempo médio (dias)"],
-      linhas: r.ranking.map((x: any) => [x.pessoa, fmtN(x.processos), fmtN(x.media_mensal), fmtN(x.ultimo_mes), x.pct_meta === null ? "-" : fmtN(x.pct_meta) + "%", fmtN(x.prioritarios), x.tempo_medio_dias === null ? "-" : fmtN(x.tempo_medio_dias)]),
-      nota: r.aviso };
+    const comCal = r.ranking.some((x: any) => x.dias_uteis_de_ausencia !== undefined);
+    return { tipo: "tabela", titulo: sec.titulo ?? "Produção por pessoa", colunas: ["Pessoa", "Processos", "Média/mês", `Último mês (${r.mes_do_ultimo})`, "% meta", "Prioritários", "Tempo médio (dias)", ...(comCal ? ["Dias úteis de ausência", "Por dia disponível"] : [])],
+      linhas: r.ranking.map((x: any) => [x.pessoa, fmtN(x.processos), fmtN(x.media_mensal), fmtN(x.ultimo_mes), x.pct_meta === null ? "-" : fmtN(x.pct_meta) + "%", fmtN(x.prioritarios), x.tempo_medio_dias === null ? "-" : fmtN(x.tempo_medio_dias),
+        ...(comCal ? [x.dias_uteis_de_ausencia === undefined ? "-" : fmtN(x.dias_uteis_de_ausencia), x.producao_por_dia_disponivel == null ? "-" : fmtN(x.producao_por_dia_disponivel)] : [])]),
+      nota: r.aviso + (comCal ? " " + AVISO_AUS : "") };
   }
   if (fonte === "producao_assuntos") {
-    const r = calcProducao({ ...pedido, visao: "assuntos", top: sec.top ?? 10 }, ps);
+    const r = calcProducao({ ...pedido, visao: "assuntos", top: sec.top ?? 10 }, ps, cal);
     if (r.erro) return { aviso: r.erro };
     if (ehGrafico) return { tipo: "grafico", grafico: sec.tipo_grafico ?? "barras_horizontais", titulo: sec.titulo ?? `Assuntos mais calculados: ${escopo(r)}`, rotulos: r.assuntos.map((x: any) => cortar(x.assunto, 45)), series: [{ nome: "Processos", dados: r.assuntos.map((x: any) => x.processos) }] };
     return { tipo: "tabela", titulo: sec.titulo ?? `Assuntos mais calculados: ${escopo(r)}`, colunas: ["Assunto", "Processos", "% do total"], linhas: r.assuntos.map((x: any) => [x.assunto, fmtN(x.processos), fmtN(x.pct) + "%"]), nota: r.aviso };
   }
   if (fonte === "producao_anos") {
-    const r = calcProducao({ ...pedido, visao: "anos" }, ps);
+    const r = calcProducao({ ...pedido, visao: "anos" }, ps, cal);
     if (r.erro) return { aviso: r.erro };
     if (ehGrafico) return { tipo: "grafico", grafico: sec.tipo_grafico ?? "linha", titulo: sec.titulo ?? `Comparação entre os anos: ${escopo(r)}`, rotulos: MESES, series: r.anos.map((x: any) => ({ nome: String(x.ano), dados: x.por_mes })) };
     return { tipo: "tabela", titulo: sec.titulo ?? `Produção por ano: ${escopo(r)}`, colunas: ["Ano", ...MESES, "Total"], linhas: r.anos.map((x: any) => [String(x.ano), ...x.por_mes.map((v: number) => fmtN(v)), fmtN(x.total)]), nota: r.observacao };
@@ -775,7 +840,7 @@ const TOOLS = [
   { type: "function", function: { name: "listar_periodos", description: "Lista os períodos de metas processuais cadastrados.", parameters: { type: "object", properties: {} } } },
   { type: "function", function: { name: "consultar_metricas", description: "Metas processuais mês a mês (recebidos, calculados, acervo, tempo de permanência) das Varas Comuns, do JEF ou do Geral consolidado, com estatísticas calculadas (média, máximo, mínimo, variação, últimos 3 meses). Sem periodo_id usa o mais recente.", parameters: { type: "object", properties: { periodo_id: { type: "number" }, aba: { type: "string", enum: ["varas", "jef", "geral"] }, campos: { type: "array", items: { type: "string", enum: ["recebidos", "calculados", "acervo", "tempo"] } }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" } }, required: ["aba"] } } },
   { type: "function", function: { name: "consultar_tendencia", description: "Perfil de chegada e envelhecimento por assunto (aba Tendência): idade mediana, percentil 90, % acima do prazo, % chegado nos últimos 30 dias e situação (Acervo velho, Chegada alta, Acervo velho e chegada alta, Normal, Poucos processos), comparados com o conjunto. Com \"assunto\" devolve também o detalhe (faixas de idade e chegada por mês). Com incluir_historico traz o acervo, as entradas e as saídas reais registrados a cada importação (existe a partir da 2ª importação). Use para perguntas sobre retenção, pressão, sobrecarga, assuntos que estão envelhecendo ou crescendo.", parameters: { type: "object", properties: { escopo: { type: "string", enum: ["todos", "comum", "jef"], description: "todas as varas, varas comuns (1-22) ou JEF (23-27)" }, assunto: { type: "string", description: "trecho do assunto (opcional); devolve o detalhe do primeiro encontrado" }, ordenar: { type: "string", enum: ["pressao", "retencao", "total", "atencao"] }, top: { type: "number", description: "quantos assuntos listar (máx. 40)" }, detalhe: { type: "boolean", description: "inclui o detalhe do primeiro assunto da lista" }, incluir_historico: { type: "boolean" } } } } },
-  { type: "function", function: { name: "consultar_producao", description: "Produção Individual: processos calculados por pessoa ou pelo setor, a partir das planilhas de produção (só meses fechados). Informe pessoa (nome ou trecho) para uma pessoa; omita para o setor inteiro. visao: resumo (total, média mensal, melhor mês, último mês, meta/acervo, prioritários, tempo até calcular, hora extra), mensal (série mês a mês), ranking (por pessoa), assuntos (assuntos agrupados), dia_semana, anos (comparação entre anos) ou pessoas (quem tem produção importada). Aceita ano ou mes_inicial/mes_final (AAAA-MM). Use para qualquer pergunta sobre produção, quanto alguém calculou, quem produziu mais, evolução, comparação de períodos e assuntos mais calculados por pessoa.", parameters: { type: "object", properties: { pessoa: { type: "string", description: "nome ou trecho do nome; vazio ou setor para todos" }, visao: { type: "string", enum: ["resumo", "mensal", "ranking", "assuntos", "dia_semana", "anos", "pessoas"] }, ano: { type: "number" }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" }, top: { type: "number", description: "máx. 40" } } } } },
+  { type: "function", function: { name: "consultar_producao", description: "Produção Individual: processos calculados por pessoa ou pelo setor, a partir das planilhas de produção (só meses fechados). Informe pessoa (nome ou trecho) para uma pessoa; omita para o setor inteiro. visao: resumo (total, média mensal, melhor mês, último mês, meta/acervo, prioritários, tempo até calcular, hora extra), mensal (série mês a mês), ranking (por pessoa), assuntos (assuntos agrupados), dia_semana, anos (comparação entre anos) ou pessoas (quem tem produção importada). Aceita ano ou mes_inicial/mes_final (AAAA-MM). Quando há calendário de ausências, traz também dias úteis de ausência (férias, licença, treinamento/licença, falta, recesso) e a produção por dia disponível. Use para qualquer pergunta sobre produção, ausências e férias de quem produziu menos num mês, quanto alguém calculou, quem produziu mais, evolução, comparação de períodos e assuntos mais calculados por pessoa.", parameters: { type: "object", properties: { pessoa: { type: "string", description: "nome ou trecho do nome; vazio ou setor para todos" }, visao: { type: "string", enum: ["resumo", "mensal", "ranking", "assuntos", "dia_semana", "anos", "pessoas"] }, ano: { type: "number" }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" }, top: { type: "number", description: "máx. 40" }, descontar_treinamento: { type: "boolean", description: "descontar treinamento/licença capacitação dos dias disponíveis (padrão: não)" } } } } },
   { type: "function", function: { name: "gerar_relatorio", description: "Monta um relatório (PDF no navegador do usuário, e tabelas em CSV) a partir de seções. O SERVIDOR preenche tabelas, gráficos e indicadores com dados reais; você escreve apenas as seções de texto. Use para qualquer pedido de PDF, relatório, resumo para imprimir, planilha ou exportação, e chame-a DE NOVO a cada novo pedido (cada chamada gera um novo arquivo). Inclua APENAS o que o usuário pediu (normalmente 3 a 6 seções); não amplie o escopo por conta própria.", parameters: { type: "object", properties: { titulo: { type: "string" }, subtitulo: { type: "string" }, interpretacao: { type: "string", description: "1 ou 2 frases dizendo exatamente o que você entendeu que o usuário pediu (aba, período, campos, filtros). É mostrada ao usuário para conferência." }, orientacao: { type: "string", enum: ["retrato", "paisagem"], description: "paisagem para tabelas largas (como a lista de processos)" }, secoes: { type: "array", maxItems: 15, items: { type: "object", properties: { tipo: { type: "string", enum: ["texto", "kpis", "tabela", "grafico"] }, titulo: { type: "string" }, conteudo: { type: "string", description: "só para tipo texto" }, fonte: { type: "string", enum: ["base", "processos", "agrupamento", "combinacoes", "situacao_prazos", "metricas", "tendencia", "tendencia_faixas", "tendencia_chegada", "historico", "producao_resumo", "producao_mensal", "producao_ranking", "producao_assuntos", "producao_anos"], description: "producao_resumo: kpis da Produção Individual; producao_mensal: série mês a mês (gráfico ou tabela); producao_ranking: por pessoa (tabela ou gráfico); producao_assuntos: assuntos agrupados; producao_anos: comparação entre anos (todas aceitam pessoa, ano, mes_inicial, mes_final, top; sem pessoa = setor). base: kpis da base; processos: lista (tabela); agrupamento: ranking por campo (tabela ou gráfico); combinacoes: tabela; situacao_prazos: gráfico; metricas: kpis, tabela ou gráfico mensal; tendencia: tabela de perfil de chegada/envelhecimento por assunto (use escopo e ordenar_tendencia); tendencia_faixas e tendencia_chegada: gráficos de UM assunto (campo assunto); historico: gráfico de acervo/entradas/saídas das importações (assunto opcional)" }, tipo_grafico: { type: "string", enum: ["barras", "barras_horizontais", "linha", "pizza"] }, campo: CAMPOS_ENUM, campos: { type: "array", items: { type: "string" }, description: "para combinacoes: campos de agrupamento; para metricas: recebidos/calculados/acervo/tempo" }, filtros: { type: "object", properties: FILTROS }, ordenar_por: { type: "string", enum: ["dias_desc", "dias_asc"] }, limite: { type: "number", description: "linhas (processos, máx. 200)" }, top: { type: "number" }, min_qtd: { type: "number" }, amostra: { type: "number" }, aba: { type: "string", enum: ["varas", "jef", "geral"] }, assunto: { type: "string", description: "nome (ou trecho) do assunto, para as fontes de tendência/histórico" }, pessoa: { type: "string", description: "nome da pessoa (fontes producao_*); vazio = setor" }, ano: { type: "number", description: "ano (fontes producao_*)" }, escopo: { type: "string", enum: ["todos", "comum", "jef"] }, ordenar_tendencia: { type: "string", enum: ["pressao", "retencao", "total", "atencao"] }, periodo_id: { type: "number" }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" } }, required: ["tipo"] } } }, required: ["titulo", "interpretacao", "secoes"] } } },
   { type: "function", function: { name: "perguntar_usuario", description: "Faz UMA pergunta de esclarecimento ao usuário ANTES de consultar ou gerar algo, quando o pedido admite mais de uma interpretação plausível que levaria a resultados diferentes e nem o histórico nem a tela resolvem. Encerra o seu turno: não escreva mais nada depois de chamá-la.", parameters: { type: "object", properties: { pergunta: { type: "string", description: "pergunta curta e objetiva" }, opcoes: { type: "array", items: { type: "string" }, description: "de 2 a 4 respostas possíveis, curtas, escritas como o usuário responderia" } }, required: ["pergunta", "opcoes"] } } },
   { type: "function", function: { name: "acao_interface", description: "Executa uma ação de navegação/visualização no SAMP do usuário (nunca altera dados). Use apenas quando o usuário pedir para abrir, ir, filtrar ou buscar.", parameters: { type: "object", properties: { acao: { type: "string", enum: ["abrir_modulo", "analise_aba", "analise_buscar", "metricas_filtrar", "metricas_limpar_filtro", "tendencia_assunto", "tendencia_modo", "producao_filtrar"] }, modulo: { type: "string", enum: ["inicio", "analise", "metricas", "producao"] }, ano: { type: "number", description: "ano para producao_filtrar (opcional)" }, aba: { type: "string", enum: ["assuntos", "poloPassivo", "advogadoAtivo", "analises", "tendencia"] }, texto: { type: "string", description: "termo da busca (analise_buscar), nome do assunto (tendencia_assunto) ou nome da pessoa (producao_filtrar; vazio ou setor = visão do setor)" }, modo: { type: "string", enum: ["mes", "faixa"], description: "eixo do mapa de calor (tendencia_modo)" }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" } }, required: ["acao"] } } },
@@ -796,7 +861,7 @@ COMO VOCÊ TRABALHA (nesta ordem)
 2) PERGUNTAR QUANDO HOUVER DÚVIDA REAL. Se o pedido admite interpretações que levariam a resultados bem diferentes e nem o histórico nem a tela resolvem (qual aba, vara, período, campo, assunto ou advogado; "faça um relatório" sem dizer de quê; "últimos meses" sem número; um nome que corresponde a vários advogados ou assuntos), chame perguntar_usuario ANTES de consultar ou gerar, com uma pergunta curta e de 2 a 4 opções. Uma pergunta por vez. NÃO pergunte o que dá para deduzir ou tem padrão razoável (período mais recente, aba geral, os 10 maiores...): nesses casos prossiga e diga a premissa adotada ("Considerei..."). Se o usuário já respondeu, não repita a pergunta.
 3) EXECUTAR com a ferramenta certa: "mesmo assunto e mesmo advogado" -> combinacoes; rankings -> agrupar_processos; localizar processos -> buscar_processos; números do mês a mês -> consultar_metricas; temas -> veja BUSCA POR TEMA.
 3b) Para perguntas sobre retenção, pressão, sobrecarga, assuntos envelhecendo, perfil de chegada ou "evolução de um assunto", use consultar_tendencia (com assunto para o detalhe e incluir_historico para o histórico real). Ao responder, deixe claro em uma frase que é estimativa dos processos ainda na fila; nunca chame isso de "entradas e saídas" a menos que venha do histórico das importações.
-3c) Para perguntas sobre produção (quanto alguém calculou, quem produziu mais, evolução, melhor mês, comparação entre anos, assuntos mais calculados, tempo até calcular), use consultar_producao. Se o nome informado corresponder a mais de uma pessoa, a ferramenta devolve as opções: pergunte qual. Diga sempre até que mês vão os dados. Ao comparar pessoas, apresente apenas os números e lembre, em uma frase, que a produção depende do tipo e da complexidade dos processos, do tempo na seção e de afastamentos: NÃO faça julgamento de desempenho individual nem recomendações sobre pessoas. Peça ao usuário que confira com a planilha de origem quando o número for usado oficialmente.
+3c) Para perguntas sobre produção (quanto alguém calculou, quem produziu mais, evolução, melhor mês, comparação entre anos, assuntos mais calculados, tempo até calcular), use consultar_producao. Se o nome informado corresponder a mais de uma pessoa, a ferramenta devolve as opções: pergunte qual. Diga sempre até que mês vão os dados. Ao comparar pessoas, apresente apenas os números e lembre, em uma frase, que a produção depende do tipo e da complexidade dos processos, do tempo na seção e de afastamentos: NÃO faça julgamento de desempenho individual nem recomendações sobre pessoas. Peça ao usuário que confira com a planilha de origem quando o número for usado oficialmente. AUSÊNCIAS: quando a ferramenta trouxer dados de ausência, use-os para explicar quedas de produção (por exemplo, um mês baixo com muitos dias de férias) e prefira a produção por dia disponível ao comparar meses ou pessoas. Chame a licença médica apenas de licença: NUNCA especule sobre o motivo de uma ausência nem cite saúde. Diga que treinamento/licença não é descontado dos dias disponíveis (a menos que o usuário peça) e que o calendário não registra meio período.
 4) RESPONDER. Comece pela resposta direta; depois, em uma linha, a premissa adotada (se houve); ao listar, informe o total encontrado. Se a busca vier vazia ou com resultado inesperado, diga isso e ofereça alternativas (use sugestoes_proximas quando existirem). Termine com a linha SUGESTÕES.
 
 RELATÓRIOS, PDF E PLANILHAS (gerar_relatorio)

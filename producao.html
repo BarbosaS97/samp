@@ -3,8 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0c2540">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="icon.svg" type="image/svg+xml" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="application-name" content="SAMP">
+<meta name="apple-mobile-web-app-title" content="SAMP">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>SAMP - Produção Individual</title>
-<link rel="icon" href="icone.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="config.js?v=20261001a"></script>
 <link rel="stylesheet" href="theme.css?v=20261001a">
@@ -78,8 +88,41 @@
   .pk-leg { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: .72rem; color: var(--muted); }
   .pk-leg span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; background: var(--c); vertical-align: baseline; }
   .pk-leg b { color: var(--ink); font-weight: 600; }
+  .pk-grid.tres { grid-template-columns: repeat(3, 1fr); }
+  .pk-nota { font-size: .72rem; color: var(--muted); line-height: 1.35; }
+  .pr-chk { display: inline-flex; align-items: center; gap: 7px; font-size: .8rem; color: var(--ink); cursor: pointer; }
+  .pr-chk input { accent-color: var(--navy); width: 15px; height: 15px; }
+  .pr-heat td.h .dot { position: absolute; top: 3px; right: 4px; width: var(--d, 10px); height: var(--d, 10px); border-radius: 50%; background: var(--g, var(--gold)); box-shadow: 0 0 0 2px rgba(255,255,255,.95), 0 1px 3px rgba(12,37,64,.35); cursor: help; transition: transform .15s ease; outline: none; }
+  .pr-heat td.h .dot::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; }   /* área de toque maior que o desenho */
+  .pr-heat td.h .dot:hover, .pr-heat td.h .dot:focus-visible { transform: scale(1.35); box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--navy); }
+  .pr-tip { position: fixed; z-index: 2000; width: 300px; max-width: calc(100vw - 20px); background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 12px 32px rgba(12,37,64,.22); padding: 12px 14px 12px; font-size: .8rem; color: var(--ink); line-height: 1.4; opacity: 0; transform: translateY(4px); transition: opacity .12s ease, transform .12s ease; pointer-events: none; }
+  .pr-tip.on { opacity: 1; transform: none; }
+  .pr-tip .t-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-bottom: 1px solid var(--line-soft); padding-bottom: 7px; margin-bottom: 8px; }
+  .pr-tip .t-h b { font-size: .95rem; color: var(--navy); font-weight: 600; }
+  .pr-tip .t-h span { color: var(--muted); font-size: .76rem; white-space: nowrap; }
+  .pr-tip .t-sec { margin-top: 9px; }
+  .pr-tip .t-sec > small { display: block; font-size: .66rem; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+  .pr-tip .t-barra { height: 8px; border-radius: 4px; background: #e8edf3; overflow: hidden; display: flex; gap: 1px; margin: 5px 0 3px; }
+  .pr-tip .t-barra i { display: block; height: 100%; }
+  .pr-tip .t-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pr-tip .t-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 10px; font-size: .74rem; font-weight: 600; background: color-mix(in srgb, var(--c) 12%, #fff); color: color-mix(in srgb, var(--c) 82%, #000); border: 1px solid color-mix(in srgb, var(--c) 30%, #fff); }
+  .pr-tip .t-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+  .pr-tip .t-lin { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px dashed var(--line-soft); }
+  .pr-tip .t-lin:last-child { border-bottom: 0; }
+  .pr-tip .t-lin span { color: var(--muted); font-size: .76rem; text-align: right; }
+  .pr-tip .t-obs { font-size: .76rem; color: var(--muted); font-style: italic; margin-top: 3px; }
+  .pr-tip .t-rod { margin-top: 10px; padding: 7px 9px; border-radius: 6px; background: var(--navy-soft); color: var(--navy); font-size: .78rem; }
+  .pr-tip .t-rod b { font-size: .95rem; }
+  .pr-tip .t-nada { color: var(--muted); }
+  @media (prefers-reduced-motion: reduce) { .pr-tip, .pr-heat td.h .dot { transition: none; } }
+  .pr-heat td.h { position: relative; }
+  .pr-leg-aus { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .74rem; color: var(--muted); margin: 8px 0 0; }
+  .pr-leg-aus span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 6px; }
+  .pr-obs { font-size: .78rem; color: var(--ink); white-space: normal !important; min-width: 220px; text-align: left !important; line-height: 1.4; }
+  .pr-obs i { font-style: normal; display: inline-block; padding: 1px 7px; margin: 1px 4px 1px 0; border-radius: 9px; background: color-mix(in srgb, var(--c) 14%, #fff); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 35%, #fff); font-size: .72rem; font-weight: 600; }
+  .pr-tab td.mut { color: #9aa6b4; }
   @media (max-width: 1000px) { .pk-grid { grid-template-columns: repeat(2, 1fr); } .pr-fresco { display: none; } }
-  @media (max-width: 560px) { .pk-grid { grid-template-columns: 1fr; } .pr-bar select { min-width: 0; } .pr-bar .pr-info-btn { margin-left: 0; } }
+  @media (max-width: 560px) { .pk-grid, .pk-grid.tres { grid-template-columns: 1fr; } .pr-bar select { min-width: 0; } .pr-bar .pr-info-btn { margin-left: 0; } }
   @media (max-width: 560px) { .pr-grid { grid-template-columns: 1fr; } .pr-ch { height: 250px; } }
 </style>
 </head>
@@ -126,6 +169,11 @@
     if (r.error) return erro('Não foi possível carregar a produção (' + r.error.message + '). Verifique se o SQL 11 foi executado e a função publicada.');
     pessoas = (r.data || []).map((x) => ({ nome: x.pessoa, total: x.total, primeira: x.primeira_data, ultima: x.ultima_data, atualizado: x.atualizado_em, ...x.dados }));
     if (!pessoas.length) return $('conteudo').innerHTML = '<div class="pr-vazio"><h2>Nenhuma produção importada ainda</h2><p>Em Cadastros, aba Produção Individual, envie as planilhas "PRODUÇÃO SECAJ - Nome".</p></div>';
+    // calendário de ausências (opcional: se não existir, a página funciona como antes)
+    try {
+      const cr = await c.from('producao_calendario').select('pessoa,dados,atualizado_em');
+      if (!cr.error) for (const x of cr.data || []) { const m = x.dados && x.dados.m; if (m) cal.set(x.pessoa, m); }
+    } catch (e) { /* sem calendário */ }
     pessoaSel = pessoas[0].nome;
     montarEstrutura(); desenhar();
   }
@@ -172,6 +220,109 @@
   }
   const ultimoMes = (lista) => lista.reduce((a, p) => (p.ultima && (!a || p.ultima > a) ? p.ultima : a), '');
 
+
+  /* ---------- calendário de ausências ---------- */
+  let cal = new Map(), contaTrein = false, calIdx = new Map();
+  const CAT_NOME = { f: 'Férias', l: 'Licença', t: 'Treinamento/licença', x: 'Falta', r: 'Recesso/eleitoral' };
+  const CAT_COR = { f: '#3b9ac4', l: '#cf3b5a', t: '#8e5fc0', x: '#374151', r: '#e08a2c' };
+  const ausDe = (it) => it.f + it.l + it.x + it.r + (contaTrein ? it.t : 0);   // treinamento só é descontado se o usuário marcar
+  const dispDe = (it) => Math.max(0, it.u - ausDe(it));
+  const marcDe = (it) => it.f + it.l + it.t + it.x + it.r;
+  const ddmm = (iso) => iso.slice(8) + '/' + iso.slice(5, 7);
+  function prodPorMes(p) {
+    if (!p._pm) { p._pm = new Map(); for (const x of p.m) { const k = ym(x[0], x[1]); p._pm.set(k, (p._pm.get(k) || 0) + x[5]); } }
+    return p._pm;
+  }
+  const faixaPessoa = (p) => [ym(+p.primeira.slice(0, 4), +p.primeira.slice(5, 7)), ym(+p.ultima.slice(0, 4), +p.ultima.slice(5, 7))];
+  // índice mês -> soma do calendário das pessoas da lista (só meses entre o primeiro e o último lançamento de cada pessoa)
+  function indiceCal(lista) {
+    const idx = new Map();
+    for (const p of lista) {
+      const c = cal.get(p.nome); if (!c || !p.primeira) continue;
+      const [k0, k1] = faixaPessoa(p), pm = prodPorMes(p);
+      for (const [chave, it] of Object.entries(c)) {
+        const k = ym(+chave.slice(0, 4), +chave.slice(5, 7));
+        if (k < k0 || k > k1) continue;
+        let o = idx.get(k);
+        if (!o) { o = { k, u: 0, disp: 0, aus: 0, marc: 0, f: 0, l: 0, t: 0, x: 0, r: 0, prod: 0, nPes: 0, nAus: 0, per: [], notas: [] }; idx.set(k, o); }
+        o.u += it.u; o.disp += dispDe(it); o.aus += ausDe(it); o.marc += marcDe(it);
+        o.f += it.f; o.l += it.l; o.t += it.t; o.x += it.x; o.r += it.r;
+        o.prod += pm.get(k) || 0; o.nPes++; if (marcDe(it) > 0) o.nAus++;
+        for (const q of it.p || []) if (q[3] > 0) o.per.push({ p: p.nome, c: q[0], i: q[1], f: q[2], u: q[3] });
+        for (const n of it.n || []) o.notas.push({ p: p.nome, d: n[0], t: n[1] });
+      }
+    }
+    return idx;
+  }
+  const doAno = (k) => !anoSel || String(Math.floor(k / 12)) === anoSel;
+  function aggCal(idx) {
+    const a = { u: 0, disp: 0, aus: 0, marc: 0, f: 0, l: 0, t: 0, x: 0, r: 0, prod: 0, meses: 0 };
+    for (const [k, o] of idx) { if (!doAno(k)) continue; for (const c of ['u', 'disp', 'aus', 'marc', 'f', 'l', 't', 'x', 'r', 'prod']) a[c] += o[c]; a.meses++; }
+    return a;
+  }
+  const catPredominante = (o) => ['f', 'l', 't', 'x', 'r'].reduce((m, c) => (o[c] > o[m] ? c : m), 'f');
+  const textoObsMes = (o) => {   // chips para a tabela de ausências
+    const chips = o.per.map((q) => `<i style="--c:${CAT_COR[q.c]}">${CAT_NOME[q.c]} ${ddmm(q.i)}${q.i !== q.f ? ' a ' + ddmm(q.f) : ''}</i>`).join('');
+    const notas = o.notas.map((n) => `<span class="mut">dia ${n.d}: ${esc(n.t)}</span>`).join(' · ');
+    return chips + (notas ? '<br>' + notas : '');
+  };
+
+
+  /* ---------- dica rica do quadro mensal (aparece ao passar o mouse, focar ou tocar no ponto) ---------- */
+  const MES_LONGO = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const rotLongo = (k) => MES_LONGO[k % 12] + ' de ' + Math.floor(k / 12);
+  const chipCat = (c, txt) => `<span class="t-chip" style="--c:${CAT_COR[c]}">${txt}</span>`;
+  const periodoTxt = (q) => `${ddmm(q.i)}${q.i !== q.f ? ' a ' + ddmm(q.f) : ''}`;
+  function dicaMes(k, v, indiv) {
+    const o = calIdx.get(k);
+    const cab = `<div class="t-h"><b>${rotLongo(k)}</b><span>${v ? n0(v) + ' processos' : 'sem produção'}</span></div>`;
+    if (!o || !o.marc) return cab + '<div class="t-nada">Nenhuma ausência registrada neste mês.</div>' + (o && o.disp > 0 && o.prod ? `<div class="t-rod"><b>${n1(o.prod / o.disp)}</b> processos por dia disponível</div>` : '');
+    const cats = ['f', 'l', 't', 'x', 'r'].filter((c) => o[c] > 0);
+    let h = cab;
+    if (indiv) {
+      h += `<div class="t-sec"><small>Ausências neste mês</small><div class="t-chips">${cats.map((c) => chipCat(c, `${CAT_NOME[c]} · ${o[c]} ${o[c] === 1 ? 'dia' : 'dias'}`)).join('')}</div></div>`;
+      if (o.per.length) h += `<div class="t-sec"><small>Períodos</small>${o.per.slice(0, 6).map((q) => `<div class="t-lin"><b style="color:${CAT_COR[q.c]}">${CAT_NOME[q.c]}</b><span>${periodoTxt(q)} · ${q.u} ${q.u === 1 ? 'dia útil' : 'dias úteis'}</span></div>`).join('')}</div>`;
+      if (o.notas.length) h += `<div class="t-sec"><small>Observações</small>${o.notas.slice(0, 3).map((n) => `<div class="t-obs">Dia ${n.d}: ${esc(n.t)}</div>`).join('')}</div>`;
+    } else {
+      const pct10 = o.marc / Math.max(1, o.u) * 100;
+      h += `<div class="t-sec"><small>Peso na capacidade do setor</small><div><b>${pct10.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</b> dos dias úteis foram de ausência · ${o.nAus} de ${o.nPes} pessoas</div>` +
+        `<div class="t-barra">${cats.map((c) => `<i style="width:${(o[c] / o.marc * 100).toFixed(1)}%;background:${CAT_COR[c]}"></i>`).join('')}</div>` +
+        `<div class="t-chips">${cats.map((c) => chipCat(c, `${CAT_NOME[c]} · ${o[c]} d`)).join('')}</div></div>`;
+      const por = new Map();
+      for (const q of o.per) { const a = por.get(q.p) || { t: 0, c: {} }; a.t += q.u; a.c[q.c] = (a.c[q.c] || 0) + q.u; por.set(q.p, a); }
+      const lista = [...por].sort((a, b) => b[1].t - a[1].t);
+      if (lista.length) h += `<div class="t-sec"><small>Quem se ausentou</small>${lista.slice(0, 6).map(([p, a]) => `<div class="t-lin"><b>${esc(p)}</b><span>${Object.entries(a.c).map(([c, d]) => `<span style="color:${CAT_COR[c]};font-weight:600">${CAT_NOME[c]} ${d} d</span>`).join(' · ')}</span></div>`).join('')}${lista.length > 6 ? `<div class="t-obs">e mais ${lista.length - 6} pessoa(s)</div>` : ''}</div>`;
+    }
+    if (o.disp > 0 && o.prod) h += `<div class="t-rod"><b>${n1(o.prod / o.disp)}</b> processos por dia disponível<br><span style="color:var(--muted);font-size:.74rem">${o.disp} dias disponíveis de ${o.u} dias úteis${indiv ? '' : ' (soma do setor)'}</span></div>`;
+    return h;
+  }
+  let tip = null, tipAlvo = null, globaisDica = false;
+  function mostrarDica(el, html) {
+    if (!tip) { tip = document.createElement('div'); tip.className = 'pr-tip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip); }
+    tip.innerHTML = html; tipAlvo = el;
+    const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight, vw = innerWidth, vh = innerHeight;
+    let x = r.left + r.width / 2 - w / 2, y = r.bottom + 10;
+    if (y + h > vh - 8) y = Math.max(8, r.top - h - 10);   // sem espaço embaixo: abre para cima
+    x = Math.max(8, Math.min(x, vw - w - 8));
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    requestAnimationFrame(() => tip && tip.classList.add('on'));
+  }
+  function esconderDica() { if (tip) tip.classList.remove('on'); tipAlvo = null; }
+  function ligarDicas(raiz, indiv) {
+    if (!raiz) return;
+    const abre = (el) => {
+      const td = el.closest('td.h'); if (!td) return;
+      const k = +td.dataset.k, v = +td.dataset.v || 0;
+      mostrarDica(el, dicaMes(k, v, indiv));
+    };
+    raiz.addEventListener('mouseover', (e) => { const d = e.target.closest('.dot'); if (d && d !== tipAlvo) abre(d); else if (!d && tipAlvo) esconderDica(); });
+    raiz.addEventListener('mouseleave', esconderDica);
+    raiz.addEventListener('focusin', (e) => { const d = e.target.closest('.dot'); if (d) abre(d); });
+    raiz.addEventListener('focusout', esconderDica);
+    raiz.addEventListener('click', (e) => { const d = e.target.closest('.dot'); if (!d) return esconderDica(); if (tipAlvo === d && tip && tip.classList.contains('on')) esconderDica(); else abre(d); });   // toque no celular
+    if (!globaisDica) { globaisDica = true; window.addEventListener('scroll', esconderDica, { passive: true }); document.addEventListener('keydown', (e) => { if (e.key === 'Escape') esconderDica(); }); }
+  }
+
   /* ---------- estrutura fixa (controles) ---------- */
   function montarEstrutura() {
     const anos = anosDe(pessoas);
@@ -180,11 +331,15 @@
       '<div class="field"><label>Visão</label><div class="pr-modo"><button type="button" data-m="setor" class="on">Setor</button><button type="button" data-m="pessoa">Individual</button></div></div>' +
       '<div class="field" id="fPessoa" style="display:none"><label for="selPessoa">Pessoa</label><select id="selPessoa">' + pessoas.map((p) => `<option>${esc(p.nome)}</option>`).join('') + '</select></div>' +
       '<div class="field"><label for="selAno">Ano</label><select id="selAno"><option value="">Todos os anos</option>' + anos.slice().reverse().map((a) => `<option>${a}</option>`).join('') + '</select></div>' +
+      (cal.size ? '<label class="pr-chk" title="Por padrão, treinamento e licença capacitação não são descontados dos dias disponíveis, pois há quem trabalhe nesses dias"><input type="checkbox" id="chkTrein"> Descontar treinamento/licença</label>' : '') +
       '<button type="button" class="pr-info-btn" id="btnInfo" aria-expanded="false"><i>i</i>Como ler estes números</button></div>' +
       '<div class="pr-info" id="prInfo"><b>De onde vêm:</b> das planilhas individuais, enviadas após a virada de cada mês; o mês em andamento não aparece. ' +
       '<b>Meta e acervo</b> vêm da coluna TIPO que cada pessoa preenche (em branco = sem classificação, comum em 2019). ' +
       '<b>Assuntos</b> escritos de várias formas são agrupados automaticamente. <b>Tempo até calcular</b> é a média entre a data de recebimento e a do cálculo, só onde a data de recebimento foi preenchida. ' +
+      (cal.size ? '<b>Ausências:</b> vêm do CALENDÁRIO SECAJ (férias, licença, treinamento/licença, falta e recesso, contados em dias úteis). Licença médica aparece apenas como "licença". ' +
+        '<b>Dias disponíveis</b> = dias úteis do mês menos as ausências; <b>produção por dia disponível</b> = processos do mês ÷ dias disponíveis. Treinamento/licença só é descontado se a opção estiver marcada. O calendário não registra meio período. ' : '') +
       'Em caso de dúvida, confira com a planilha de origem.</div><div id="corpo"></div>';
+    if ($('chkTrein')) $('chkTrein').onchange = (e) => { contaTrein = e.target.checked; desenhar(); };
     $('btnInfo').onclick = () => { const on = $('prInfo').classList.toggle('on'); $('btnInfo').setAttribute('aria-expanded', on); };
     document.querySelectorAll('.pr-modo button').forEach((b) => b.onclick = () => {
       modo = b.dataset.m; document.querySelectorAll('.pr-modo button').forEach((x) => x.classList.toggle('on', x === b));
@@ -285,7 +440,22 @@
       `<div class="pk" style="animation-delay:.3s"><span class="pk-l">Tempo até calcular</span><span class="pk-t">${r.tempo === null ? '-' : n0(r.tempo) + ' <small>dias</small>'}</span><span class="pk-s">Do recebimento ao cálculo (média)</span><span class="pk-s"><small>${n0(r.nd)} processos com data de recebimento</small></span></div>` +
       `<div class="pk" style="animation-delay:.34s"><span class="pk-l">Hora extra</span><span class="pk-v">${n0(r.he)}</span><span class="pk-s">${r.total ? (r.he / r.total * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '% da produção' : ''}</span>` +
         comp([{ rot: 'Hora extra', v: r.he, cor: GOLD }, { rot: 'Horário normal', v: Math.max(0, r.total - r.he), cor: '#d5dde8' }]).replace(/<div class="pk-leg">.*<\/div>$/, '') + '</div>' +
-      '</div></div>';
+      '</div>' + cartoesCal() + '</div>';
+  }
+  function cartoesCal() {
+    const a = aggCal(calIdx);
+    if (!a.meses || !a.u) return '';
+    const pDisp = a.disp > 0 ? a.prod / a.disp : null, pUtil = a.u > 0 ? a.prod / a.u : null;
+    const ajuste = pDisp !== null && pUtil ? ((pDisp - pUtil) / pUtil) * 100 : 0;
+    const part = (c) => ({ rot: CAT_NOME[c], v: a[c], cor: CAT_COR[c] });
+    return '<div class="pk-grid tres">' +
+      `<div class="pk gold" style="animation-delay:.38s"><span class="pk-l">Produção por dia disponível</span><span class="pk-t">${pDisp === null ? '-' : n1(pDisp)} <small>por dia</small></span>` +
+        `<span class="pk-s">${pUtil === null ? '' : n1(pUtil) + ' por dia útil, sem descontar ausências'}</span>${pDisp !== null && Math.abs(ajuste) > 0.5 ? badge(ajuste, pct(ajuste) + ' ao descontar as ausências') : ''}</div>` +
+      `<div class="pk" style="animation-delay:.42s"><span class="pk-l">Dias úteis de ausência</span><span class="pk-v">${n0(a.marc)}</span><span class="pk-s">${a.u ? (a.marc / a.u * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '% dos dias úteis' : ''}</span>` +
+        comp(['f', 'l', 't', 'x', 'r'].map(part)) + (contaTrein ? '' : '<span class="pk-nota">Treinamento/licença aparece à parte e não é descontado dos dias disponíveis.</span>') + '</div>' +
+      `<div class="pk" style="animation-delay:.46s"><span class="pk-l">Dias úteis disponíveis</span><span class="pk-v">${n0(a.disp)}</span><span class="pk-s">de ${n0(a.u)} dias úteis (${a.u ? Math.round(a.disp / a.u * 100) : 0}%)</span>` +
+        `<span class="pk-nota">Calendário cobre ${a.meses} ${a.meses === 1 ? 'mês' : 'meses'} no período.</span></div>` +
+      '</div>';
   }
 
   /* ---------- tabelas ---------- */
@@ -298,7 +468,9 @@
     const u = tot(ultK);
     const vs = r.media > 0 ? ((u - r.media) / r.media) * 100 : null;
     const classif = r.meta + r.acervo;
-    return { nome: p.nome, total: r.total, media: r.media, meses: r.meses, ultimo: u, vs, metaPct: classif ? (r.meta / classif) * 100 : null, prio: r.prio + r.prio60 + r.legal, tempo: r.tempo, primeira: p.primeira, ultimaData: p.ultima, fim: ultK };
+    const ac = cal.has(p.nome) ? aggCal(indiceCal([p])) : null;   // ausências e produção por dia disponível (se houver calendário)
+    return { nome: p.nome, total: r.total, media: r.media, meses: r.meses, ultimo: u, vs, metaPct: classif ? (r.meta / classif) * 100 : null, prio: r.prio + r.prio60 + r.legal, tempo: r.tempo, primeira: p.primeira, ultimaData: p.ultima, fim: ultK,
+      aus: ac && ac.meses ? ac.marc : null, pdia: ac && ac.disp > 0 ? ac.prod / ac.disp : null };
   }
   function tabelaRanking() {
     const ls = pessoas.map(linhaPessoa).filter((x) => x.total > 0);
@@ -307,18 +479,50 @@
     const soma = ls.reduce((a, x) => a + x.total, 0);
     const th = (col, txt) => `<th class="ord" data-c="${col}">${txt}${ordem.col === col ? (ordem.asc ? ' ▲' : ' ▼') : ''}</th>`;
     const fim = ls.length ? ls[0].fim : 0;
-    return '<div class="pr-tab"><table><thead><tr>' + th('nome', 'Pessoa') + th('total', 'Processos') + th('media', 'Média/mês') + th('ultimo', fim ? 'Último mês (' + rotYM(fim) + ')' : 'Último mês') + th('vs', 'vs. própria média') + th('metaPct', '% meta') + th('prio', 'Prioritários') + th('tempo', 'Tempo médio (dias)') + '<th>Período</th></tr></thead><tbody>' +
+    return '<div class="pr-tab"><table><thead><tr>' + th('nome', 'Pessoa') + th('total', 'Processos') + th('media', 'Média/mês') + th('ultimo', fim ? 'Último mês (' + rotYM(fim) + ')' : 'Último mês') + th('vs', 'vs. própria média') + th('metaPct', '% meta') + th('prio', 'Prioritários') + th('tempo', 'Tempo médio (dias)') + (cal.size ? th('aus', 'Dias de ausência') + th('pdia', 'Por dia disponível') : '') + '<th>Período</th></tr></thead><tbody>' +
       ls.map((x) => `<tr class="cl" data-p="${esc(x.nome)}"><td><b>${esc(x.nome)}</b></td><td>${n0(x.total)}</td><td>${n1(x.media)}</td><td${x.ultimo ? '' : ' class="zero"'}>${n0(x.ultimo)}</td>` +
         `<td>${x.vs === null ? '-' : `<span class="pr-var ${x.vs >= 0 ? 'up' : 'down'}">${pct(x.vs)}</span>`}</td><td>${x.metaPct === null ? '-' : Math.round(x.metaPct) + '%'}</td><td>${n0(x.prio)}</td><td>${x.tempo === null ? '-' : n0(x.tempo)}</td>` +
+        (cal.size ? `<td${x.aus ? '' : ' class="mut"'}>${x.aus === null ? '-' : n0(x.aus)}</td><td>${x.pdia === null ? '-' : n1(x.pdia)}</td>` : '') +
         `<td>${x.primeira ? MES[+x.primeira.slice(5, 7) - 1] + '/' + x.primeira.slice(0, 4) : '-'} a ${x.ultimaData ? MES[+x.ultimaData.slice(5, 7) - 1] + '/' + x.ultimaData.slice(0, 4) : '-'}</td></tr>`).join('') +
-      `</tbody><tfoot><tr><td>Total do setor</td><td>${n0(soma)}</td><td colspan="7"></td></tr></tfoot></table></div>`;
+      `</tbody><tfoot><tr><td>Total do setor</td><td>${n0(soma)}</td><td colspan="${cal.size ? 9 : 7}"></td></tr></tfoot></table></div>`;
   }
-  function quadroMensal(lista) {   // o mesmo quadro Jan-Dez x ano das planilhas, com mapa de calor
+  function quadroMensal(lista) {   // o mesmo quadro Jan-Dez x ano das planilhas, com mapa de calor e marcas de ausência
     const t = new Map(); for (const p of lista) for (const x of p.m) { const k = x[0] + '|' + x[1]; t.set(k, (t.get(k) || 0) + x[5]); }
     const anos = anosDe(lista); let mx = 0; t.forEach((v) => { if (v > mx) mx = v; });
-    const cel = (v) => v ? `<td class="h" style="--bg:rgba(18,53,91,${(0.08 + 0.55 * (v / mx)).toFixed(2)});--fg:${v / mx > .55 ? '#fff' : 'var(--ink)'}">${n0(v)}</td>` : '<td class="h zero">-</td>';
-    return '<div class="pr-tab pr-heat"><table><thead><tr><th>Ano</th>' + MES.map((m) => `<th>${m}</th>`).join('') + '<th>Total</th></tr></thead><tbody>' +
-      anos.map((a) => { let s = 0; const cs = MES.map((_, i) => { const v = t.get(a + '|' + (i + 1)) || 0; s += v; return cel(v); }).join(''); return `<tr><td><b>${a}</b></td>${cs}<td><b>${n0(s)}</b></td></tr>`; }).join('') + '</tbody></table></div>';
+    const indiv = lista.length === 1;
+    // ponto = mês com ausências; as cores mostram a composição (tipo e proporção) e o tamanho, o peso no mês
+    const conic = (o) => {
+      const cs = ['f', 'l', 't', 'x', 'r'].filter((c) => o[c] > 0); let acc = 0;
+      return 'conic-gradient(' + cs.map((c) => { const ini = acc; acc += (o[c] / o.marc) * 100; return `${CAT_COR[c]} ${ini.toFixed(1)}% ${acc.toFixed(1)}%`; }).join(', ') + ')';
+    };
+    const cel = (v, a, m) => {
+      const k = ym(a, m), o = calIdx.get(k), marcado = o && (indiv ? o.marc > 0 : o.marc / Math.max(1, o.u) >= 0.1);
+      if (!v && !marcado) return '<td class="h zero">-</td>';
+      const peso = marcado ? Math.min(1, o.marc / Math.max(1, o.u) / (indiv ? 0.6 : 0.3)) : 0;
+      const dot = marcado ? `<b class="dot" tabindex="0" role="button" aria-label="Ver as ausências de ${rotLongo(k)}" style="--d:${(9 + 5 * peso).toFixed(1)}px;--g:${conic(o)}"></b>` : '';
+      return `<td class="h${marcado ? ' aus' : ''}${v ? '' : ' zero'}" data-k="${k}" data-v="${v}" style="${v ? `--bg:rgba(18,53,91,${(0.08 + 0.55 * (v / mx)).toFixed(2)});--fg:${v / mx > .55 ? '#fff' : 'var(--ink)'}` : ''}">${v ? n0(v) : '-'}${dot}</td>`;
+    };
+    const leg = calIdx.size ? '<div class="pr-leg-aus">' + ['f', 'l', 't', 'x', 'r'].map((c) => `<span style="--c:${CAT_COR[c]}">${CAT_NOME[c]}</span>`).join('') +
+      `<span style="--c:#9aa6b4">${indiv ? 'O ponto marca meses com ausências' : 'O ponto marca meses em que 10% ou mais dos dias úteis do setor foram de ausência'}; as cores mostram o tipo. Passe o mouse (ou toque) no ponto para ver os detalhes.</span></div>` : '';
+    return '<div class="pr-tab pr-heat" data-indiv="' + (indiv ? 1 : 0) + '"><table><thead><tr><th>Ano</th>' + MES.map((m) => `<th>${m}</th>`).join('') + '<th>Total</th></tr></thead><tbody>' +
+      anos.map((a) => { let s = 0; const cs = MES.map((_, i) => { const v = t.get(a + '|' + (i + 1)) || 0; s += v; return cel(v, a, i + 1); }).join(''); return `<tr><td><b>${a}</b></td>${cs}<td><b>${n0(s)}</b></td></tr>`; }).join('') + '</tbody></table></div>' + leg;
+  }
+  // tabela de ausências: individual (mês a mês, com períodos e observações) ou do setor (capacidade por mês)
+  function tabelaAusencias(lista) {
+    const meses = [...calIdx.values()].filter((o) => doAno(o.k) && (lista.length === 1 ? o.marc > 0 || o.notas.length : o.marc > 0)).sort((a, b) => b.k - a.k);
+    if (!meses.length) return '<div class="sub" style="margin:0">Nenhuma ausência registrada no calendário para este período.</div>';
+    const indiv = lista.length === 1;
+    if (indiv) {
+      return '<div class="pr-tab"><table><thead><tr><th>Mês</th><th>Dias úteis</th><th>Disponíveis</th><th>Férias</th><th>Licença</th><th>Trein./lic.</th><th>Falta</th><th>Recesso</th><th>Processos</th><th>Por dia disp.</th><th>Períodos e observações</th></tr></thead><tbody>' +
+        meses.map((o) => `<tr><td><b>${rotYM(o.k)}</b></td><td>${o.u}</td><td>${o.disp}</td>` + ['f', 'l', 't', 'x', 'r'].map((c) => `<td${o[c] ? '' : ' class="mut"'}>${o[c] || '-'}</td>`).join('') +
+          `<td>${n0(o.prod)}</td><td>${o.disp > 0 && o.prod ? n1(o.prod / o.disp) : '-'}</td><td class="pr-obs">${textoObsMes(o) || '-'}</td></tr>`).join('') + '</tbody></table></div>';
+    }
+    return '<div class="pr-tab"><table><thead><tr><th>Mês</th><th>Pessoas com ausência</th><th>Dias úteis de ausência</th><th>% da capacidade</th><th>Processos</th><th>Por dia disponível</th><th>Quem mais se ausentou</th></tr></thead><tbody>' +
+      meses.slice(0, 36).map((o) => {
+        const por = new Map(); for (const q of o.per) por.set(q.p, (por.get(q.p) || 0) + q.u);
+        const topo = [...por].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p, d]) => `${esc(p)} (${d} d)`).join(', ');
+        return `<tr><td><b>${rotYM(o.k)}</b></td><td>${o.nAus} de ${o.nPes}</td><td>${o.marc}</td><td>${(o.marc / Math.max(1, o.u) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</td><td>${n0(o.prod)}</td><td>${o.disp > 0 && o.prod ? n1(o.prod / o.disp) : '-'}</td><td class="pr-obs">${topo || '-'}</td></tr>`;
+      }).join('') + '</tbody></table></div>';
   }
 
   /* ---------- desenho ---------- */
@@ -331,6 +535,7 @@
     const anosHist = anosDe(pessoas);
     $('meta').innerHTML = `<span class="chip"><b>${pessoas.length}</b> pessoas</span>` + (anosHist.length ? `<span class="chip"><b>${anosHist[0]}</b> a <b>${anosHist[anosHist.length - 1]}</b></span>` : '') + `<span class="chip">Só meses fechados</span>`;
     $('fresco').innerHTML = `<div><span>Dados até</span><b>${ate}</b></div><div><span>Última importação</span><b>${imp ? new Date(imp).toLocaleDateString('pt-BR') : '-'}</b></div>`;
+    calIdx = indiceCal(lista);
     let h = cartoes(lista);
     if (modo === 'setor') {
       h += '<div class="pr-grid">' +
@@ -340,6 +545,7 @@
         '<div class="pr-box"><h3>Assuntos mais calculados</h3><div class="sub">Assuntos agrupados</div><div class="pr-ch alto"><canvas id="g4"></canvas></div></div>' +
         '<div class="pr-box"><h3>Dia da semana</h3><div class="sub">Média de processos por dia trabalhado</div><div class="pr-ch"><canvas id="g5"></canvas></div></div>' +
         '<div class="pr-box larga"><h3>Quadro mensal do setor</h3><div class="sub">Total de cada mês (quanto mais escuro, maior a produção)</div>' + quadroMensal(pessoas) + '</div>' +
+        (calIdx.size ? '<div class="pr-box larga"><h3>Ausências e capacidade do setor</h3><div class="sub">Meses com ausências no calendário (do mais recente para o mais antigo, até 36). Os dias são úteis; "capacidade" é o total de dias úteis das pessoas com calendário.</div>' + tabelaAusencias(lista) + '</div>' : '') +
         '<div class="pr-box larga"><h3>Produção por pessoa</h3><div class="sub">Clique no nome para ver o detalhe individual. Cabeçalhos ordenam a tabela. As médias consideram só os meses em que a pessoa produziu.</div><div id="rank">' + tabelaRanking() + '</div></div>' +
         '</div>';
     } else {
@@ -351,11 +557,13 @@
         '<div class="pr-box"><h3>Assuntos mais calculados</h3><div class="sub">Assuntos agrupados</div><div class="pr-ch alto"><canvas id="g4"></canvas></div></div>' +
         '<div class="pr-box"><h3>Dia da semana</h3><div class="sub">Média de processos por dia trabalhado</div><div class="pr-ch"><canvas id="g5"></canvas></div></div>' +
         '<div class="pr-box larga"><h3>Quadro mensal</h3><div class="sub">Mesmo quadro da planilha: processos por mês e ano</div>' + quadroMensal(lista) + '</div>' +
+        (calIdx.size ? `<div class="pr-box larga"><h3>Ausências e observações de ${esc(p.nome)}</h3><div class="sub">Meses com férias, licença, treinamento, falta ou recesso no calendário, com os períodos e as observações registradas. Licença médica aparece só como "licença".</div>` + tabelaAusencias(lista) + '</div>' : '') +
         `<div class="pr-box larga"><h3>Observações sobre os dados</h3><div class="sub">Processos refeitos: ${n0(p.r.refeitos)} lançamentos repetidos do mesmo número (${n0(p.r.repetidos)} processos aparecem mais de uma vez). Primeiro lançamento: ${p.primeira ? p.primeira.split('-').reverse().join('/') : '-'}; último: ${p.ultima ? p.ultima.split('-').reverse().join('/') : '-'}. Importado em ${new Date(p.atualizado).toLocaleString('pt-BR')}.</div></div>` +
         '</div>';
     }
     h += '<p class="desc" style="color:var(--muted);font-size:.78rem;margin:0 0 24px">Assuntos: os nomes digitados nas planilhas (por exemplo "INSS", "inss" e "Benefício previdenciário") são reunidos em grupos como Previdenciário, Diferenças salariais, PSS e Imposto de renda; o que não se encaixa vai para "Outros". Confira sempre com a planilha de origem em caso de dúvida.</p>';
     $('corpo').innerHTML = h;
+    esconderDica(); document.querySelectorAll('.pr-heat').forEach((el) => ligarDicas(el, el.dataset.indiv === '1'));
     graficoMensal('g1', lista); graficoAnual('g2', lista); graficoAnoAno('g3', lista); graficoGrupos('g4', lista); graficoSemana('g5', lista);
     const rk = $('rank');
     if (rk) { rk.onclick = (ev) => { const th = ev.target.closest('th[data-c]'); if (th) { const c = th.dataset.c; ordem = { col: c, asc: ordem.col === c ? !ordem.asc : c === 'nome' }; rk.innerHTML = tabelaRanking(); return; } const tr = ev.target.closest('tr[data-p]'); if (tr) abrirPessoa(tr.dataset.p); }; }

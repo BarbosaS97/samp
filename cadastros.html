@@ -3,8 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0c2540">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="icon.svg" type="image/svg+xml" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="application-name" content="SAMP">
+<meta name="apple-mobile-web-app-title" content="SAMP">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>SAMP - Cadastros</title>
-<link rel="icon" href="icone.png">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="config.js?v=20261001a"></script>
 <link rel="stylesheet" href="theme.css?v=20261001a">
@@ -12,13 +22,110 @@
   .btn { padding: 9px 18px; cursor: pointer; display: inline-flex; align-items: center; font-size: .85rem; }
   .tabs { display: flex; }
   .tab { padding: 14px 20px; background: transparent; border: none; cursor: pointer; font-size: 14px; }
+  /* navegação entre as seções de cadastro: barra fixa, ícones, selos de quantidade e indicador deslizante */
+  .cad-nav { position: sticky; top: 51px; z-index: 40; margin-top: 4px; }
+  .cad-nav .tabs { position: relative; display: flex; gap: 2px; padding: 0 6px !important; overflow-x: auto; scrollbar-width: none; background: #fff !important; border: 1px solid var(--line); border-bottom: 1px solid var(--line) !important; border-radius: var(--radius) var(--radius) 0 0 !important; transition: box-shadow .25s; }
+  .cad-nav .tabs::-webkit-scrollbar { display: none; }
+  body.rolou .cad-nav .tabs { box-shadow: 0 6px 16px rgba(12,37,64,.1); }
+  .cad-nav .tab { display: inline-flex; align-items: center; gap: 10px; padding: 12px 16px !important; white-space: nowrap; border-radius: 4px 4px 0 0; position: relative; color: var(--muted) !important; transition: color .2s, background .2s; }
+  .cad-nav .tab:hover { background: #f4f6f9 !important; color: var(--navy) !important; }
+  .cad-nav .tab:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
+  .cad-nav .tab.active { color: var(--navy) !important; border-bottom-color: transparent !important; }
+  .cad-nav .tab .ti { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; opacity: .8; transition: transform .25s, opacity .2s; }
+  .cad-nav .tab.active .ti { opacity: 1; transform: translateY(-1px) scale(1.06); }
+  .cad-nav .tl { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; text-align: left; }
+  .cad-nav .tl b { font-weight: 600; font-size: .9rem; }
+  .cad-nav .tl small { font-size: .62rem; text-transform: uppercase; letter-spacing: .8px; color: #8a97a8; font-weight: 700; margin-top: 2px; }
+  .cad-nav .tab.active .tl small { color: var(--gold); }
+  .cad-nav .tb { min-width: 20px; height: 18px; padding: 0 6px; border-radius: 9px; background: var(--navy-soft); color: var(--navy); font-size: .68rem; font-weight: 700; display: none; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+  .cad-nav .tb.on { display: inline-flex; }
+  .cad-nav .tab.active .tb { background: var(--navy); color: #fff; }
+  .cad-nav .tab.sujo::after { content: ""; position: absolute; top: 9px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px #fff; animation: cad-pulso 1.6s ease-in-out infinite; }
+  .cad-nav .tab-ind { height: 3px !important; background: var(--gold) !important; border-radius: 3px 3px 0 0 !important; box-shadow: 0 0 8px rgba(166,138,78,.5); }
+  .cad-nav::after { content: ""; position: absolute; right: 0; top: 1px; bottom: 1px; width: 28px; background: linear-gradient(90deg, rgba(255,255,255,0), #fff); pointer-events: none; opacity: 0; transition: opacity .2s; border-radius: 0 var(--radius) 0 0; }
+  .cad-nav.mais::after { opacity: 1; }
+  .cad-ctx { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: .78rem; color: var(--muted); }
+  .cad-ctx a { color: var(--navy); text-decoration: none; } .cad-ctx a:hover { text-decoration: underline; }
+  .cad-ctx .sep { opacity: .5; }
+  .cad-ctx b { color: var(--navy); font-weight: 600; }
+  .pane { scroll-margin-top: 120px; }
+  @keyframes cad-pulso { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: .65; } }
+  @media (max-width: 720px) { .cad-nav { position: static; } .cad-nav .tl small { display: none; } .cad-nav .tab { padding: 11px 13px !important; } }
+  @media (prefers-reduced-motion: reduce) { .cad-nav .tab.sujo::after { animation: none; } }
   .hidden { display: none !important; }
-  .gate-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 16px; }
-  .gate { width: 100%; max-width: 420px; margin: 0; background: #fff; border: 1px solid var(--line); border-top: 3px solid var(--navy); border-radius: var(--radius); padding: 28px; }
-  .gate h1 { font-size: 1.25rem; color: var(--navy); font-weight: 600; margin-bottom: 4px; }
-  .gate p { color: var(--muted); margin-bottom: 18px; font-size: .9rem; }
-  .gate input { width: 100%; padding: 10px 12px; margin-bottom: 12px; font-size: 1rem; }
-  .gate .btn { width: 100%; justify-content: center; }
+  /* ---------- acesso restrito ---------- */
+  .gate-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 20px; position: relative; overflow: hidden; }
+  .gate-wrap::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(900px 420px at 15% 0%, rgba(18,53,91,.07), transparent 70%), radial-gradient(700px 360px at 100% 100%, rgba(166,138,78,.09), transparent 70%); }
+  .gate { position: relative; width: 100%; max-width: 940px; display: grid; grid-template-columns: 1fr 1.02fr; background: #fff; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; box-shadow: 0 18px 50px rgba(12,37,64,.14); animation: gt-sobe .6s both; }
+  .gate-marca { position: relative; background: var(--navy-dark); color: #fff; padding: 40px 38px 34px; display: flex; flex-direction: column; justify-content: space-between; gap: 26px; overflow: hidden; }
+  .gate-marca::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px); background-size: 40px 40px; mask-image: linear-gradient(to bottom, #000 25%, transparent 95%); -webkit-mask-image: linear-gradient(to bottom, #000 25%, transparent 95%); }
+  .gate-marca::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--gold); }
+  .gate-marca > * { position: relative; z-index: 1; }
+  .gt-cadeado { width: 58px; height: 58px; border-radius: 50%; border: 1px solid rgba(224,201,143,.55); display: grid; place-items: center; background: rgba(224,201,143,.08); animation: gt-sobe .6s .1s both; position: relative; }
+  .gt-cadeado::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 1px solid rgba(224,201,143,.3); animation: gt-pulso 2.8s 1.2s ease-out infinite; }
+  .gt-cadeado svg { width: 26px; height: 26px; stroke: #e0c98f; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .gt-cadeado .arco { transform-origin: 8px 11px; transition: transform .35s ease; }
+  .gate.digitando .gt-cadeado .arco { transform: translateY(-1.5px); }
+  .gate-marca h2 { font-size: 1.55rem; font-weight: 600; line-height: 1.25; margin: 18px 0 8px; animation: gt-sobe .6s .18s both; }
+  .gate-marca h2 em { font-style: normal; color: #e0c98f; }
+  .gate-marca > div > p { opacity: .8; font-size: .9rem; line-height: 1.55; animation: gt-sobe .6s .26s both; }
+  .gt-lista { list-style: none; display: grid; gap: 11px; margin: 0; padding: 0; }
+  .gt-lista li { display: flex; align-items: center; gap: 12px; font-size: .86rem; opacity: 0; animation: gt-sobe .6s both; }
+  .gt-lista li:nth-child(1) { animation-delay: .36s; } .gt-lista li:nth-child(2) { animation-delay: .44s; } .gt-lista li:nth-child(3) { animation-delay: .52s; } .gt-lista li:nth-child(4) { animation-delay: .6s; }
+  .gt-lista svg { flex: none; width: 32px; height: 32px; padding: 7px; border: 1px solid rgba(255,255,255,.22); border-radius: 4px; stroke: #e0c98f; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .gate-form { padding: 40px 40px 30px; display: flex; flex-direction: column; justify-content: center; background: #fff; }
+  .gate-form .eyebrow { font-size: .7rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 700; animation: gt-sobe .6s .2s both; }
+  .gate-form h1 { font-size: 1.6rem; color: var(--navy); font-weight: 600; margin: 6px 0 6px; animation: gt-sobe .6s .26s both; }
+  .gate-form .sub { color: var(--muted); font-size: .9rem; margin-bottom: 22px; line-height: 1.5; animation: gt-sobe .6s .32s both; }
+  .gt-campo { position: relative; margin-bottom: 12px; animation: gt-sobe .6s .4s both; }
+  .gt-campo .ico { position: absolute; left: 14px; top: 50%; width: 20px; height: 20px; margin-top: -10px; stroke: var(--muted); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; transition: stroke .2s; pointer-events: none; }
+  .gt-campo input { width: 100%; height: 56px; padding: 23px 48px 6px 44px; font-size: 1.05rem; border: 1px solid #b9c2cc !important; border-radius: var(--radius) !important; background: #fff; outline: none !important; margin: 0; transition: border-color .2s, box-shadow .2s; }
+  .gt-campo input::placeholder { color: transparent; }
+  .gt-campo label { position: absolute; left: 44px; top: 18px; font-size: .95rem; color: var(--muted); pointer-events: none; transform-origin: left top; transition: transform .2s ease, color .2s; }
+  .gt-campo input:focus + label, .gt-campo input:not(:placeholder-shown) + label { transform: translateY(-11px) scale(.76); color: var(--navy); font-weight: 600; }
+  .gt-campo input:focus { border-color: var(--navy) !important; box-shadow: 0 0 0 3px rgba(18,53,91,.14); }
+  .gt-campo input:focus ~ .ico { stroke: var(--navy); }
+  .gt-campo .foco { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--navy); border-radius: 0 0 3px 3px; transform: scaleX(0); transform-origin: left; transition: transform .3s ease; pointer-events: none; }
+  .gt-campo input:focus ~ .foco { transform: scaleX(1); }
+  .gt-campo.erro input { border-color: var(--bad) !important; box-shadow: 0 0 0 3px rgba(179,38,30,.12); }
+  .gt-campo.erro .ico { stroke: var(--bad); }
+  .gt-campo.balanca { animation: gt-balanca .45s; }
+  .gt-olho { position: absolute; right: 6px; top: 50%; width: 40px; height: 40px; margin-top: -20px; display: grid; place-items: center; background: none; border: 0; border-radius: 4px; cursor: pointer; color: var(--muted); }
+  .gt-olho:hover { background: var(--navy-soft); color: var(--navy); }
+  .gt-olho svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .gt-olho .fechado { display: none; } .gt-olho.on .fechado { display: block; } .gt-olho.on .aberto { display: none; }
+  .gt-avisos { min-height: 0; }
+  .gt-caps { display: none; align-items: center; gap: 7px; font-size: .8rem; color: #7a5a14; background: #fbf3e0; border: 1px solid #ecd9a8; border-radius: 3px; padding: 6px 10px; margin-bottom: 10px; }
+  .gt-caps.on { display: flex; animation: gt-desce .3s both; }
+  .gt-erro { max-height: 0; overflow: hidden; opacity: 0; color: var(--bad); font-size: .84rem; transition: max-height .3s, opacity .3s, margin .3s; }
+  .gt-erro.on { max-height: 80px; opacity: 1; margin: 0 0 10px; }
+  .gt-entrar { width: 100%; height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: var(--navy); color: #fff; border: 1px solid var(--navy); border-radius: var(--radius); font-size: .95rem; font-weight: 600; letter-spacing: .3px; cursor: pointer; position: relative; overflow: hidden; transition: background .2s, transform .1s; animation: gt-sobe .6s .48s both; }
+  .gt-entrar:hover:not(:disabled) { background: var(--navy-dark); }
+  .gt-entrar:active:not(:disabled) { transform: scale(.985); }
+  .gt-entrar:disabled { cursor: progress; }
+  .gt-entrar .seta { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s; }
+  .gt-entrar:hover:not(:disabled) .seta { transform: translateX(5px); }
+  .gt-entrar .giro { display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: gt-gira .7s linear infinite; }
+  .gt-entrar.carregando .seta { display: none; } .gt-entrar.carregando .giro { display: inline-block; }
+  .gt-entrar::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--gold); transform: scaleX(0); transform-origin: left; }
+  .gt-entrar.carregando::after { animation: gt-carrega 1.6s ease-in-out infinite; }
+  .gt-ajuda { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: .8rem; line-height: 1.55; animation: gt-sobe .6s .56s both; }
+  .gt-ajuda b { color: var(--navy); font-weight: 600; }
+  .gt-voltar { display: inline-block; margin-top: 8px; color: var(--navy); font-size: .8rem; text-decoration: none; }
+  .gt-voltar:hover { text-decoration: underline; }
+  @keyframes gt-sobe { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes gt-desce { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  @keyframes gt-pulso { 0% { opacity: .7; transform: scale(1); } 100% { opacity: 0; transform: scale(1.6); } }
+  @keyframes gt-gira { to { transform: rotate(360deg); } }
+  @keyframes gt-carrega { 0% { transform: scaleX(0); transform-origin: left; } 50% { transform: scaleX(1); transform-origin: left; } 51% { transform: scaleX(1); transform-origin: right; } 100% { transform: scaleX(0); transform-origin: right; } }
+  @keyframes gt-balanca { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-7px); } 40%, 60% { transform: translateX(7px); } }
+  @media (max-width: 800px) {
+    .gate { grid-template-columns: minmax(0, 1fr); max-width: 460px; }
+    .gate-marca { padding: 22px 24px 20px; flex-direction: row; align-items: center; gap: 16px; }
+    .gate-marca h2 { font-size: 1.15rem; margin: 0 0 2px; } .gate-marca > div > p, .gt-lista { display: none; }
+    .gt-cadeado { width: 46px; height: 46px; flex: none; } .gate-form { padding: 28px 24px 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .gate, .gate * { animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
   .msg { font-size: .85rem; margin-top: 8px; min-height: 1.2em; }
   .msg.err { color: var(--bad); } .msg.ok { color: var(--ok); }
   .topline { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -93,33 +200,67 @@
 <script src="layout.js?v=20261001a"></script>
 
 <!-- Acesso restrito -->
-<div class="gate-wrap" id="gateWrap"><div class="gate" id="gate">
-  <h1>Cadastros - acesso restrito</h1>
-  <p>Informe a senha de cadastro para incluir ou excluir dados do sistema.</p>
-  <input type="password" id="senha" placeholder="Senha" autocomplete="off">
-  <button class="btn btn-primary" id="entrar">Entrar</button>
-  <div class="msg err" id="gateMsg"></div>
-</div></div>
+<div class="gate-wrap" id="gateWrap">
+  <section class="gate" id="gate" aria-labelledby="gtTitulo">
+    <aside class="gate-marca">
+      <div>
+        <div class="gt-cadeado" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.8"/><path class="arco" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+        <h2>Área de <em>cadastros</em> do SAMP</h2>
+        <p>É aqui que os dados do sistema são incluídos, atualizados e excluídos. Por isso, o acesso exige uma senha própria, além da sua matrícula.</p>
+      </div>
+      <ul class="gt-lista">
+        <li><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/><circle cx="19" cy="19" r="2"/></svg>Base de processos e prazos</li>
+        <li><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Períodos das metas processuais</li>
+        <li><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>Produção individual e calendário</li>
+        <li><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1.8"/><path d="M7 12h6M7 15h3"/></svg>Matrículas autorizadas</li>
+      </ul>
+    </aside>
+    <div class="gate-form">
+      <div class="eyebrow">Acesso restrito</div>
+      <h1 id="gtTitulo">Cadastros</h1>
+      <p class="sub">Informe a senha de cadastro para incluir, alterar ou excluir dados do sistema.</p>
+      <form id="gateForm" autocomplete="off" novalidate>
+        <div class="gt-campo" id="gtCampo">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="1.8"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          <input type="password" id="senha" placeholder=" " autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Senha de cadastro" aria-describedby="gateMsg">
+          <label for="senha">Senha de cadastro</label>
+          <button type="button" class="gt-olho" id="gtOlho" aria-label="Mostrar senha" title="Mostrar ou ocultar a senha">
+            <svg class="aberto" viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="fechado" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 6.2A9.8 9.8 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.5 7.6C3.9 9.3 2 12 2 12s3.6 6 10 6c1.5 0 2.9-.3 4.1-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+          </button>
+          <span class="foco"></span>
+        </div>
+        <div class="gt-caps" id="gtCaps"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l7 8h-4v5H9v-5H5z"/><path d="M9 20h6"/></svg>Caps Lock está ativado.</div>
+        <div class="gt-erro" id="gateMsg" role="alert" aria-live="assertive"></div>
+        <button type="submit" class="gt-entrar" id="entrar"><span class="rot">Entrar</span><svg class="seta" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span class="giro"></span></button>
+      </form>
+      <div class="gt-ajuda">
+        Não tem a senha? Ela é fornecida pelo responsável pelo sistema. Quem consulta as informações no SAMP não precisa dela.
+        <br><a class="gt-voltar" href="index.html">&larr; Voltar para a tela inicial</a>
+      </div>
+    </div>
+  </section>
+</div>
 
 <!-- Área autenticada -->
 <main class="page hidden" id="app">
   <div class="header">
     <div class="topline">
-      <div class="title"><h1>Cadastros</h1><p>Inclusões e exclusões de todos os módulos</p></div>
+      <div class="title"><h1>Cadastros</h1><p id="cadSub">Inclusões e exclusões de todos os módulos</p><div class="cad-ctx" aria-label="Você está em"><a href="index.html">Início</a><span class="sep">/</span><span>Cadastros</span><span class="sep">/</span><b id="cadAqui">Processos</b></div></div>
       <button class="btn" id="sair">Sair</button>
     </div>
   </div>
 
-  <div class="tabs">
-    <button class="tab active" data-pane="pProc">Processos (Análise)</button>
-    <button class="tab" data-pane="pPrazos">Prazos (Análise)</button>
-    <button class="tab" data-pane="pMetas">Metas Processuais</button>
-    <button class="tab" data-pane="pProd">Produção Individual</button>
-    <button class="tab" data-pane="pUsers">Usuários (matrículas)</button>
-  </div>
+  <div class="cad-nav" id="cadNav"><div class="tabs" role="tablist" aria-label="Seções de cadastro">
+    <button class="tab active" role="tab" id="tab_pProc" aria-selected="true" aria-controls="pProc" tabindex="0" data-pane="pProc" data-hash="processos"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h10"/><circle cx="19" cy="19" r="2"/></svg><span class="tl"><b>Processos</b><small>Análise</small></span><span class="tb" id="tbProc"></span></button>
+    <button class="tab" role="tab" id="tab_pPrazos" aria-selected="false" aria-controls="pPrazos" tabindex="-1" data-pane="pPrazos" data-hash="prazos"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg><span class="tl"><b>Prazos</b><small>Análise</small></span></button>
+    <button class="tab" role="tab" id="tab_pMetas" aria-selected="false" aria-controls="pMetas" tabindex="-1" data-pane="pMetas" data-hash="metas"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="tl"><b>Metas</b><small>Processuais</small></span></button>
+    <button class="tab" role="tab" id="tab_pProd" aria-selected="false" aria-controls="pProd" tabindex="-1" data-pane="pProd" data-hash="producao"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg><span class="tl"><b>Produção</b><small>Individual</small></span><span class="tb" id="tbProd"></span></button>
+    <button class="tab" role="tab" id="tab_pUsers" aria-selected="false" aria-controls="pUsers" tabindex="-1" data-pane="pUsers" data-hash="usuarios"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="1.8"/><path d="M7 12h6M7 15h3"/></svg><span class="tl"><b>Matrículas</b><small>Acesso</small></span><span class="tb" id="tbUsers"></span></button>
+  </div></div>
 
   <!-- PROCESSOS -->
-  <div class="pane" id="pProc">
+  <div class="pane" id="pProc" role="tabpanel" aria-labelledby="tab_pProc" tabindex="-1">
     <h2>Base de processos</h2>
     <p class="desc">Importe a planilha (.xlsx) para substituir toda a base exibida em Análise de Processos.</p>
     <div class="info" id="procInfo">Carregando...</div>
@@ -150,7 +291,7 @@
   </div>
 
   <!-- PRAZOS -->
-  <div class="pane hidden" id="pPrazos">
+  <div class="pane hidden" id="pPrazos" role="tabpanel" aria-labelledby="tab_pPrazos" tabindex="-1">
     <h2>Classificação de prazos</h2>
     <p class="desc">Limites em dias usados para classificar os processos como normal, atenção ou atrasado.</p>
     <div class="row">
@@ -164,7 +305,7 @@
   </div>
 
   <!-- METAS -->
-  <div class="pane hidden" id="pMetas">
+  <div class="pane hidden" id="pMetas" role="tabpanel" aria-labelledby="tab_pMetas" tabindex="-1">
     <h2>Períodos de metas processuais</h2>
     <p class="desc">Cada gravação cria um novo período; o módulo Metas Processuais exibe sempre o mais recente.</p>
     <div class="row">
@@ -195,7 +336,7 @@
     </div>
   </div>
   <!-- PRODUÇÃO INDIVIDUAL -->
-  <div class="pane hidden" id="pProd">
+  <div class="pane hidden" id="pProd" role="tabpanel" aria-labelledby="tab_pProd" tabindex="-1">
     <h2>Produção Individual</h2>
     <p class="desc">Envie as planilhas "PRODUÇÃO SECAJ - Nome" (.xlsm, .xlsx ou .xlsb) logo após a virada do mês. Pode selecionar várias de uma vez. O sistema lê só a aba Produção: a lista de processos (data, número, objeto, prioridade, observação, recebido em e tipo). O mês em andamento é ignorado e cada envio substitui por completo os dados da pessoa, então reenviar nunca duplica.</p>
     <div class="info" id="prodInfo">Carregando...</div>
@@ -216,13 +357,27 @@
         <tbody id="prodLista"></tbody>
       </table>
     </div>
+    <h2 style="margin-top:26px">Calendário de ausências</h2>
+    <p class="desc">Envie a planilha "CALENDÁRIO SECAJ" (.xls ou .xlsx). O sistema lê as cores de cada dia (férias, licença, treinamento, falta e recesso) e mostra essas ausências ao lado da produção de cada pessoa. Detalhes de saúde nunca são exibidos: licença médica aparece apenas como "licença". Cada envio substitui o calendário anterior. Teletrabalho não é tratado como ausência.</p>
+    <div class="info" id="calInfo">Carregando...</div>
+    <div class="row">
+      <label class="drop" id="dropCal" for="arqCal">
+        <input type="file" id="arqCal" accept=".xls,.xlsx" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="1.5"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>
+        <b>Arraste o calendário aqui</b><span>ou clique para selecionar</span>
+      </label>
+      <button class="btn btn-primary" id="calImportar" disabled>Importar calendário</button>
+      <button class="btn btn-danger" id="calExcluir">Excluir calendário</button>
+    </div>
+    <div class="msg" id="calMsg"></div>
+    <div id="calMapa"></div>
     <div class="danger-zone" style="border-top:none;padding-top:0">
       <p class="desc" style="margin-bottom:8px">Os assuntos são agrupados por regras do sistema (por exemplo, "INSS", "inss" e "Benefício previdenciário" viram Previdenciário). Se as regras forem ajustadas, use o botão abaixo para refazer os números de todos sem enviar as planilhas de novo.</p>
       <button class="btn" id="prodRecalcular">Recalcular resumos</button>
     </div>
   </div>
   <!-- USUÁRIOS -->
-  <div class="pane hidden" id="pUsers">
+  <div class="pane hidden" id="pUsers" role="tabpanel" aria-labelledby="tab_pUsers" tabindex="-1">
     <h2>Matrículas autorizadas</h2>
     <p class="desc">Somente quem tem a matrícula cadastrada aqui consegue entrar no SAMP. O sistema trata a pessoa pelo nome informado.</p>
     <div class="row">
@@ -257,7 +412,7 @@
     $('toasts').appendChild(t); setTimeout(() => t.remove(), 4500);
   }
   let dirty = false;
-  function setDirty(v) { dirty = v; $('dirtyChip').classList.toggle('on', v); }
+  function setDirty(v) { dirty = v; $('dirtyChip').classList.toggle('on', v); const t = document.querySelector('.cad-nav .tab[data-pane="pMetas"]'); if (t) { t.classList.toggle('sujo', v); t.title = v ? 'Há alterações não salvas neste período' : ''; } }
   const descartar = () => !dirty || confirm('Há alterações não salvas no período. Deseja descartá-las?');
   window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
@@ -284,27 +439,75 @@
       iniciar();
     } catch (e) {
       senha = '';
-      if (!silencioso) $('gateMsg').textContent = e.message === 'Failed to fetch' ? 'Não foi possível contatar o servidor. A função "cadastros-function" foi publicada?' : e.message;
+      if (!silencioso) $('gateMsg').dataset.msg = e.message === 'Failed to fetch' ? 'Não foi possível contatar o servidor. A função "cadastros-function" foi publicada?' : (/incorreta/i.test(e.message) ? 'Senha incorreta. Confira e tente novamente.' : e.message);
     }
   }
   function sair() {
     senha = ''; try { sessionStorage.removeItem('cad_senha'); } catch (e) {}
-    $('app').classList.add('hidden'); $('gateWrap').classList.remove('hidden'); $('senha').value = '';
+    $('app').classList.add('hidden'); $('gateWrap').classList.remove('hidden'); $('senha').value = ''; $('gate').classList.remove('digitando'); setTimeout(() => $('senha').focus(), 50);
   }
-  $('entrar').onclick = () => { $('gateMsg').textContent = ''; entrar($('senha').value, false); };
-  $('senha').addEventListener('keypress', (e) => { if (e.key === 'Enter') $('entrar').click(); });
-  $('sair').onclick = sair;
-  document.querySelectorAll('.tab').forEach((t) => t.onclick = () => {
-    document.querySelectorAll('.tab').forEach((x) => x.classList.remove('active')); t.classList.add('active');
-    document.querySelectorAll('.pane').forEach((p) => p.classList.add('hidden')); $(t.dataset.pane).classList.remove('hidden');
-    try { sessionStorage.setItem('cad_aba', t.dataset.pane); } catch (e) {}
+  // formulário de acesso: carregamento, mensagem de erro com animação, mostrar senha e aviso de Caps Lock
+  const gateErro = (txt) => {
+    const e = $('gateMsg'); e.textContent = txt || ''; e.classList.toggle('on', !!txt);
+    const c = $('gtCampo'); c.classList.toggle('erro', !!txt);
+    if (txt) { c.classList.remove('balanca'); void c.offsetWidth; c.classList.add('balanca'); }
+  };
+  $('gateForm').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const b = $('entrar'), v = $('senha').value;
+    if (!v) { gateErro('Digite a senha de cadastro.'); $('senha').focus(); return; }
+    gateErro(''); b.disabled = true; b.classList.add('carregando'); b.querySelector('.rot').textContent = 'Verificando...';
+    await entrar(v, false);
+    b.disabled = false; b.classList.remove('carregando'); b.querySelector('.rot').textContent = 'Entrar';
+    if ($('gateMsg').dataset.msg) { gateErro($('gateMsg').dataset.msg); $('gateMsg').dataset.msg = ''; $('senha').select(); }
   });
+  $('senha').addEventListener('input', () => { $('gate').classList.toggle('digitando', $('senha').value.length > 0); if ($('gtCampo').classList.contains('erro')) gateErro(''); });
+  $('gtOlho').onclick = () => { const mostrar = $('senha').type === 'password'; $('senha').type = mostrar ? 'text' : 'password'; $('gtOlho').classList.toggle('on', mostrar); $('gtOlho').setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha'); $('senha').focus(); };
+  const caps = (e) => { if (e.getModifierState) $('gtCaps').classList.toggle('on', e.getModifierState('CapsLock')); };
+  $('senha').addEventListener('keydown', caps); $('senha').addEventListener('keyup', caps); $('senha').addEventListener('blur', () => $('gtCaps').classList.remove('on'));
+  $('sair').onclick = sair;
+  /* navegação entre as seções: endereço (#producao), teclado (setas, Home, End), rolagem da barra e contexto no cabeçalho */
+  const SECOES = {
+    pProc: ['Processos', 'Base de processos exibida em Análise de Processos'],
+    pPrazos: ['Prazos', 'Limites de classificação dos processos (normal, atenção e atrasado)'],
+    pMetas: ['Metas', 'Períodos de metas processuais: recebidos, calculados, acervo e tempo'],
+    pProd: ['Produção Individual', 'Planilhas de produção de cada pessoa e calendário de ausências'],
+    pUsers: ['Matrículas', 'Quem pode entrar no SAMP'],
+  };
+  const abas = [...document.querySelectorAll('.cad-nav .tab')];
+  function abrirAba(t, opc) {
+    opc = opc || {};
+    abas.forEach((x) => { const on = x === t; x.classList.toggle('active', on); x.setAttribute('aria-selected', on); x.tabIndex = on ? 0 : -1; });
+    document.querySelectorAll('.pane').forEach((p) => p.classList.add('hidden')); $(t.dataset.pane).classList.remove('hidden');
+    $('cadAqui').textContent = SECOES[t.dataset.pane][0]; $('cadSub').textContent = SECOES[t.dataset.pane][1];
+    document.title = 'SAMP - Cadastros: ' + SECOES[t.dataset.pane][0];
+    try { sessionStorage.setItem('cad_aba', t.dataset.pane); } catch (e) {}
+    if (opc.hash !== false) { try { history.replaceState(null, '', '#' + t.dataset.hash); } catch (e) {} }
+    const nav = t.parentElement, alvo = t.offsetLeft - (nav.clientWidth - t.offsetWidth) / 2;   // mantém a aba atual visível na barra rolável
+    nav.scrollTo({ left: Math.max(0, alvo), behavior: opc.suave === false ? 'auto' : 'smooth' });
+    if (opc.foco) t.focus();
+    if (opc.rolar && window.scrollY > 160) { const topo = $('cadNav').getBoundingClientRect().top + window.scrollY - 52; window.scrollTo({ top: topo, behavior: 'smooth' }); }
+  }
+  abas.forEach((t) => {
+    t.onclick = () => abrirAba(t, { rolar: true });
+    t.addEventListener('keydown', (e) => {
+      const i = abas.indexOf(t); let j = null;
+      if (e.key === 'ArrowRight') j = (i + 1) % abas.length; else if (e.key === 'ArrowLeft') j = (i - 1 + abas.length) % abas.length;
+      else if (e.key === 'Home') j = 0; else if (e.key === 'End') j = abas.length - 1;
+      if (j !== null) { e.preventDefault(); abrirAba(abas[j], { foco: true }); }
+    });
+  });
+  window.addEventListener('hashchange', () => { const t = abas.find((x) => x.dataset.hash === location.hash.slice(1)); if (t && !t.classList.contains('active')) abrirAba(t, { hash: false }); });
+  const marcaBarra = () => { const tb = abas[0].parentElement; $('cadNav').classList.toggle('mais', tb.scrollWidth > tb.clientWidth + 2 && tb.scrollLeft + tb.clientWidth < tb.scrollWidth - 4); };
+  abas[0].parentElement.addEventListener('scroll', marcaBarra, { passive: true }); window.addEventListener('resize', marcaBarra);
+  const selo = (id, n) => { const e = $(id); if (!e) return; e.textContent = n > 99999 ? '99 mil+' : Number(n).toLocaleString('pt-BR'); e.classList.toggle('on', n > 0); };
 
   /* ---------- PROCESSOS ---------- */
   let preparados = null;
   async function infoProcessos() {
     const { count } = await sb.from('processos').select('id', { count: 'exact', head: true });
     const { data } = await sb.from('processos').select('data_importacao').order('data_importacao', { ascending: false }).limit(1);
+    selo('tbProc', count || 0);
     $('procInfo').textContent = count
       ? `${count} processos cadastrados. Última importação: ${new Date(data[0].data_importacao).toLocaleString('pt-BR')}.`
       : 'Nenhum processo cadastrado.';
@@ -593,6 +796,7 @@
     const q = $('uBusca').value.trim().toLowerCase();
     const vis = usuarios.filter((u) => !q || u.nome.toLowerCase().includes(q) || u.matricula.toLowerCase().includes(q));
     $('uTotal').textContent = `${usuarios.filter((u) => u.ativo).length} ativos de ${usuarios.length}`;
+    selo('tbUsers', usuarios.filter((u) => u.ativo).length);
     $('uLista').innerHTML = vis.length ? vis.map((u) => `<tr>
       <td>${escH(u.matricula)}</td><td>${escH(u.nome)}</td>
       <td><span class="${u.ativo ? 'tag-on' : 'tag-off'}">${u.ativo ? 'Autorizada' : 'Bloqueada'}</span></td>
@@ -797,6 +1001,7 @@
       return;
     }
     jaImportados = r.data || [];
+    selo('tbProd', jaImportados.length);
     const total = jaImportados.reduce((a, x) => a + x.total, 0);
     $('prodInfo').textContent = jaImportados.length
       ? `${jaImportados.length} pessoa(s) com produção importada, ${total.toLocaleString('pt-BR')} processos no total.`
@@ -820,9 +1025,173 @@
     $('prodRecalcular').disabled = false;
   };
 
+  /* ---------- CALENDÁRIO DE AUSÊNCIAS ---------- */
+  const MESES_CAL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  // cor de fundo da célula -> categoria: f férias, l licença (amarelo em dia útil), t treinamento/licença (azul), x falta, r recesso/eleitoral.
+  // Roxo (teletrabalho) e verde (serviço extraordinário) não são ausências. Os tons de cinza mudaram ao longo dos anos: todos são férias.
+  const COR_CAL = { '808080': 'f', '969696': 'f', '999999': 'f', 'C0C0C0': 'f', 'FFFF00': 'l', '00CCFF': 't', '000000': 'x', 'FF0000': 'r' };
+  const GRUPOS_CAL = new Set(['secaj', 'sercaj', 'servidores', 'terceirizado', 'terceirizados', 'terceirizado/estagiario', 'terceirizados/estagiarios', 'terceirizados / estagiarios', 'estagiarios']);
+  const NOTA_SENSIVEL = /atestado|sa[uú]de|m[eé]dic|doen[cç]a|cirurg|exame|\bcid\b|falta injustificada|d[eé]bito|advert|disciplin|puni[cç]/i;
+  const ALIAS_CAL = { 'thiago': 'Thiago Saldanha', 'thiago alves': 'Thiago Borges', 'romlulo': 'Rômulo' };
+  const chaveCal = (x) => String(x == null ? '' : x).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  let calNomes = [], calArquivo = '', calApelidos = [];
+
+  function lerCalendario(buf) {
+    const nomes = XLSX.read(buf, { type: 'array', bookSheets: true }).SheetNames;
+    const abas = nomes.filter((n) => /^\d{4}$/.test(n.trim()) && +n.trim() >= 2019);
+    if (!abas.length) throw new Error('Nenhuma aba de ano (2019 em diante) encontrada');
+    const wb = XLSX.read(buf, { type: 'array', cellStyles: true, sheets: abas });
+    const por = new Map();   // chave do nome -> { nome, m: { 'AAAA-MM': {...} }, aus }
+    let semCor = 0;
+    for (const aba of abas) {
+      const ws = wb.Sheets[aba]; if (!ws || !ws['!ref']) continue;
+      const ano = +aba.trim(), rng = XLSX.utils.decode_range(ws['!ref']);
+      const cel = (r, c) => ws[XLSX.utils.encode_cell({ r, c })];
+      const texto = (r, c) => { const x = cel(r, c); return x && x.v != null ? String(x.v).trim() : ''; };
+      const rgb = (r, c) => {
+        const x = cel(r, c), st = x && x.s;
+        if (!st || st.patternType !== 'solid' || !st.fgColor) return '';
+        if (st.fgColor.rgb) { const v = String(st.fgColor.rgb).toUpperCase().slice(-6); return v === 'FFFFFF' ? '' : v; }   // branco = sem cor
+        semCor++; return '';
+      };
+      for (let r = 0; r <= rng.e.r; r++) {
+        const mi = MESES_CAL.indexOf(texto(r, 0));
+        if (mi < 0) continue;
+        const mes = mi + 1, ult = new Date(ano, mes, 0).getDate(), chaveMes = `${ano}-${String(mes).padStart(2, '0')}`;
+        const cab = []; for (let d = 1; d <= ult; d++) cab[d] = rgb(r + 1, d);
+        let grupo = '';
+        for (let rr = r + 3; rr <= rng.e.r && texto(rr, 0) !== ''; rr++) {
+          const nome = texto(rr, 0), chave = chaveCal(nome);
+          if (GRUPOS_CAL.has(chave)) { grupo = nome; continue; }
+          const reg = por.get(chave) || { nome, m: {}, aus: 0 };
+          por.set(chave, reg);
+          const item = reg.m[chaveMes] || (reg.m[chaveMes] = { u: 0, f: 0, l: 0, t: 0, x: 0, r: 0, p: [], n: [] });
+          let corrida = null; const eUtil = [];
+          for (let d = 1; d <= ult; d++) {
+            const dt = new Date(ano, mes - 1, d), util = dt.getDay() >= 1 && dt.getDay() <= 5 && cab[d] === '';
+            eUtil[d] = util;
+            const cor = rgb(rr, d);
+            const cat = cor && cor !== cab[d] ? COR_CAL[cor] || null : null;   // igual ao cabeçalho = marca da coluna (fim de semana, feriado)
+            if (util) item.u++;
+            if (cat && util) { item[cat]++; reg.aus++; }
+            const iso = `${ano}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            if (cat && corrida && corrida[0] === cat) { corrida[2] = iso; if (util) corrida[3]++; }
+            else { corrida = cat ? [cat, iso, iso, util ? 1 : 0] : null; if (corrida) item.p.push(corrida); }
+            const nota = cel(rr, d) && cel(rr, d).c;
+            if (nota && nota.length) {
+              let t = String(nota[0].t || '').replace(/^[^\n]*:\s*\n/, '').replace(/\s+/g, ' ').trim();
+              if (NOTA_SENSIVEL.test(t)) t = 'Ausência';
+              if (t && item.n.length < 10) item.n.push([d, t.slice(0, 160)]);
+            }
+          }
+          // une períodos do mesmo tipo separados só por fim de semana ou feriado (ex.: férias de uma semana inteira)
+          const dia = (iso) => +iso.slice(8);
+          for (let i = item.p.length - 2; i >= 0; i--) {
+            const a = item.p[i], b = item.p[i + 1];
+            if (a[0] !== b[0]) continue;
+            let soNaoUtil = true; for (let d = dia(a[2]) + 1; d < dia(b[1]); d++) if (eUtil[d]) soNaoUtil = false;
+            if (soNaoUtil) { a[2] = b[2]; a[3] += b[3]; item.p.splice(i + 1, 1); }
+          }
+        }
+      }
+    }
+    return { por, semCor };
+  }
+
+  const nomesProducao = () => jaImportados.map((x) => x.pessoa);
+  function sugerirPessoa(chave, nome) {
+    const prod = nomesProducao();
+    const achar = (alvo) => prod.find((p) => chaveCal(p) === chaveCal(alvo));
+    const salvo = calApelidos.find((a) => a.chave === chave);
+    if (salvo) return salvo.pessoa || '';
+    if (ALIAS_CAL[chave] && achar(ALIAS_CAL[chave])) return achar(ALIAS_CAL[chave]);
+    const exato = achar(nome); if (exato) return exato;
+    const comeca = prod.filter((p) => chaveCal(p).startsWith(chave + ' '));
+    return comeca.length === 1 ? comeca[0] : '';
+  }
+
+  function desenharMapaCal() {
+    const box = $('calMapa');
+    if (!calNomes.length) { box.innerHTML = ''; return; }
+    const opcoes = (sel) => '<option value="">(ignorar este nome)</option>' + nomesProducao().map((p) => `<option${p === sel ? ' selected' : ''}>${escH(p)}</option>`).join('');
+    box.innerHTML = '<p class="desc" style="margin:6px 0">Confira a que pessoa da produção cada nome do calendário corresponde. O que ficar como "ignorar" não entra. A escolha fica salva para os próximos envios.</p>' +
+      '<div class="grid-wrap"><table class="usr"><thead><tr><th>Nome no calendário</th><th>Pessoa na produção</th><th>Meses</th><th>Dias úteis de ausência</th></tr></thead><tbody>' +
+      calNomes.map((x, i) => `<tr><td>${escH(x.nome)}</td><td><select data-i="${i}" class="cal-sel" style="min-width:200px">${opcoes(x.pessoa)}</select></td><td>${x.meses}</td><td>${x.aus}</td></tr>`).join('') +
+      '</tbody></table></div>';
+    $('calImportar').disabled = !calNomes.some((x) => x.pessoa);
+  }
+  $('calMapa').addEventListener('change', (ev) => {
+    const e = ev.target; if (!e.classList.contains('cal-sel')) return;
+    calNomes[+e.dataset.i].pessoa = e.value; $('calImportar').disabled = !calNomes.some((x) => x.pessoa);
+  });
+
+  async function carregarArquivoCal(file) {
+    msg('calMsg', 'Lendo o calendário...'); $('calImportar').disabled = true; calNomes = []; desenharMapaCal();
+    await esperar();
+    try {
+      const { por, semCor } = lerCalendario(new Uint8Array(await file.arrayBuffer()));
+      calArquivo = file.name;
+      calNomes = [...por].map(([chave, v]) => ({ chave, nome: v.nome, m: v.m, meses: Object.keys(v.m).length, aus: v.aus, pessoa: sugerirPessoa(chave, v.nome) }))
+        .filter((x) => x.aus > 0 || x.pessoa)
+        .sort((a, b) => (b.pessoa ? 1 : 0) - (a.pessoa ? 1 : 0) || a.nome.localeCompare(b.nome, 'pt-BR'));
+      if (!calNomes.length) throw new Error('Nenhuma pessoa com ausência encontrada. A planilha tem as cores de fundo preservadas?');
+      msg('calMsg', `${calNomes.length} nomes lidos.` + (semCor ? ' Atenção: algumas cores não puderam ser lidas (a planilha foi salva em outro formato de cor); confira os resultados.' : ''), semCor ? 'err' : 'ok');
+      desenharMapaCal();
+    } catch (e) { msg('calMsg', e.message, 'err'); }
+  }
+  const dropC = $('dropCal');
+  ['dragenter', 'dragover'].forEach((t) => dropC.addEventListener(t, (e) => { e.preventDefault(); dropC.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((t) => dropC.addEventListener(t, (e) => { e.preventDefault(); dropC.classList.remove('over'); }));
+  dropC.addEventListener('drop', (e) => { const fl = [...(e.dataTransfer?.files || [])].find((x) => /\.xlsx?$/i.test(x.name)); if (fl) carregarArquivoCal(fl); });
+  $('arqCal').onchange = (ev) => { const fl = ev.target.files[0]; ev.target.value = ''; if (fl) carregarArquivoCal(fl); };
+
+  $('calImportar').onclick = async () => {
+    const usados = calNomes.filter((x) => x.pessoa);
+    // nomes diferentes do calendário para a mesma pessoa (ex.: grafia corrigida no meio do histórico) são unidos; em mês repetido vale o primeiro
+    const por = new Map(); let unidos = 0, conflitos = 0;
+    for (const x of usados) {
+      const a = por.get(x.pessoa);
+      if (!a) { por.set(x.pessoa, { pessoa: x.pessoa, m: { ...x.m } }); continue; }
+      unidos++;
+      for (const [k, v] of Object.entries(x.m)) { if (a.m[k]) conflitos++; else a.m[k] = v; }
+    }
+    if (!confirm(`Importar o calendário para ${por.size} pessoa(s)?` + (unidos ? ` (${unidos} nome(s) do calendário serão unidos a outro da mesma pessoa.)` : '') + ' O calendário anterior será substituído.')) return;
+    $('calImportar').disabled = true; msg('calMsg', 'Enviando...');
+    try {
+      const r = await api('calendario_salvar', {
+        arquivo: calArquivo,
+        pessoas: [...por.values()].map((x) => ({ pessoa: x.pessoa, dados: { m: x.m } })),
+        apelidos: calNomes.map((x) => ({ nome: x.nome, pessoa: x.pessoa || '' })),
+      });
+      msg('calMsg', `Calendário importado para ${r.pessoas} pessoa(s).` + (conflitos ? ` ${conflitos} mês(es) apareciam em dois nomes da mesma pessoa; foi usado o primeiro.` : ''), 'ok'); toast('Calendário importado.', 'ok');
+      calNomes = []; desenharMapaCal(); carregarCalendario();
+    } catch (e) { msg('calMsg', e.message, 'err'); $('calImportar').disabled = false; }
+  };
+  $('calExcluir').onclick = async () => {
+    if (!confirm('Excluir todo o calendário de ausências? Para recuperar, será preciso importar a planilha de novo.')) return;
+    try { await api('calendario_excluir'); toast('Calendário excluído.', 'ok'); carregarCalendario(); } catch (e) { msg('calMsg', e.message, 'err'); }
+  };
+  async function carregarCalendario() {
+    const [c, a] = await Promise.all([
+      sb.from('producao_calendario').select('pessoa,arquivo,atualizado_em').order('pessoa'),
+      sb.from('producao_apelidos').select('chave,nome,pessoa'),
+    ]);
+    if (c.error) { $('calInfo').textContent = 'Não foi possível ler o calendário (' + c.error.message + '). Verifique se o SQL 12 foi executado e a função publicada.'; return; }
+    calApelidos = a.data || [];
+    const ls = c.data || [];
+    $('calInfo').textContent = ls.length
+      ? `Calendário importado para ${ls.length} pessoa(s) em ${new Date(ls.reduce((m, x) => (x.atualizado_em > m ? x.atualizado_em : m), '')).toLocaleString('pt-BR')} (${ls[0].arquivo || 'arquivo'}).`
+      : 'Nenhum calendário importado ainda.';
+  }
+
   async function iniciar() {
-    try { const a = sessionStorage.getItem('cad_aba'); if (a && $(a)) document.querySelector(`.tab[data-pane="${a}"]`).click(); } catch (e) {}
-    infoProcessos(); carregarPrazos(); carregarUsuarios(); carregarEquivalencias(); carregarProducao();
+    try {
+      const porHash = abas.find((x) => x.dataset.hash === location.hash.slice(1));
+      const a = sessionStorage.getItem('cad_aba'), porSessao = a && abas.find((x) => x.dataset.pane === a);
+      abrirAba(porHash || porSessao || abas[0], { suave: false, hash: !!(porHash || porSessao) });
+    } catch (e) {}
+    marcaBarra(); setTimeout(() => { const ativa = document.querySelector('.cad-nav .tab.active'); if (ativa) abrirAba(ativa, { suave: false, hash: false }); marcaBarra(); }, 400);
+    infoProcessos(); carregarPrazos(); carregarUsuarios(); carregarEquivalencias(); carregarProducao().then(carregarCalendario);
     const lista = await listarPeriodos();
     if (lista.length) carregar(lista[0].id); else $('novoPeriodo').click();
   }
