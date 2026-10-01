@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>SAMP - Metas Processuais</title>
+    
+    <!-- Ícones para navegador e PWA -->
+    <link rel="icon" type="image/png" sizes="16x16" href="icone.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icone.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="icone.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="icone.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="icone.png">
+    <link rel="icon" type="image/png" sizes="128x128" href="icone.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icone.png">
+    <link rel="icon" type="image/png" sizes="256x256" href="icone.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icone.png">
+    <link rel="apple-touch-icon" sizes="57x57" href="icone.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="icone.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="icone.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="icone.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="icone.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="icone.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="icone.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="icone.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icone.png">
+    
+    <!-- Meta tags para PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Metas Processuais">
+    <meta name="application-name" content="Metas Processuais">
+    <meta name="msapplication-TileColor" content="#12355b">
+    <meta name="theme-color" content="#12355b">
+    <meta name="msapplication-config" content="">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="config.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; }
+        body { background: #eef2f7; padding: 20px; min-height: 100vh; }
+        .container { max-width: 1500px; margin: 0 auto; width: 100%; }
+        
+        .header {
+            background: linear-gradient(135deg, #d4e4f7 0%, #b8d4f0 50%, #a0c8e8 100%);
+            padding: 25px 32px;
+            border-radius: 28px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .title h1 { font-size: 1.8rem; color: #1a4d7a; letter-spacing: -0.5px; font-weight: 600; }
+        .title p { color: #2c5a82; font-size: 0.85rem; margin-top: 4px; opacity: 0.85; }
+        
+        .filter-panel { background: white; border-radius: 20px; padding: 16px 24px; margin-bottom: 24px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; border: 1px solid #e2e8f0; }
+        .filter-group { display: flex; flex-direction: column; gap: 6px; }
+        .filter-group label { font-size: 0.75rem; font-weight: 600; color: #5b6e8c; text-transform: uppercase; }
+        .filter-group select { padding: 10px 12px; border: 1px solid #cbd5e6; border-radius: 14px; font-size: 0.85rem; background: white; min-width: 140px; }
+        .filter-group button { padding: 10px 20px; }
+        
+        .collapse-panel { background: white; border-radius: 20px; margin-bottom: 24px; border: 1px solid #e2e8f0; overflow: hidden; }
+        .collapse-header { padding: 14px 24px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
+        .collapse-header:hover { background: #f1f5f9; }
+        .collapse-header h3 { font-size: 0.9rem; color: #12355b; font-weight: 500; }
+        .collapse-header .arrow { transition: transform 0.3s; font-size: 1.2rem; }
+        .collapse-header .arrow.down { transform: rotate(90deg); }
+        .collapse-content { display: none; padding: 20px 24px; border-top: 1px solid #e2e8f0; background: white; }
+        .collapse-content.show { display: block; }
+        .period-controls { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        .control-group label { font-size: 0.75rem; font-weight: 600; color: #5b6e8c; text-transform: uppercase; }
+        .month-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 500px; max-height: 100px; overflow-y: auto; }
+        .month-badge { background: #eef2ff; padding: 6px 12px; border-radius: 40px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px; }
+        .month-badge button { background: none; border: none; color: #dc2626; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+        .btn-small { background: #12355b; color: white; border: none; padding: 8px 16px; border-radius: 40px; cursor: pointer; font-weight: 600; font-size: 0.8rem; }
+        .btn-small-danger { background: #dc2626; color: white; border: none; padding: 8px 16px; border-radius: 40px; cursor: pointer; font-weight: 600; font-size: 0.8rem; }
+        
+        .action-buttons { display: flex; justify-content: flex-end; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+        .btn { background: white; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 50px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; transition: 0.2s; }
+        .btn-primary { background: #12355b; color: white; border-color: #12355b; }
+        .btn-danger { background: #dc2626; color: white; border-color: #dc2626; }
+        .btn-success { background: #059669; color: white; border-color: #059669; }
+        .btn-secondary { background: #4f46e5; color: white; border-color: #4f46e5; }
+        .btn-outline { background: white; border-color: #cbd5e1; }
+        .btn-outline:hover { background: #f1f5f9; }
+        .btn:hover { opacity: 0.88; transform: scale(0.98); }
+        
+        .section { background: white; border-radius: 28px; margin-bottom: 40px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .section-header { background: #f8fafc; padding: 16px 24px; border-bottom: 2px solid #e2e8f0; }
+        .section-header h2 { color: #0f3b5f; font-size: 1.3rem; font-weight: 600; }
+        .section-content { padding: 24px; }
+        
+        .stats-grid { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 28px; }
+        .stat-card { background: #f8fafc; flex: 1; min-width: 160px; padding: 18px 16px; border-radius: 20px; text-align: center; border: 1px solid #e2e8f0; }
+        .stat-card h3 { font-size: 0.75rem; text-transform: uppercase; color: #5b6e8c; margin-bottom: 8px; letter-spacing: 0.5px; }
+        .stat-card .value { font-size: 2rem; font-weight: 700; color: #0f3b5f; }
+        
+        .table-wrapper { background: white; border-radius: 20px; overflow-x: auto; margin-bottom: 28px; border: 1px solid #e2edf2; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 600px; }
+        th, td { padding: 12px 10px; text-align: center; border-bottom: 1px solid #ecf3f9; }
+        th { background: #f8fafc; font-weight: 600; color: #1e3a5f; }
+        .number-input { width: 110px; padding: 8px 6px; text-align: right; border: 1px solid #cbd5e6; border-radius: 12px; font-size: 0.8rem; background: #fffef5; }
+        .number-input:focus { outline: none; border-color: #12355b; }
+        .readonly-value { background-color: #eef2ff; color: #12355b; font-weight: 600; display: inline-block; width: 110px; padding: 8px 6px; border-radius: 12px; text-align: right; }
+        .tempo-input { width: 85px; text-align: center; background-color: #fff3e0; }
+        
+        .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 20px; }
+        .chart-card { background: white; border-radius: 20px; padding: 18px; border: 1px solid #e2e8f0; }
+        .chart-card h4 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; color: #1e3a5f; border-bottom: 2px solid #eef2ff; padding-bottom: 8px; }
+        .chart-card canvas { max-height: 260px; width: 100%; }
+        .combined-chart { grid-column: span 2; }
+        
+        .filter-info { background: #eef2ff; padding: 10px 16px; border-radius: 12px; margin-bottom: 20px; font-size: 0.8rem; color: #12355b; }
+        .section-buttons { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+        .btn-small-pdf { background: white; border: 1px solid #cbd5e1; padding: 5px 12px; border-radius: 40px; font-size: 0.7rem; font-weight: 500; cursor: pointer; }
+        .btn-small-pdf:hover { background: #f1f5f9; }
+        .info-badge { background: #eef2ff; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; color: #12355b; margin-left: 12px; }
+        
+        .loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 9999; color: white; font-size: 1.2rem; backdrop-filter: blur(3px); }
+        .loading.active { display: flex; }
+        .spinner-box { background: #12355b; padding: 20px 40px; border-radius: 60px; }
+        
+        .status-bar { position: fixed; bottom: 20px; right: 20px; background: #12355b; color: white; padding: 8px 16px; border-radius: 40px; font-size: 0.7rem; z-index: 1000; }
+        
+        .password-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 10001; }
+        .password-modal.active { display: flex; }
+        .password-content { background: white; border-radius: 28px; padding: 30px; max-width: 350px; width: 90%; text-align: center; }
+        .password-content input { width: 100%; padding: 12px; margin: 20px 0; border: 1px solid #cbd5e6; border-radius: 14px; font-size: 1rem; text-align: center; }
+        
+        footer { text-align: center; margin-top: 30px; padding: 16px; font-size: 0.75rem; color: #6c86a3; }
+        
+        @media (max-width: 1000px) { .charts-grid { grid-template-columns: 1fr; } .combined-chart { grid-column: span 1; } .number-input { width: 85px; } .readonly-value { width: 85px; } }
+    </style>
+    <link rel="stylesheet" href="theme.css">
+</head>
+<body data-page="metricas">
+<script src="layout.js"></script>
+<div class="loading" id="loading"><div class="spinner-box">Processando...</div></div>
+<div class="container">
+    <div class="header" style="display:block">
+        <div class="title">
+            <h1>Estatísticas Consolidadas</h1>
+            <p>Metas processuais | Varas Comuns, JEF e Geral consolidado</p>
+        </div>
+        <div class="meta" id="metaPeriodo"></div>
+    </div>
+    
+    <nav class="subnav" aria-label="Seções">
+        <a href="#secVaras">Varas Comuns</a><a href="#secJef">JEF</a><a href="#secGeral">Geral Consolidado</a>
+    </nav>
+
+    <div class="filter-panel">
+        <div class="filter-group">
+            <label>Data Inicial</label>
+            <select id="dataInicialSelect"></select>
+        </div>
+        <div class="filter-group">
+            <label>Data Final</label>
+            <select id="dataFinalSelect"></select>
+        </div>
+        <div class="filter-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-secondary" id="aplicarFiltroBtn">Aplicar Filtro</button>
+        </div>
+        <div class="filter-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-outline" id="limparFiltroBtn">Limpar Filtro</button>
+        </div>
+    </div>
+    
+    <div class="action-buttons">
+        <button class="btn btn-outline" id="refreshFromDBBtn">Recarregar do Banco</button>
+        <button class="btn btn-warning" id="exportCompletePDFBtn">Exportar PDF Completo</button>
+    </div>
+    
+    <div id="filterInfo" class="filter-info" style="display: none;"></div>
+    
+    <!-- SEÇÃO 1: VARAS COMUNS -->
+    <div class="section" id="secVaras">
+        <div class="section-header"><h2>1. Varas Comuns</h2></div>
+        <div class="section-content">
+            <div class="stats-grid" id="statsVaras"></div>
+            <div class="table-wrapper">
+                <table id="tableVaras">
+                    <thead><tr><th>Mês/Ano</th><th>Processos Recebidos</th><th>Processos Calculados</th><th>Evolução do Acervo</th><th>Tempo de Permanência (dias)</th></tr></thead>
+                    <tbody id="tbodyVaras"></tbody>
+                </table>
+            </div>
+            <div class="charts-grid" id="chartsVaras"></div>
+            <div class="section-buttons">
+                <button class="btn-small-pdf" id="exportVarasBtn">PDF Varas Comuns</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SEÇÃO 2: JEF -->
+    <div class="section" id="secJef">
+        <div class="section-header"><h2>2. JEF</h2></div>
+        <div class="section-content">
+            <div class="stats-grid" id="statsJef"></div>
+            <div class="table-wrapper">
+                <table id="tableJef">
+                    <thead><tr><th>Mês/Ano</th><th>Processos Recebidos</th><th>Processos Calculados</th><th>Evolução do Acervo</th><th>Tempo de Permanência (dias)</th></tr></thead>
+                    <tbody id="tbodyJef"></tbody>
+                </table>
+            </div>
+            <div class="charts-grid" id="chartsJef"></div>
+            <div class="section-buttons">
+                <button class="btn-small-pdf" id="exportJefBtn">PDF JEF</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SEÇÃO 3: GERAL CONSOLIDADO -->
+    <div class="section" id="secGeral">
+        <div class="section-header">
+            <h2>3. Geral Consolidado <span class="info-badge">(Varas + JEF)</span></h2>
+        </div>
+        <div class="section-content">
+            <div class="stats-grid" id="statsGeral"></div>
+            <div class="table-wrapper">
+                <table id="tableGeral">
+                    <thead><tr><th>Mês/Ano</th><th>Processos Recebidos</th><th>Processos Calculados</th><th>Evolução do Acervo</th></tr></thead>
+                    <tbody id="tbodyGeral"></tbody>
+                </table>
+            </div>
+            <div class="charts-grid" id="chartsGeral"></div>
+            <div class="section-buttons">
+                <button class="btn-small-pdf" id="exportGeralBtn">PDF Geral Consolidado</button>
+            </div>
+        </div>
+    </div>
+    
+    <footer>Os dados são mantidos no módulo Cadastros. O Geral Consolidado é calculado automaticamente (soma de Varas + JEF).</footer>
+</div>
+
+<script>
+    function formatNumberWithDots(value) {
+        if (value === null || value === undefined || value === '') return '';
+        let numStr = String(value).replace(/[^0-9]/g, '');
+        if (numStr === '') return '';
+        let num = parseInt(numStr, 10);
+        return num.toLocaleString('pt-BR');
+    }
+    
+    function getRawNumber(formattedValue) {
+        if (!formattedValue) return 0;
+        let numStr = String(formattedValue).replace(/[^0-9]/g, '');
+        return parseInt(numStr, 10) || 0;
+    }
+    
+    function createNumberInputHandler(inputElement, callback) {
+        inputElement.readOnly = true;
+        inputElement.addEventListener('blur', function() {
+            let rawValue = getRawNumber(this.value);
+            this.value = formatNumberWithDots(rawValue);
+            if (callback) callback(rawValue);
+        });
+        inputElement.addEventListener('input', function(e) {
+            let rawValue = this.value.replace(/[^0-9]/g, '');
+            if (rawValue === '') {
+                this.value = '';
+            } else {
+                this.value = rawValue;
+            }
+        });
+        inputElement.addEventListener('focus', function() {
+            let rawValue = getRawNumber(this.value);
+            this.value = rawValue === 0 ? '' : rawValue;
+        });
+    }
+    
+    const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG;
+    
+    let supabaseClient = null;
+    try { supabaseClient = window.criarClienteLeitura(); } catch(e) { console.error(e); }
+    
+    let fullMonths = [];
+    let fullMonthLabels = [];
+    let currentMonths = [];
+    let currentMonthLabels = [];
+    let activeFilter = { startIndex: null, endIndex: null };
+    
+    let varasData = { recebidos: [], calculados: [], acervo: [], tempo: [] };
+    let jefData = { recebidos: [], calculados: [], acervo: [], tempo: [] };
+    let geralData = { recebidos: [], calculados: [], acervo: [] };
+    
+    let varasDataOriginal = { recebidos: [], calculados: [], acervo: [], tempo: [] };
+    let jefDataOriginal = { recebidos: [], calculados: [], acervo: [], tempo: [] };
+    
+    let charts = { geral: {}, varas: {}, jef: {} };
+    let periodoAtualNome = '';
+    
+    const defaultMonths = ["2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04"];
+    
+    function formatLabel(ym) {
+        let partes = ym.split('-');
+        let nomes = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+        return `${nomes[parseInt(partes[1])-1]}/${partes[0]}`;
+    }
+    
+    function atualizarGeral() {
+        for (let i = 0; i < currentMonths.length; i++) {
+            geralData.recebidos[i] = (varasData.recebidos[i] || 0) + (jefData.recebidos[i] || 0);
+            geralData.calculados[i] = (varasData.calculados[i] || 0) + (jefData.calculados[i] || 0);
+            geralData.acervo[i] = (varasData.acervo[i] || 0) + (jefData.acervo[i] || 0);
+        }
+    }
+    
+    function calcularMedias(data, hasTempo = false) {
+        const total = currentMonths.length;
+        if (total === 0) return { rec: 0, calc: 0, ac: 0, tp: 0 };
+        return {
+            rec: data.recebidos.reduce((a,b)=>a+b,0)/total,
+            calc: data.calculados.reduce((a,b)=>a+b,0)/total,
+            ac: data.acervo.reduce((a,b)=>a+b,0)/total,
+            tp: hasTempo ? data.tempo.reduce((a,b)=>a+b,0)/total : 0
+        };
+    }
+    
+    function atualizarMeta() {
+        const el = document.getElementById('metaPeriodo');
+        if (!el || !currentMonthLabels.length) return;
+        const n = currentMonthLabels.length;
+        el.innerHTML = `<span class="chip">Período: <b>${currentMonthLabels[0]} a ${currentMonthLabels[n-1]}</b></span>` +
+            `<span class="chip"><b>${n}</b> ${n === 1 ? 'mês' : 'meses'}</span>` +
+            (activeFilter.startIndex !== null ? '<span class="chip">Filtro aplicado</span>' : '') +
+            (periodoAtualNome ? `<span class="chip">Registro: ${periodoAtualNome.replace(/^Período\s+/, '')}</span>` : '');
+    }
+
+    function atualizarStats() {
+        atualizarMeta();
+        const medVaras = calcularMedias(varasData, true);
+        const medJef = calcularMedias(jefData, true);
+        const medGeral = calcularMedias(geralData, false);
+        
+        const statsVaras = document.getElementById('statsVaras');
+        if (statsVaras) statsVaras.innerHTML = `
+            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${medVaras.rec.toFixed(1)}</div></div>
+            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${medVaras.calc.toFixed(1)}</div></div>
+            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${medVaras.ac.toFixed(1)}</div></div>
+            <div class="stat-card"><h3>Média Tempo (dias)</h3><div class="value">${medVaras.tp.toFixed(1)}</div></div>`;
+        
+        const statsJef = document.getElementById('statsJef');
+        if (statsJef) statsJef.innerHTML = `
+            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${medJef.rec.toFixed(1)}</div></div>
+            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${medJef.calc.toFixed(1)}</div></div>
+            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${medJef.ac.toFixed(1)}</div></div>
+            <div class="stat-card"><h3>Média Tempo (dias)</h3><div class="value">${medJef.tp.toFixed(1)}</div></div>`;
+        
+        const statsGeral = document.getElementById('statsGeral');
+        if (statsGeral) statsGeral.innerHTML = `
+            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${medGeral.rec.toFixed(1)}</div></div>
+            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${medGeral.calc.toFixed(1)}</div></div>
+            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${medGeral.ac.toFixed(1)}</div></div>`;
+    }
+    
+    function renderizarGraficos(aba, data, hasTempo = true, isGeral = false) {
+        const container = document.getElementById(`charts${aba.charAt(0).toUpperCase() + aba.slice(1)}`);
+        if (!container) return;
+        
+        if (charts[aba]) {
+            if (charts[aba].recebidos) charts[aba].recebidos.destroy();
+            if (charts[aba].calculados) charts[aba].calculados.destroy();
+            if (charts[aba].acervo) charts[aba].acervo.destroy();
+            if (charts[aba].tempo) charts[aba].tempo.destroy();
+            if (charts[aba].combined) charts[aba].combined.destroy();
+            if (charts[aba].tempoComparativo) charts[aba].tempoComparativo.destroy();
+        }
+        charts[aba] = {};
+        container.innerHTML = '';
+        
+        const cores = { recebidos: '#12355b', calculados: '#2f7d5b', acervo: '#b7791f', tempo: '#6b4f7a', varasTempo: '#12355b', jefTempo: '#2f7d5b' };
+        const titulos = { recebidos: 'Processos Recebidos', calculados: 'Processos Calculados', acervo: 'Evolução do Acervo', tempo: 'Tempo de Permanência (dias)' };
+        
+        const combinedCard = document.createElement('div');
+        combinedCard.className = 'chart-card combined-chart';
+        combinedCard.innerHTML = `<h4>Comparativo Geral (Quantidades)</h4><canvas id="combined_${aba}"></canvas>`;
+        container.appendChild(combinedCard);
+        
+        for (let tipo of ['recebidos', 'calculados', 'acervo', 'tempo']) {
+            if (!hasTempo && tipo === 'tempo') continue;
+            const card = document.createElement('div');
+            card.className = 'chart-card';
+            card.innerHTML = `<h4>${titulos[tipo]}</h4><canvas id="chart_${aba}_${tipo}"></canvas>`;
+            container.appendChild(card);
+        }
+        
+        if (isGeral) {
+            const tempoComparativoCard = document.createElement('div');
+            tempoComparativoCard.className = 'chart-card combined-chart';
+            tempoComparativoCard.innerHTML = `<h4>Comparativo Tempo de Permanência (dias) - Varas Comuns vs JEF</h4><canvas id="tempo_comparativo_${aba}"></canvas>`;
+            container.appendChild(tempoComparativoCard);
+        }
+        
+        charts[aba].recebidos = new Chart(document.getElementById(`chart_${aba}_recebidos`), {
+            type: 'line', data: { labels: currentMonthLabels, datasets: [{ label: titulos.recebidos, data: data.recebidos, borderColor: cores.recebidos, backgroundColor: cores.recebidos+'20', tension: 0.2, fill: true, pointRadius: 3 }] }, options: { responsive: true }
+        });
+        charts[aba].calculados = new Chart(document.getElementById(`chart_${aba}_calculados`), {
+            type: 'line', data: { labels: currentMonthLabels, datasets: [{ label: titulos.calculados, data: data.calculados, borderColor: cores.calculados, backgroundColor: cores.calculados+'20', tension: 0.2, fill: true, pointRadius: 3 }] }, options: { responsive: true }
+        });
+        charts[aba].acervo = new Chart(document.getElementById(`chart_${aba}_acervo`), {
+            type: 'line', data: { labels: currentMonthLabels, datasets: [{ label: titulos.acervo, data: data.acervo, borderColor: cores.acervo, backgroundColor: cores.acervo+'20', tension: 0.2, fill: true, pointRadius: 3 }] }, options: { responsive: true }
+        });
+        
+        if (hasTempo) {
+            charts[aba].tempo = new Chart(document.getElementById(`chart_${aba}_tempo`), {
+                type: 'line', data: { labels: currentMonthLabels, datasets: [{ label: titulos.tempo, data: data.tempo, borderColor: cores.tempo, backgroundColor: cores.tempo+'20', tension: 0.2, fill: true, pointRadius: 3 }] }, options: { responsive: true }
+            });
+        }
+        
+        const datasets = [
+            { label: 'Recebidos', data: data.recebidos, borderColor: cores.recebidos, backgroundColor: 'transparent', tension: 0.2, pointRadius: 2 },
+            { label: 'Calculados', data: data.calculados, borderColor: cores.calculados, backgroundColor: 'transparent', tension: 0.2, pointRadius: 2 },
+            { label: 'Acervo', data: data.acervo, borderColor: cores.acervo, backgroundColor: 'transparent', tension: 0.2, pointRadius: 2, borderDash: [5,5] }
+        ];
+        
+        charts[aba].combined = new Chart(document.getElementById(`combined_${aba}`), {
+            type: 'line', data: { labels: currentMonthLabels, datasets: datasets }, options: { responsive: true, plugins: { tooltip: { mode: 'index', intersect: false } }, scales: { y: { title: { display: true, text: 'Quantidade' } } } }
+        });
+        
+        if (isGeral) {
+            const tempoDatasets = [
+                { label: 'Varas Comuns', data: varasData.tempo, borderColor: cores.varasTempo, backgroundColor: cores.varasTempo+'20', tension: 0.2, fill: false, pointRadius: 3 },
+                { label: 'JEF', data: jefData.tempo, borderColor: cores.jefTempo, backgroundColor: cores.jefTempo+'20', tension: 0.2, fill: false, pointRadius: 3 }
+            ];
+            charts[aba].tempoComparativo = new Chart(document.getElementById(`tempo_comparativo_${aba}`), {
+                type: 'line', data: { labels: currentMonthLabels, datasets: tempoDatasets }, options: { responsive: true, plugins: { tooltip: { mode: 'index', intersect: false } }, scales: { y: { title: { display: true, text: 'Tempo (dias)' } } } }
+            });
+        }
+    }
+    
+    function renderizarTabelaVaras() {
+        const tbody = document.getElementById('tbodyVaras');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        
+        for (let i = 0; i < currentMonths.length; i++) {
+            const row = tbody.insertRow();
+            row.insertCell(0).innerText = currentMonthLabels[i];
+            
+            const cellRec = row.insertCell();
+            const inputRec = document.createElement('input');
+            inputRec.type = 'text';
+            inputRec.className = 'number-input';
+            inputRec.value = varasData.recebidos[i] !== undefined ? formatNumberWithDots(varasData.recebidos[i]) : '0';
+            createNumberInputHandler(inputRec, (rawValue) => {
+                varasData.recebidos[i] = rawValue;
+                atualizarGeral();
+                renderizarTabelaVaras();
+                renderizarTabelaJef();
+                renderizarTabelaGeral();
+                renderizarGraficos('varas', varasData, true, false);
+                renderizarGraficos('geral', geralData, false, true);
+                atualizarStats();
+            });
+            cellRec.appendChild(inputRec);
+            
+            const cellCalc = row.insertCell();
+            const inputCalc = document.createElement('input');
+            inputCalc.type = 'text';
+            inputCalc.className = 'number-input';
+            inputCalc.value = varasData.calculados[i] !== undefined ? formatNumberWithDots(varasData.calculados[i]) : '0';
+            createNumberInputHandler(inputCalc, (rawValue) => {
+                varasData.calculados[i] = rawValue;
+                atualizarGeral();
+                renderizarTabelaVaras();
+                renderizarTabelaJef();
+                renderizarTabelaGeral();
+                renderizarGraficos('varas', varasData, true, false);
+                renderizarGraficos('geral', geralData, false, true);
+                atualizarStats();
+            });
+            cellCalc.appendChild(inputCalc);
+            
+            const cellAcv = row.insertCell();
+            const inputAcv = document.createElement('input');
+            inputAcv.type = 'text';
+            inputAcv.className = 'number-input';
+            inputAcv.style.backgroundColor = '#fbf6e9';
+            inputAcv.value = varasData.acervo[i] !== undefined ? formatNumberWithDots(varasData.acervo[i]) : '0';
+            createNumberInputHandler(inputAcv, (rawValue) => {
+                varasData.acervo[i] = rawValue;
+                atualizarGeral();
+                renderizarTabelaVaras();
+                renderizarTabelaJef();
+                renderizarTabelaGeral();
+                renderizarGraficos('varas', varasData, true, false);
+                renderizarGraficos('geral', geralData, false, true);
+                atualizarStats();
+            });
+            cellAcv.appendChild(inputAcv);
+            
+            const cellTemp = row.insertCell();
+            const inputTemp = document.createElement('input');
+            inputTemp.type = 'text';
+            inputTemp.className = 'tempo-input';
+            inputTemp.readOnly = true;
+            inputTemp.style.backgroundColor = '#fbf6e9';
+            inputTemp.value = varasData.tempo[i] !== undefined ? varasData.tempo[i] : '0';
+            inputTemp.addEventListener('blur', function() {
+                let val = parseFloat(this.value.replace(',', '.')) || 0;
+                varasData.tempo[i] = parseFloat(val.toFixed(1));
+                this.value = varasData.tempo[i];
+                renderizarTabelaVaras();
+                renderizarGraficos('varas', varasData, true, false);
+                renderizarGraficos('geral', geralData, false, true);
+                atualizarStats();
+            });
+            inputTemp.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') this.blur();
+            });
+            cellTemp.appendChild(inputTemp);
+        }
+    }
+    
+    function renderizarTabelaJef() {
+        const tbody = document.getElementById('tbodyJef');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        
+        for (let i = 0; i < currentMonths.length; i++) {
+            const row = tbody.insertRow();
+            row.insertCell(0).innerText = currentMonthLabels[i];
+            
+            const cellRec = row.insertCell();
+            const inputRec = document.createElement('input');
+            inputRec.type = 'text';
+            inputRec.className = 'number-input';
+            inputRec.value = jefData.recebidos[i] !== undefined ? formatNumberWithDots(jefData.recebidos[i]) : '0';
+            createNumberInputHandler(inputRec, (rawValue) => {
+                jefData.recebidos[i] = rawValue;
+                atualizarGeral();
+                renderizarTabelaVaras();
+                renderizarTabelaJef();
+                renderizarTabelaGeral();
+                renderizarGraficos('jef', jefData, true, false);
+                renderizarGraficos('geral', geralData, false, true);
+                atualizarStats();
+            });
+            cellRec.appendChild(inputRec);
+            
+            const cellCalc = row.insertCell();
+            const inputCalc = document.createElement('input');
+            inputCalc.type = 'text';
+            inputCalc.className = 'number-input';
+            inputCalc.value = jefData.calculados[i] !== undefined ? formatNumberWithDots(jefData.calculados[i]) : '0';
+            createNumberInputHandler(inputCalc, (rawValue) => {
+                jefData.calculados[i] = rawValue;
+                atualizarGeral();
+                renderizarTabelaVaras();
+                renderizarTabelaJef();
+                renderizarTabelaGeral();
+                renderizarGraficos('jef', jefData, true, false);
+                renderizarGraficos('geral', geralData, false, true);
+                atualizarStats();
+            });
+            cellCalc.appendChild(inputCalc);
+            
+            const cellAcv = row.insertCell();
+            const inputAcv = document.createElement('input');
+            inputAcv.type = 'text';
+            inputAcv.className = 'number-input';
+            inputAcv.style.backgroundColor = '#fbf6e9';
+            inputAcv.value = jefData.acervo[i] !== undefined ? formatNumberWithDots(jefData.acervo[i]) : '0';
+            createNumberInputHandler(inputAcv, (rawValue) => {
+                jefData.acervo[i] = rawValue;
+                atualizarGeral();
+                renderizarTabelaVaras();
+                renderizarTabelaJef();
+                renderizarTabelaGeral();
+                renderizarGraficos('jef', jefData, true, false);
+                renderizarGraficos('geral', geralData, false, true);
+                atualizarStats();
+            });
+            cellAcv.appendChild(inputAcv);
+            
+            const cellTemp = row.insertCell();
+            const inputTemp = document.createElement('input');
+            inputTemp.type = 'text';
+            inputTemp.className = 'tempo-input';
+            inputTemp.readOnly = true;
+            inputTemp.style.backgroundColor = '#fbf6e9';
+            inputTemp.value = jefData.tempo[i] !== undefined ? jefData.tempo[i] : '0';
+            inputTemp.addEventListener('blur', function() {
+                let val = parseFloat(this.value.replace(',', '.')) || 0;
+                jefData.tempo[i] = parseFloat(val.toFixed(1));
+                this.value = jefData.tempo[i];
+                renderizarTabelaJef();
+                renderizarGraficos('jef', jefData, true, false);
+                renderizarGraficos('geral', geralData, false, true);
+                atualizarStats();
+            });
+            inputTemp.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') this.blur();
+            });
+            cellTemp.appendChild(inputTemp);
+        }
+    }
+    
+    function renderizarTabelaGeral() {
+        const tbody = document.getElementById('tbodyGeral');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        
+        for (let i = 0; i < currentMonths.length; i++) {
+            const row = tbody.insertRow();
+            row.insertCell(0).innerText = currentMonthLabels[i];
+            
+            const cellRec = row.insertCell();
+            const spanRec = document.createElement('span');
+            spanRec.className = 'readonly-value';
+            spanRec.innerText = formatNumberWithDots(geralData.recebidos[i] || 0);
+            cellRec.appendChild(spanRec);
+            
+            const cellCalc = row.insertCell();
+            const spanCalc = document.createElement('span');
+            spanCalc.className = 'readonly-value';
+            spanCalc.innerText = formatNumberWithDots(geralData.calculados[i] || 0);
+            cellCalc.appendChild(spanCalc);
+            
+            const cellAcv = row.insertCell();
+            const spanAcv = document.createElement('span');
+            spanAcv.className = 'readonly-value';
+            spanAcv.innerText = formatNumberWithDots(geralData.acervo[i] || 0);
+            cellAcv.appendChild(spanAcv);
+        }
+    }
+    
+    function atualizarListaMeses() {
+        const container = document.getElementById('monthList');
+        if (container && fullMonths.length) {
+            let html = "";
+            for (let i = 0; i < fullMonths.length; i++) {
+                html += `<span class="month-badge">${formatLabel(fullMonths[i])} <button onclick="removerMesPorIndex(${i})">✕</button></span>`;
+            }
+            container.innerHTML = html;
+        }
+        
+        const dataInicialSelect = document.getElementById('dataInicialSelect');
+        const dataFinalSelect = document.getElementById('dataFinalSelect');
+        if (dataInicialSelect && fullMonthLabels.length) {
+            dataInicialSelect.innerHTML = '<option value="">Selecione...</option>';
+            dataFinalSelect.innerHTML = '<option value="">Selecione...</option>';
+            for (let i = 0; i < fullMonthLabels.length; i++) {
+                const option1 = document.createElement('option');
+                option1.value = i;
+                option1.textContent = fullMonthLabels[i];
+                dataInicialSelect.appendChild(option1);
+                const option2 = document.createElement('option');
+                option2.value = i;
+                option2.textContent = fullMonthLabels[i];
+                dataFinalSelect.appendChild(option2);
+            }
+        }
+    }
+    
+    async function carregarDoBanco() {
+        const loading = document.getElementById('loading');
+        loading.classList.add('active');
+        try {
+            const { data: periodoData } = await supabaseClient.from('config_periodos').select('*').order('id', { ascending: false });
+            if (periodoData && periodoData.length > 0) {
+                const periodo = periodoData[0];
+                periodoAtualNome = periodo.nome_periodo || '';
+                fullMonths = periodo.meses;
+                fullMonthLabels = fullMonths.map(m => formatLabel(m));
+                const { data: dadosData } = await supabaseClient.from('dados_processos').select('*').eq('periodo_id', periodo.id);
+                for (let field of ['recebidos', 'calculados', 'acervo', 'tempo']) {
+                    const varasReg = dadosData?.find(r => r.aba === 'varas' && r.tipo === field);
+                    const jefReg = dadosData?.find(r => r.aba === 'jef' && r.tipo === field);
+                    varasDataOriginal[field] = varasReg?.valores ? [...varasReg.valores] : Array(fullMonths.length).fill(0);
+                    jefDataOriginal[field] = jefReg?.valores ? [...jefReg.valores] : Array(fullMonths.length).fill(0);
+                    varasData[field] = [...varasDataOriginal[field]];
+                    jefData[field] = [...jefDataOriginal[field]];
+                }
+            } else {
+                fullMonths = [...defaultMonths];
+                fullMonthLabels = fullMonths.map(m => formatLabel(m));
+                for (let field of ['recebidos', 'calculados', 'acervo', 'tempo']) {
+                    varasDataOriginal[field] = Array(fullMonths.length).fill(0);
+                    jefDataOriginal[field] = Array(fullMonths.length).fill(0);
+                    varasData[field] = [...varasDataOriginal[field]];
+                    jefData[field] = [...jefDataOriginal[field]];
+                }
+            }
+            
+            currentMonths = [...fullMonths];
+            currentMonthLabels = fullMonths.map(m => formatLabel(m));
+            
+            atualizarGeral();
+            renderizarTabelaVaras();
+            renderizarTabelaJef();
+            renderizarTabelaGeral();
+            renderizarGraficos('varas', varasData, true, false);
+            renderizarGraficos('jef', jefData, true, false);
+            renderizarGraficos('geral', geralData, false, true);
+            atualizarStats();
+            atualizarListaMeses();
+        } catch(err) { console.error(err); }
+        finally { loading.classList.remove('active'); }
+    }
+    
+    async function gerarPaginaRelatorio(aba, nome, data, med, hasTempo = true) {
+        const div = document.createElement('div');
+        div.style.width = '1100px';
+        div.style.padding = '40px';
+        div.style.backgroundColor = 'white';
+        div.style.fontFamily = 'Segoe UI, sans-serif';
+        
+        let tabelaHtml = '<table style="width:100%;border-collapse:collapse;border:1px solid #ccc;">';
+        if (hasTempo) {
+            tabelaHtml += '<thead><tr style="background:#f0f2f5;"><th style="padding:12px;border:1px solid #ccc;">Mês/Ano</th><th style="padding:12px;border:1px solid #ccc;">Processos Recebidos</th><th style="padding:12px;border:1px solid #ccc;">Processos Calculados</th><th style="padding:12px;border:1px solid #ccc;">Evolução do Acervo</th><th style="padding:12px;border:1px solid #ccc;">Tempo de Permanência (dias)</th></tr></thead><tbody>';
+        } else {
+            tabelaHtml += '<thead><tr style="background:#f0f2f5;"><th style="padding:12px;border:1px solid #ccc;">Mês/Ano</th><th style="padding:12px;border:1px solid #ccc;">Processos Recebidos</th><th style="padding:12px;border:1px solid #ccc;">Processos Calculados</th><th style="padding:12px;border:1px solid #ccc;">Evolução do Acervo</th></tr></thead><tbody>';
+        }
+        
+        for (let i = 0; i < currentMonths.length; i++) {
+            if (hasTempo) {
+                tabelaHtml += `<tr><td style="padding:10px;border:1px solid #ccc;">${currentMonthLabels[i]}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:right;">${formatNumberWithDots(data.recebidos[i] || 0)}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:right;">${formatNumberWithDots(data.calculados[i] || 0)}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:right;">${formatNumberWithDots(data.acervo[i] || 0)}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:center;">${(data.tempo[i] || 0).toFixed(1)}</td>
+                </tr>`;
+            } else {
+                tabelaHtml += `<tr><td style="padding:10px;border:1px solid #ccc;">${currentMonthLabels[i]}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:right;">${formatNumberWithDots(data.recebidos[i] || 0)}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:right;">${formatNumberWithDots(data.calculados[i] || 0)}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:right;">${formatNumberWithDots(data.acervo[i] || 0)}</td>
+                </tr>`;
+            }
+        }
+        tabelaHtml += '</tbody></table>';
+        
+        let statsHtml = '<div style="display:flex;gap:16px;margin:30px 0;">';
+        statsHtml += `<div style="flex:1;background:#f8fafc;padding:15px;border-radius:12px;text-align:center;"><strong>Média Recebidos</strong><br><span style="font-size:22px;font-weight:700;">${formatNumberWithDots(Math.round(med.rec))}</span></div>`;
+        statsHtml += `<div style="flex:1;background:#f8fafc;padding:15px;border-radius:12px;text-align:center;"><strong>Média Calculados</strong><br><span style="font-size:22px;font-weight:700;">${formatNumberWithDots(Math.round(med.calc))}</span></div>`;
+        statsHtml += `<div style="flex:1;background:#f8fafc;padding:15px;border-radius:12px;text-align:center;"><strong>Média Acervo</strong><br><span style="font-size:22px;font-weight:700;">${formatNumberWithDots(Math.round(med.ac))}</span></div>`;
+        if (hasTempo) {
+            statsHtml += `<div style="flex:1;background:#f8fafc;padding:15px;border-radius:12px;text-align:center;"><strong>Média Tempo (dias)</strong><br><span style="font-size:22px;font-weight:700;">${med.tp.toFixed(1)}</span></div>`;
+        }
+        statsHtml += '</div>';
+        
+        div.innerHTML = `
+            <h1 style="text-align:center;color:#0f3b5f;margin-bottom:20px;">Relatório - ${nome}</h1>
+            <p style="text-align:center;margin-bottom:30px;color:#475569;">Período: ${currentMonthLabels[0]} a ${currentMonthLabels[currentMonthLabels.length-1]} (${currentMonths.length} meses)</p>
+            ${tabelaHtml}
+            ${statsHtml}
+        `;
+        
+        document.body.appendChild(div);
+        await new Promise(r => setTimeout(r, 100));
+        const canvas = await html2canvas(div, { scale: 2.5, backgroundColor: '#ffffff' });
+        document.body.removeChild(div);
+        return canvas;
+    }
+    
+    async function gerarPaginaGraficos(aba, nome, hasTempo = true, isGeral = false) {
+        const div = document.createElement('div');
+        div.style.width = '1100px';
+        div.style.padding = '40px';
+        div.style.backgroundColor = 'white';
+        div.style.fontFamily = 'Segoe UI, sans-serif';
+        
+        let chartsHtml = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;">';
+        chartsHtml += '<div style="grid-column:span 2;border:1px solid #ddd;border-radius:12px;padding:15px;"><h4 style="text-align:center;">Comparativo Geral (Quantidades)</h4><img id="img_combined" style="width:100%;"></div>';
+        chartsHtml += '<div style="border:1px solid #ddd;border-radius:12px;padding:15px;"><h4 style="text-align:center;">Processos Recebidos</h4><img id="img_recebidos" style="width:100%;"></div>';
+        chartsHtml += '<div style="border:1px solid #ddd;border-radius:12px;padding:15px;"><h4 style="text-align:center;">Processos Calculados</h4><img id="img_calculados" style="width:100%;"></div>';
+        chartsHtml += '<div style="border:1px solid #ddd;border-radius:12px;padding:15px;"><h4 style="text-align:center;">Evolução do Acervo</h4><img id="img_acervo" style="width:100%;"></div>';
+        if (hasTempo) {
+            chartsHtml += '<div style="border:1px solid #ddd;border-radius:12px;padding:15px;"><h4 style="text-align:center;">Tempo de Permanência (dias)</h4><img id="img_tempo" style="width:100%;"></div>';
+        }
+        if (isGeral) {
+            chartsHtml += '<div style="grid-column:span 2;border:1px solid #ddd;border-radius:12px;padding:15px;"><h4 style="text-align:center;">Comparativo Tempo de Permanência (dias) - Varas Comuns vs JEF</h4><img id="img_tempo_comparativo" style="width:100%;"></div>';
+        }
+        chartsHtml += '</div>';
+        
+        div.innerHTML = `<h1 style="text-align:center;color:#0f3b5f;margin-bottom:30px;">Gráficos - ${nome}</h1>${chartsHtml}`;
+        
+        document.body.appendChild(div);
+        
+        const combinedCanvas = document.getElementById(`combined_${aba}`);
+        const recebidosCanvas = document.getElementById(`chart_${aba}_recebidos`);
+        const calculadosCanvas = document.getElementById(`chart_${aba}_calculados`);
+        const acervoCanvas = document.getElementById(`chart_${aba}_acervo`);
+        const tempoCanvas = document.getElementById(`chart_${aba}_tempo`);
+        const tempoComparativoCanvas = document.getElementById(`tempo_comparativo_${aba}`);
+        
+        if (combinedCanvas) document.getElementById('img_combined').src = combinedCanvas.toDataURL('image/png');
+        if (recebidosCanvas) document.getElementById('img_recebidos').src = recebidosCanvas.toDataURL('image/png');
+        if (calculadosCanvas) document.getElementById('img_calculados').src = calculadosCanvas.toDataURL('image/png');
+        if (acervoCanvas) document.getElementById('img_acervo').src = acervoCanvas.toDataURL('image/png');
+        if (hasTempo && tempoCanvas) document.getElementById('img_tempo').src = tempoCanvas.toDataURL('image/png');
+        if (isGeral && tempoComparativoCanvas) document.getElementById('img_tempo_comparativo').src = tempoComparativoCanvas.toDataURL('image/png');
+        
+        await new Promise(r => setTimeout(r, 200));
+        const canvas = await html2canvas(div, { scale: 2.5, backgroundColor: '#ffffff' });
+        document.body.removeChild(div);
+        return canvas;
+    }
+    
+    async function exportarPDFCompleto() {
+        const loading = document.getElementById('loading');
+        loading.classList.add('active');
+        try {
+            const medVaras = calcularMedias(varasData, true);
+            const medJef = calcularMedias(jefData, true);
+            const medGeral = calcularMedias(geralData, false);
+            
+            const canvasVarasRel = await gerarPaginaRelatorio('varas', 'Varas Comuns', varasData, medVaras, true);
+            const canvasVarasGraf = await gerarPaginaGraficos('varas', 'Varas Comuns', true, false);
+            
+            const canvasJefRel = await gerarPaginaRelatorio('jef', 'JEF', jefData, medJef, true);
+            const canvasJefGraf = await gerarPaginaGraficos('jef', 'JEF', true, false);
+            
+            const canvasGeralRel = await gerarPaginaRelatorio('geral', 'Geral Consolidado', geralData, medGeral, false);
+            const canvasGeralGraf = await gerarPaginaGraficos('geral', 'Geral Consolidado', true, true);
+            
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190;
+            const margin = 10;
+            
+            const imgData1 = canvasVarasRel.toDataURL('image/png');
+            const imgHeight1 = (canvasVarasRel.height * imgWidth) / canvasVarasRel.width;
+            pdf.addImage(imgData1, 'PNG', margin, margin, imgWidth, imgHeight1);
+            
+            pdf.addPage();
+            const imgData2 = canvasVarasGraf.toDataURL('image/png');
+            const imgHeight2 = (canvasVarasGraf.height * imgWidth) / canvasVarasGraf.width;
+            pdf.addImage(imgData2, 'PNG', margin, margin, imgWidth, imgHeight2);
+            
+            pdf.addPage();
+            const imgData3 = canvasJefRel.toDataURL('image/png');
+            const imgHeight3 = (canvasJefRel.height * imgWidth) / canvasJefRel.width;
+            pdf.addImage(imgData3, 'PNG', margin, margin, imgWidth, imgHeight3);
+            
+            pdf.addPage();
+            const imgData4 = canvasJefGraf.toDataURL('image/png');
+            const imgHeight4 = (canvasJefGraf.height * imgWidth) / canvasJefGraf.width;
+            pdf.addImage(imgData4, 'PNG', margin, margin, imgWidth, imgHeight4);
+            
+            pdf.addPage();
+            const imgData5 = canvasGeralRel.toDataURL('image/png');
+            const imgHeight5 = (canvasGeralRel.height * imgWidth) / canvasGeralRel.width;
+            pdf.addImage(imgData5, 'PNG', margin, margin, imgWidth, imgHeight5);
+            
+            pdf.addPage();
+            const imgData6 = canvasGeralGraf.toDataURL('image/png');
+            const imgHeight6 = (canvasGeralGraf.height * imgWidth) / canvasGeralGraf.width;
+            pdf.addImage(imgData6, 'PNG', margin, margin, imgWidth, imgHeight6);
+            
+            pdf.save(`relatorio_completo_${new Date().toISOString().slice(0,19)}.pdf`);
+        } catch(err) { console.error(err); alert('Erro: ' + err.message); }
+        finally { loading.classList.remove('active'); }
+    }
+    
+    async function gerarPDFUnico(aba, nome, data, hasTempo = true, isGeral = false) {
+        const loading = document.getElementById('loading');
+        loading.classList.add('active');
+        try {
+            const med = calcularMedias(data, hasTempo);
+            const canvasRel = await gerarPaginaRelatorio(aba, nome, data, med, hasTempo);
+            const canvasGraf = await gerarPaginaGraficos(aba, nome, hasTempo, isGeral);
+            
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190;
+            const margin = 10;
+            
+            const imgData1 = canvasRel.toDataURL('image/png');
+            const imgHeight1 = (canvasRel.height * imgWidth) / canvasRel.width;
+            pdf.addImage(imgData1, 'PNG', margin, margin, imgWidth, imgHeight1);
+            
+            pdf.addPage();
+            const imgData2 = canvasGraf.toDataURL('image/png');
+            const imgHeight2 = (canvasGraf.height * imgWidth) / canvasGraf.width;
+            pdf.addImage(imgData2, 'PNG', margin, margin, imgWidth, imgHeight2);
+            
+            pdf.save(`${nome.replace(/ /g, '_')}_${new Date().toISOString().slice(0,19)}.pdf`);
+        } catch(err) { console.error(err); alert('Erro: ' + err.message); }
+        finally { loading.classList.remove('active'); }
+    }
+    
+    function aplicarFiltro(startIdx, endIdx) {
+        if (startIdx === null || endIdx === null || startIdx > endIdx) {
+            activeFilter = { startIndex: null, endIndex: null };
+            currentMonths = [...fullMonths];
+            currentMonthLabels = fullMonths.map(m => formatLabel(m));
+            document.getElementById('filterInfo').style.display = 'none';
+        } else {
+            activeFilter = { startIndex: startIdx, endIndex: endIdx };
+            currentMonths = fullMonths.slice(startIdx, endIdx + 1);
+            currentMonthLabels = fullMonthLabels.slice(startIdx, endIdx + 1);
+            const infoDiv = document.getElementById('filterInfo');
+            infoDiv.innerHTML = `Filtro ativo: ${fullMonthLabels[startIdx]} a ${fullMonthLabels[endIdx]} (${currentMonths.length} meses)`;
+            infoDiv.style.display = 'block';
+        }
+        
+        const newLength = currentMonths.length;
+        for (let field of ['recebidos', 'calculados', 'acervo', 'tempo']) {
+            if (varasData[field].length > newLength) {
+                varasData[field] = varasData[field].slice(0, newLength);
+                jefData[field] = jefData[field].slice(0, newLength);
+            } else if (varasData[field].length < newLength) {
+                while (varasData[field].length < newLength) { varasData[field].push(0); }
+                while (jefData[field].length < newLength) { jefData[field].push(0); }
+            }
+        }
+        
+        atualizarGeral();
+        renderizarTabelaVaras();
+        renderizarTabelaJef();
+        renderizarTabelaGeral();
+        renderizarGraficos('varas', varasData, true, false);
+        renderizarGraficos('jef', jefData, true, false);
+        renderizarGraficos('geral', geralData, false, true);
+        atualizarStats();
+    }
+    
+    function limparFiltro() {
+        activeFilter = { startIndex: null, endIndex: null };
+        currentMonths = [...fullMonths];
+        currentMonthLabels = fullMonths.map(m => formatLabel(m));
+        document.getElementById('filterInfo').style.display = 'none';
+        document.getElementById('dataInicialSelect').value = '';
+        document.getElementById('dataFinalSelect').value = '';
+        
+        for (let field of ['recebidos', 'calculados', 'acervo', 'tempo']) {
+            varasData[field] = [...varasDataOriginal[field]];
+            jefData[field] = [...jefDataOriginal[field]];
+        }
+        
+        atualizarGeral();
+        renderizarTabelaVaras();
+        renderizarTabelaJef();
+        renderizarTabelaGeral();
+        renderizarGraficos('varas', varasData, true, false);
+        renderizarGraficos('jef', jefData, true, false);
+        renderizarGraficos('geral', geralData, false, true);
+        atualizarStats();
+    }
+    
+    function init() {
+        carregarDoBanco();
+        
+        document.getElementById('refreshFromDBBtn')?.addEventListener('click', carregarDoBanco);
+        document.getElementById('exportCompletePDFBtn')?.addEventListener('click', exportarPDFCompleto);
+        document.getElementById('exportVarasBtn')?.addEventListener('click', () => gerarPDFUnico('varas', 'Varas Comuns', varasData, true, false));
+        document.getElementById('exportJefBtn')?.addEventListener('click', () => gerarPDFUnico('jef', 'JEF', jefData, true, false));
+        document.getElementById('exportGeralBtn')?.addEventListener('click', () => gerarPDFUnico('geral', 'Geral Consolidado', geralData, true, true));
+        document.getElementById('aplicarFiltroBtn')?.addEventListener('click', () => {
+            const start = document.getElementById('dataInicialSelect').value;
+            const end = document.getElementById('dataFinalSelect').value;
+            if (start !== '' && end !== '') { aplicarFiltro(parseInt(start), parseInt(end)); }
+            else { alert('Selecione as datas inicial e final'); }
+        });
+        document.getElementById('limparFiltroBtn')?.addEventListener('click', limparFiltro);
+        
+    }
+    
+    init();
+</script>
+<script src="sampinha.js"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAMP - Sistema de Acompanhamento e Métricas Processuais</title>
+<link rel="icon" href="icone.png">
+<link rel="stylesheet" href="theme.css">
+<style>
+  .hero { padding: 40px 0 28px; }
+  .hero .eyebrow { font-size: .72rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+  .hero h1 { font-size: 1.9rem; color: var(--navy); font-weight: 600; margin: 6px 0 8px; }
+  .hero p { color: var(--muted); max-width: 640px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  a.card { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; text-decoration: none; color: var(--ink); transition: border-color .15s, box-shadow .15s; }
+  a.card:hover { border-color: var(--navy); box-shadow: 0 2px 10px rgba(18,53,91,.12); }
+  .card .ico { width: 44px; height: 44px; border-radius: var(--radius); background: var(--navy-soft); color: var(--navy); display: grid; place-items: center; margin-bottom: 16px; }
+  .card .ico svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .card .tag { font-size: .68rem; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .card h2 { font-size: 1.15rem; color: var(--navy); margin: 4px 0 8px; font-weight: 600; }
+  .card p { color: var(--muted); font-size: .9rem; flex: 1; }
+  .card ul { margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line-soft); list-style: none; font-size: .82rem; color: var(--ink); display: grid; gap: 4px; }
+  .card ul li::before { content: ""; display: inline-block; width: 5px; height: 5px; background: var(--gold); margin-right: 9px; vertical-align: middle; }
+  .card .go { margin-top: 16px; color: var(--navy); font-weight: 600; font-size: .85rem; }
+  a.card:hover .go { text-decoration: underline; }
+  .card.restrito { background: #fbfcfd; }
+</style>
+</head>
+<body data-page="inicio">
+<script src="layout.js"></script>
+<main class="page">
+  <section class="hero">
+    <div class="eyebrow" id="saudacao">SAMP</div>
+    <h1>Sistema de Acompanhamento e Métricas Processuais</h1>
+    <p>Consulte os painéis de análise e de metas ou acesse o módulo de cadastros para atualizar as informações do sistema.</p>
+  </section>
+
+  <div class="cards">
+    <a class="card" href="analise.html">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/><circle cx="19" cy="19" r="2"/></svg></div>
+      <div class="tag">Consulta</div>
+      <h2>Análise de Processos</h2>
+      <p>Processos organizados por assunto, vara, polo passivo e advogado, com classificação por prazo.</p>
+      <ul><li>Indicadores de prazo</li><li>Busca e agrupamentos</li><li>Relatório para impressão</li></ul>
+      <span class="go">Acessar &rarr;</span>
+    </a>
+    <a class="card" href="metricas.html">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
+      <div class="tag">Consulta</div>
+      <h2>Metas Processuais</h2>
+      <p>Estatísticas de processos recebidos, calculados, acervo e tempo médio nas Varas Comuns e no JEF.</p>
+      <ul><li>Varas, JEF e consolidado</li><li>Filtro por período</li><li>Exportação em PDF</li></ul>
+      <span class="go">Acessar &rarr;</span>
+    </a>
+    <a class="card restrito" href="cadastros.html">
+      <div class="ico"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+      <div class="tag">Acesso restrito</div>
+      <h2>Cadastros</h2>
+      <p>Inclusão e exclusão de dados de todos os módulos. Exige senha de cadastro.</p>
+      <ul><li>Importação da base de processos</li><li>Prazos de classificação</li><li>Períodos de metas</li></ul>
+      <span class="go">Acessar &rarr;</span>
+    </a>
+  </div>
+</main>
+<script>
+  (function () { const u = window.SAMP_USUARIO; if (u) document.getElementById("saudacao").textContent = "Olá, " + u.nome.split(" ")[0] + " - SAMP"; })();
+</script>
+</body>
+</html>

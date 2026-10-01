@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAMP - Acesso</title>
+<link rel="icon" href="icone.png">
+<script src="config.js"></script>
+<link rel="stylesheet" href="theme.css">
+<style>
+  /* a tela de acesso tem layout próprio: sem barra superior nem rodapé comuns */
+  body[data-page="entrar"] .app-bar, body[data-page="entrar"] .app-footer { display: none !important; }
+  body { transition: opacity .35s ease; }
+  body.saindo { opacity: 0; }
+
+  .login { flex: 1; display: grid; grid-template-columns: 1.08fr 1fr; min-height: 100vh; min-height: 100dvh; }
+
+  /* ---------- painel institucional ---------- */
+  .marca { position: relative; overflow: hidden; background: var(--navy-dark); color: #fff; padding: 56px 56px 40px; display: flex; flex-direction: column; justify-content: space-between; }
+  .marca::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px); background-size: 44px 44px; mask-image: linear-gradient(to bottom, #000 30%, transparent 95%); -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 95%); }
+  .marca::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--gold); }
+  .marca > * { position: relative; z-index: 1; }
+  .logo { display: flex; align-items: baseline; gap: 14px; animation: sobe .7s .05s both; }
+  .logo b { font-size: 1.9rem; letter-spacing: 3px; }
+  .logo span { font-size: .8rem; opacity: .75; max-width: 230px; line-height: 1.3; }
+  .tese { max-width: 460px; }
+  .tese h2 { font-size: 1.85rem; font-weight: 600; line-height: 1.25; margin-bottom: 14px; animation: sobe .8s .2s both; }
+  .tese h2 em { font-style: normal; color: #e0c98f; }
+  .tese p { opacity: .8; line-height: 1.55; animation: sobe .8s .32s both; }
+  .grafico { width: 100%; max-width: 470px; margin: 28px 0 8px; animation: sobe .8s .42s both; }
+  .grafico .barra { fill: rgba(255,255,255,.13); transform-box: fill-box; transform-origin: bottom; transform: scaleY(0); animation: cresce .9s cubic-bezier(.2,.8,.2,1) forwards; }
+  .grafico .barra.dest { fill: rgba(224,201,143,.55); }
+  .grafico .linha { fill: none; stroke: #e0c98f; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 700; stroke-dashoffset: 700; animation: traca 2.1s 1.1s cubic-bezier(.4,.1,.2,1) forwards; }
+  .grafico .ponto { fill: #0c2540; stroke: #e0c98f; stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; animation: surge .4s forwards; }
+  .grafico .pulso { fill: none; stroke: #e0c98f; stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: center; animation: pulsa 2.4s 3.4s infinite; }
+  .grafico .eixo { stroke: rgba(255,255,255,.22); stroke-width: 1; }
+  .topicos { list-style: none; display: grid; gap: 12px; margin-top: 18px; }
+  .topicos li { display: flex; align-items: center; gap: 12px; font-size: .9rem; opacity: 0; animation: sobe .7s both; }
+  .topicos li:nth-child(1) { animation-delay: .55s; } .topicos li:nth-child(2) { animation-delay: .68s; } .topicos li:nth-child(3) { animation-delay: .81s; }
+  .topicos svg { flex: none; width: 34px; height: 34px; padding: 7px; border: 1px solid rgba(255,255,255,.22); border-radius: 4px; stroke: #e0c98f; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .rodape-marca { font-size: .74rem; opacity: .6; margin-top: 28px; }
+
+  /* ---------- formulário ---------- */
+  .acesso { min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 28px; background: var(--bg); }
+  .caixa { width: 100%; max-width: 410px; min-width: 0; position: relative; }
+  .cartao { background: #fff; border: 1px solid var(--line); border-top: 3px solid var(--navy); border-radius: var(--radius); padding: 34px 32px 28px; box-shadow: 0 8px 28px rgba(12,37,64,.08); animation: sobe .7s .15s both; overflow: hidden; }
+  .cartao .eyebrow { font-size: .7rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 700; animation: sobe .6s .3s both; }
+  .cartao h1 { font-size: 1.55rem; color: var(--navy); font-weight: 600; margin: 6px 0 6px; animation: sobe .6s .36s both; }
+  .cartao .sub { color: var(--muted); font-size: .9rem; margin-bottom: 20px; animation: sobe .6s .42s both; }
+  .destino { display: none; align-items: center; gap: 8px; background: var(--navy-soft); color: var(--navy); border: 1px solid #d5deea; border-radius: 3px; padding: 7px 11px; font-size: .8rem; margin-bottom: 16px; animation: sobe .5s both; }
+  .destino.on { display: flex; }
+  .aviso { display: none; border-radius: 3px; padding: 8px 12px; font-size: .82rem; margin-bottom: 16px; animation: desce .4s both; }
+  .aviso.on { display: block; }
+  .aviso.info { background: #fbf3e0; color: #7a5a14; border: 1px solid #ecd9a8; }
+  .aviso.ok { background: #e5f1ea; color: var(--ok); border: 1px solid #bfdccb; }
+
+  .campo { position: relative; margin-bottom: 14px; animation: sobe .6s .5s both; }
+  .campo .ico { position: absolute; left: 14px; top: 50%; width: 20px; height: 20px; margin-top: -10px; stroke: var(--muted); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; transition: stroke .2s; pointer-events: none; }
+  .campo input { width: 100%; height: 54px; padding: 22px 14px 6px 44px; font-size: 1.08rem; letter-spacing: .6px; text-transform: uppercase; border: 1px solid #b9c2cc !important; border-radius: var(--radius) !important; background: #fff; transition: border-color .2s, box-shadow .2s; outline: none !important; }
+  .campo input::placeholder { color: transparent; }
+  .campo label { position: absolute; left: 44px; top: 17px; font-size: .95rem; color: var(--muted); pointer-events: none; transform-origin: left top; transition: transform .2s ease, color .2s; }
+  .campo input:focus + label, .campo input:not(:placeholder-shown) + label { transform: translateY(-11px) scale(.76); color: var(--navy); font-weight: 600; }
+  .campo input:focus { border-color: var(--navy) !important; box-shadow: 0 0 0 3px rgba(18,53,91,.14); }
+  .campo input:focus ~ .ico { stroke: var(--navy); }
+  .campo .barra-foco { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--navy); border-radius: 0 0 3px 3px; transform: scaleX(0); transform-origin: left; transition: transform .3s ease; pointer-events: none; }
+  .campo input:focus ~ .barra-foco { transform: scaleX(1); }
+  .campo.erro input { border-color: var(--bad) !important; box-shadow: 0 0 0 3px rgba(179,38,30,.12); }
+  .campo.erro .ico { stroke: var(--bad); }
+  .campo.balanca { animation: balanca .45s; }
+
+  .msg { color: var(--bad); font-size: .84rem; min-height: 0; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .3s, opacity .3s, margin .3s; }
+  .msg.on { max-height: 70px; opacity: 1; margin: -4px 0 12px; }
+  .opcoes { display: flex; align-items: center; justify-content: space-between; font-size: .82rem; color: var(--muted); margin-bottom: 18px; animation: sobe .6s .58s both; }
+  .opcoes label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .opcoes input { width: 16px; height: 16px; accent-color: var(--navy); }
+
+  .entrar { width: 100%; height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: var(--navy); color: #fff; border: 1px solid var(--navy); border-radius: var(--radius); font-size: .95rem; font-weight: 600; letter-spacing: .3px; cursor: pointer; position: relative; overflow: hidden; transition: background .2s, transform .1s; animation: sobe .6s .64s both; }
+  .entrar:hover:not(:disabled) { background: var(--navy-dark); }
+  .entrar:active:not(:disabled) { transform: scale(.985); }
+  .entrar:disabled { cursor: progress; }
+  .entrar .seta { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s; }
+  .entrar:hover:not(:disabled) .seta { transform: translateX(5px); }
+  .entrar .giro { display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: gira .7s linear infinite; }
+  .entrar.carregando .seta { display: none; } .entrar.carregando .giro { display: inline-block; }
+  .entrar::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--gold); transform: scaleX(0); transform-origin: left; }
+  .entrar.carregando::after { animation: carrega 1.6s ease-in-out infinite; }
+  .ajuda { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: .8rem; line-height: 1.5; animation: sobe .6s .72s both; }
+  .ajuda a { color: var(--navy); }
+  .ajuda .dica { display: none; color: var(--warn); margin-top: 6px; }
+  .ajuda .dica.on { display: block; animation: desce .4s both; }
+  .legal { margin-top: 18px; font-size: .72rem; color: var(--muted); text-align: center; animation: sobe .6s .8s both; }
+
+  /* ---------- sequência de boas-vindas ---------- */
+  .form-wrap { transition: opacity .3s, transform .3s; }
+  .cartao.concluido .form-wrap { opacity: 0; transform: translateY(-8px); pointer-events: none; position: absolute; visibility: hidden; transition-delay: 0s; }
+  .boasvindas { display: none; text-align: center; padding: 22px 0 14px; }
+  .cartao.concluido .boasvindas { display: block; animation: sobe .5s both; }
+  .selo { width: 86px; height: 86px; margin: 0 auto 20px; }
+  .selo circle { fill: none; stroke: var(--ok); stroke-width: 3; stroke-dasharray: 252; stroke-dashoffset: 252; transform-origin: center; transform: rotate(-90deg); animation: traca-s .7s .1s ease-out forwards; }
+  .selo path { fill: none; stroke: var(--ok); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 50; stroke-dashoffset: 50; animation: traca-s .4s .7s ease-out forwards; }
+  .boasvindas h2 { font-size: 1.45rem; color: var(--navy); font-weight: 600; }
+  .boasvindas p { color: var(--muted); font-size: .9rem; margin: 6px 0 22px; }
+  .progresso { height: 4px; background: var(--line-soft); border-radius: 2px; overflow: hidden; }
+  .progresso i { display: block; height: 100%; width: 0; background: var(--navy); border-radius: 2px; }
+  .cartao.concluido .progresso i { animation: encher 1.5s .5s ease-in-out forwards; }
+
+  @keyframes sobe { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes desce { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  @keyframes cresce { to { transform: scaleY(1); } }
+  @keyframes traca { to { stroke-dashoffset: 0; } }
+  @keyframes traca-s { to { stroke-dashoffset: 0; } }
+  @keyframes surge { 0% { opacity: 0; transform: scale(.2); } 70% { transform: scale(1.25); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes pulsa { 0% { opacity: .75; transform: scale(1); } 100% { opacity: 0; transform: scale(3.2); } }
+  @keyframes balanca { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-7px); } 40%, 60% { transform: translateX(7px); } }
+  @keyframes gira { to { transform: rotate(360deg); } }
+  @keyframes carrega { 0% { transform: scaleX(0); transform-origin: left; } 50% { transform: scaleX(1); transform-origin: left; } 51% { transform: scaleX(1); transform-origin: right; } 100% { transform: scaleX(0); transform-origin: right; } }
+  @keyframes encher { to { width: 100%; } }
+
+  @media (max-width: 900px) {
+    .login { grid-template-columns: minmax(0, 1fr); }
+    .marca { padding: 24px 22px 20px; }
+    .tese, .grafico, .topicos, .rodape-marca { display: none; }
+    .acesso { padding: 26px 16px 40px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    .grafico .linha { stroke-dashoffset: 0; } .grafico .barra { transform: none; } .grafico .ponto { opacity: 1; }
+  }
+</style>
+</head>
+<body data-page="entrar">
+<script src="layout.js"></script>
+<div class="login">
+
+  <aside class="marca" aria-hidden="false">
+    <div class="logo"><b>SAMP</b><span>Sistema de Acompanhamento e Métricas Processuais</span></div>
+
+    <div class="tese">
+      <h2>Acompanhe os processos e as metas da unidade <em>em um só lugar</em>.</h2>
+      <p>Prazos, varas, assuntos e indicadores consolidados, com apoio da Sampinha, a assistente de IA do sistema.</p>
+
+      <svg class="grafico" viewBox="0 0 480 220" role="img" aria-label="Ilustração de um gráfico de evolução">
+        <line class="eixo" x1="10" y1="196" x2="470" y2="196"/>
+        <g>
+          <rect class="barra" style="animation-delay:.5s"  x="26"  y="136" width="36" height="60" rx="2"/>
+          <rect class="barra" style="animation-delay:.6s"  x="86"  y="116" width="36" height="80" rx="2"/>
+          <rect class="barra" style="animation-delay:.7s"  x="146" y="146" width="36" height="50" rx="2"/>
+          <rect class="barra" style="animation-delay:.8s"  x="206" y="96"  width="36" height="100" rx="2"/>
+          <rect class="barra" style="animation-delay:.9s"  x="266" y="106" width="36" height="90" rx="2"/>
+          <rect class="barra dest" style="animation-delay:1s" x="326" y="66"  width="36" height="130" rx="2"/>
+          <rect class="barra dest" style="animation-delay:1.1s" x="386" y="46" width="36" height="150" rx="2"/>
+        </g>
+        <path class="linha" d="M44 118 C 74 96, 98 100, 104 92 S 160 124, 164 118 S 220 70, 224 72 S 284 84, 284 82 S 344 44, 344 44 S 404 22, 404 22"/>
+        <g>
+          <circle class="ponto" style="animation-delay:1.7s" cx="104" cy="92"  r="5"/>
+          <circle class="ponto" style="animation-delay:2.1s" cx="224" cy="72"  r="5"/>
+          <circle class="ponto" style="animation-delay:2.6s" cx="344" cy="44"  r="5"/>
+          <circle class="ponto" style="animation-delay:3.1s" cx="404" cy="22"  r="5"/>
+          <circle class="pulso" cx="404" cy="22" r="6"/>
+        </g>
+      </svg>
+
+      <ul class="topicos">
+        <li><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/><circle cx="19" cy="19" r="2"/></svg>Análise de processos por prazo, vara, assunto e advogado</li>
+        <li><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Metas processuais com gráficos e relatórios em PDF</li>
+        <li><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>Sampinha: consultas em linguagem natural</li>
+      </ul>
+    </div>
+
+    <div class="rodape-marca">Acesso restrito a servidores, prestadores e estagiários com matrícula autorizada.</div>
+  </aside>
+
+  <main class="acesso">
+    <div class="caixa">
+      <section class="cartao" id="cartao">
+
+        <div class="form-wrap">
+          <div class="eyebrow">Acesso ao sistema</div>
+          <h1>Bem-vindo(a)</h1>
+          <p class="sub">Informe a sua matrícula para entrar no SAMP.</p>
+
+          <div class="destino" id="destino"></div>
+          <div class="aviso" id="aviso" role="status"></div>
+
+          <form id="form" autocomplete="off" novalidate>
+            <div class="campo" id="campo">
+              <input id="matricula" name="matricula" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="30" placeholder=" " autofocus required aria-describedby="msg">
+              <label for="matricula">Matrícula</label>
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M6 16c.6-1.6 1.7-2.4 3-2.4s2.4.8 3 2.4M14.5 10h4M14.5 13h3"/></svg>
+              <span class="barra-foco"></span>
+            </div>
+            <div class="msg" id="msg" role="alert"></div>
+
+            <div class="opcoes"><label><input type="checkbox" id="lembrar"> Lembrar neste computador</label></div>
+
+            <button type="submit" class="entrar" id="entrar">
+              <span class="giro" aria-hidden="true"></span>
+              <span class="txt">Entrar</span>
+              <svg class="seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </form>
+
+          <div class="ajuda">
+            Não consegue acessar? Solicite o cadastro da sua matrícula ao responsável pelo sistema.
+            <div class="dica" id="dica">Dica: digite somente a matrícula, sem espaços ou outros caracteres.</div>
+            <div style="margin-top:8px"><a href="cadastros.html">Acesso ao Cadastros (administrador)</a></div>
+          </div>
+        </div>
+
+        <div class="boasvindas" id="boasvindas" aria-live="polite">
+          <svg class="selo" viewBox="0 0 86 86" aria-hidden="true"><circle cx="43" cy="43" r="40"/><path d="M27 44l11 11 22-24"/></svg>
+          <h2 id="olaNome">Olá!</h2>
+          <p>Acesso autorizado. Preparando o seu ambiente...</p>
+          <div class="progresso"><i></i></div>
+        </div>
+      </section>
+      <div class="legal">SAMP &middot; Sistema de Acompanhamento e Métricas Processuais</div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const PAGINAS = { 'index.html': 'Início', 'analise.html': 'Análise de Processos', 'metricas.html': 'Metas Processuais' };
+  const params = new URLSearchParams(location.search);
+  const volta = params.get('volta');
+  const destino = PAGINAS[volta] ? volta : 'index.html';
+  const reduzir = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (window.SAMP_AUTH.get()) { location.replace(destino); return; }
+
+  /* ---------- contexto ---------- */
+  const aviso = (texto, tipo) => { const a = $('aviso'); a.textContent = texto; a.className = 'aviso on ' + tipo; };
+  if (params.get('expirou')) aviso('Sua sessão expirou. Entre novamente para continuar.', 'info');
+  else if (params.get('saiu')) aviso('Você saiu com segurança.', 'ok');
+  if (volta && destino !== 'index.html') { const d = $('destino'); d.textContent = 'Depois de entrar, você irá para: ' + PAGINAS[destino]; d.classList.add('on'); }
+
+  try { const m = localStorage.getItem('samp_lembrar'); if (m) { $('matricula').value = m; $('lembrar').checked = true; } } catch (e) {}
+
+  /* ---------- erro / carregamento ---------- */
+  let tentativas = 0;
+  function mostrarErro(texto) {
+    const campo = $('campo'), msg = $('msg');
+    msg.textContent = texto; msg.classList.add('on');
+    campo.classList.remove('balanca'); void campo.offsetWidth;
+    campo.classList.add('erro', 'balanca');
+    if (++tentativas >= 2) $('dica').classList.add('on');
+  }
+  function limparErro() { $('campo').classList.remove('erro', 'balanca'); $('msg').classList.remove('on'); }
+  $('matricula').addEventListener('input', limparErro);
+  function carregando(v) {
+    const b = $('entrar');
+    b.disabled = v; b.classList.toggle('carregando', v); b.querySelector('.txt').textContent = v ? 'Verificando...' : 'Entrar';
+    $('matricula').readOnly = v;
+  }
+
+  /* ---------- envio ---------- */
+  $('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const matricula = $('matricula').value.replace(/\s+/g, '').toUpperCase();
+    if (!matricula) { mostrarErro('Informe a sua matrícula.'); $('matricula').focus(); return; }
+    limparErro(); $('aviso').classList.remove('on'); carregando(true);
+    try {
+      const r = await window.chamarSAMP({ action: 'login', matricula });
+      window.SAMP_AUTH.set({ token: r.token, exp: r.exp, nome: r.nome, matricula: r.matricula });
+      try { if ($('lembrar').checked) localStorage.setItem('samp_lembrar', r.matricula); else localStorage.removeItem('samp_lembrar'); } catch (x) {}
+      boasVindas(r.nome);
+    } catch (err) {
+      carregando(false);
+      mostrarErro(err.message === 'Failed to fetch' ? 'Não foi possível contatar o servidor. Verifique a conexão e tente novamente.' : (err.status === 401 ? 'Matrícula não autorizada. Confira o número digitado.' : err.message));
+      $('matricula').select();
+    }
+  });
+
+  /* ---------- sequência de boas-vindas ---------- */
+  function boasVindas(nome) {
+    $('olaNome').textContent = 'Olá, ' + String(nome).split(' ')[0] + '!';
+    $('cartao').classList.add('concluido');
+    setTimeout(() => { document.body.classList.add('saindo'); setTimeout(() => location.replace(destino), reduzir ? 30 : 380); }, reduzir ? 500 : 2100);
+  }
+})();
+</script>
+</body>
+</html>

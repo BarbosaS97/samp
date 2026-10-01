@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAMP - Cadastros</title>
+<link rel="icon" href="icone.png">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<link rel="stylesheet" href="theme.css">
+<style>
+  .btn { padding: 9px 18px; cursor: pointer; display: inline-flex; align-items: center; font-size: .85rem; }
+  .tabs { display: flex; }
+  .tab { padding: 14px 20px; background: transparent; border: none; cursor: pointer; font-size: 14px; }
+  .hidden { display: none !important; }
+  .gate-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 16px; }
+  .gate { width: 100%; max-width: 420px; margin: 0; background: #fff; border: 1px solid var(--line); border-top: 3px solid var(--navy); border-radius: var(--radius); padding: 28px; }
+  .gate h1 { font-size: 1.25rem; color: var(--navy); font-weight: 600; margin-bottom: 4px; }
+  .gate p { color: var(--muted); margin-bottom: 18px; font-size: .9rem; }
+  .gate input { width: 100%; padding: 10px 12px; margin-bottom: 12px; font-size: 1rem; }
+  .gate .btn { width: 100%; justify-content: center; }
+  .msg { font-size: .85rem; margin-top: 8px; min-height: 1.2em; }
+  .msg.err { color: var(--bad); } .msg.ok { color: var(--ok); }
+  .topline { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .tabs { margin-bottom: 0; }
+  .pane { background: #fff; border: 1px solid var(--line); border-radius: 0 0 var(--radius) var(--radius); padding: 24px; }
+  .pane h2 { font-size: 1.05rem; color: var(--navy); font-weight: 600; margin-bottom: 4px; }
+  .pane .desc { color: var(--muted); font-size: .88rem; margin-bottom: 18px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: .7rem; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 600; }
+  .field input, .field select { padding: 8px 10px; min-width: 120px; }
+  .info { background: var(--navy-soft); color: var(--navy); border-radius: var(--radius); padding: 10px 14px; font-size: .88rem; margin-bottom: 16px; }
+  .grid-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); margin: 8px 0 16px; }
+  .grid-wrap table { min-width: 900px; }
+  .grid-wrap td { padding: 4px 6px; }
+  .grid-wrap td input { width: 100%; min-width: 70px; padding: 6px; text-align: right; }
+  .grid-wrap td.m { text-align: left; font-weight: 600; white-space: nowrap; }
+  .grid-wrap th.grp { background: var(--navy-dark) !important; text-align: center; }
+  .x { background: none; border: none; color: var(--bad); cursor: pointer; font-weight: 700; }
+  .savebar { position: sticky; bottom: 0; z-index: 20; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #fff; border-top: 1px solid var(--line); margin: 0 -24px -24px; padding: 14px 24px; }
+  .dirty { display: none; font-size: .8rem; color: var(--warn); font-weight: 600; }
+  .dirty.on { display: inline-flex; align-items: center; gap: 6px; }
+  .dirty::before { content: ""; width: 8px; height: 8px; background: var(--warn); border-radius: 50%; }
+  table.prev { width: 100%; font-size: .8rem; margin: 4px 0 12px; border: 1px solid var(--line); }
+  table.prev td, table.prev th { text-align: left !important; font-weight: 400; color: var(--ink); }
+  table.prev th { color: #fff; font-weight: 600; }
+  .toasts { position: fixed; right: 20px; bottom: 20px; z-index: 2000; display: grid; gap: 8px; }
+  .toastx { background: var(--navy-dark); color: #fff; padding: 11px 16px; border-radius: var(--radius); font-size: .85rem; border-left: 4px solid var(--gold); max-width: 360px; }
+  .toastx.ok { border-left-color: #5fbf93; } .toastx.err { border-left-color: #e57373; background: #4a1613; }
+  .vara-box { border: 1px solid var(--line); border-radius: var(--radius); margin: 4px 0 14px; background: #fff; }
+  .vara-box h3 { font-size: .85rem; color: var(--navy); font-weight: 600; padding: 10px 12px 0; }
+  .vara-box .sub { font-size: .78rem; color: var(--muted); padding: 2px 12px 8px; }
+  .vara-scroll { max-height: 300px; overflow: auto; border-top: 1px solid var(--line-soft); }
+  table.vr { width: 100%; font-size: .8rem; }
+  table.vr th { position: sticky; top: 0; }
+  table.vr td, table.vr th { text-align: left !important; font-weight: 400; color: var(--ink); padding: 6px 12px !important; }
+  table.vr th { color: #fff; font-weight: 600; }
+  table.vr td.n { text-align: right !important; }
+  table.vr tr.aviso td { background: #fbf3e0 !important; }
+  table.vr td.mudou { color: var(--navy); font-weight: 600; }
+  table.usr { min-width: 640px; }
+  table.usr td, table.usr th { text-align: left !important; }
+  table.usr td:first-child { font-family: Consolas, monospace; }
+  table.usr td:last-child { text-align: right !important; white-space: nowrap; }
+  .tag-on, .tag-off { font-size: .72rem; font-weight: 600; padding: 2px 8px; border-radius: 3px; }
+  .tag-on { background: #e5f1ea; color: var(--ok); } .tag-off { background: #f6e1df; color: var(--bad); }
+  .lnk { background: none; border: none; color: var(--navy); cursor: pointer; font-size: .82rem; padding: 4px 8px; text-decoration: underline; }
+  .lnk.rm { color: var(--bad); }
+  .danger-zone { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 16px; }
+</style>
+</head>
+<body data-page="cadastros">
+<script src="layout.js"></script>
+
+<!-- Acesso restrito -->
+<div class="gate-wrap" id="gateWrap"><div class="gate" id="gate">
+  <h1>Cadastros - acesso restrito</h1>
+  <p>Informe a senha de cadastro para incluir ou excluir dados do sistema.</p>
+  <input type="password" id="senha" placeholder="Senha" autocomplete="off">
+  <button class="btn btn-primary" id="entrar">Entrar</button>
+  <div class="msg err" id="gateMsg"></div>
+</div></div>
+
+<!-- Área autenticada -->
+<main class="page hidden" id="app">
+  <div class="header">
+    <div class="topline">
+      <div class="title"><h1>Cadastros</h1><p>Inclusões e exclusões de todos os módulos</p></div>
+      <button class="btn" id="sair">Sair</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-pane="pProc">Processos (Análise)</button>
+    <button class="tab" data-pane="pPrazos">Prazos (Análise)</button>
+    <button class="tab" data-pane="pMetas">Metas Processuais</button>
+    <button class="tab" data-pane="pUsers">Usuários (matrículas)</button>
+  </div>
+
+  <!-- PROCESSOS -->
+  <div class="pane" id="pProc">
+    <h2>Base de processos</h2>
+    <p class="desc">Importe a planilha (.xlsx) para substituir toda a base exibida em Análise de Processos.</p>
+    <div class="info" id="procInfo">Carregando...</div>
+    <div class="row">
+      <div class="field"><label>Planilha</label><input type="file" id="arquivo" accept=".xlsx,.xls"></div>
+      <button class="btn btn-primary" id="importar" disabled>Substituir base pela planilha</button>
+    </div>
+    <div class="msg" id="procMsg"></div>
+    <div id="previaVaras"></div>
+    <div id="preview"></div>
+    <div class="danger-zone" style="border-top:none;margin-top:8px;padding-top:0">
+      <h2 style="font-size:.95rem;margin:4px 0">Unificação das varas</h2>
+      <p class="desc" style="margin-bottom:10px">As varas são unificadas pela numeração (1 a 22 = Varas Comuns; 23 a 27 = JEF; adjuntos somam na vara correspondente). Use o botão abaixo para aplicar a regra aos processos que já estão cadastrados, sem precisar importar a planilha de novo.</p>
+      <button class="btn" id="renormalizar">Reaplicar unificação na base atual</button>
+    </div>
+    <div class="danger-zone">
+      <button class="btn btn-danger" id="excluirProc">Excluir todos os processos</button>
+    </div>
+  </div>
+
+  <!-- PRAZOS -->
+  <div class="pane hidden" id="pPrazos">
+    <h2>Classificação de prazos</h2>
+    <p class="desc">Limites em dias usados para classificar os processos como normal, atenção ou atrasado.</p>
+    <div class="row">
+      <div class="field"><label>Normal (verde) - até</label><input type="number" id="pNormal" min="1" max="365"></div>
+      <div class="field"><label>Atenção (amarelo) - até</label><input type="number" id="pAtencao" min="1" max="365"></div>
+      <div class="field"><label>Atrasado (vermelho) - a partir de</label><input type="number" id="pAtrasado" min="1" max="365"></div>
+      <button class="btn btn-primary" id="salvarPrazos">Salvar prazos</button>
+    </div>
+    <div class="msg" id="prazoMsg"></div>
+  </div>
+
+  <!-- METAS -->
+  <div class="pane hidden" id="pMetas">
+    <h2>Períodos de metas processuais</h2>
+    <p class="desc">Cada gravação cria um novo período; o módulo Metas Processuais exibe sempre o mais recente.</p>
+    <div class="row">
+      <div class="field"><label>Período existente</label><select id="selPeriodo"></select></div>
+      <button class="btn" id="carregarPeriodo">Carregar para edição</button>
+      <button class="btn" id="novoPeriodo">Novo (em branco)</button>
+      <button class="btn btn-danger" id="excluirPeriodo">Excluir período selecionado</button>
+    </div>
+    <div class="row">
+      <button class="btn" id="addPrev">+ Mês anterior</button>
+      <button class="btn" id="addNext">+ Mês posterior</button>
+      <button class="btn" id="delFirst">Remover primeiro mês</button>
+      <button class="btn" id="delLast">Remover último mês</button>
+    </div>
+    <div class="grid-wrap">
+      <table>
+        <thead>
+          <tr><th rowspan="2">Mês/Ano</th><th colspan="4" class="grp">Varas Comuns</th><th colspan="4" class="grp">JEF</th><th rowspan="2"></th></tr>
+          <tr><th>Recebidos</th><th>Calculados</th><th>Acervo</th><th>Tempo (dias)</th><th>Recebidos</th><th>Calculados</th><th>Acervo</th><th>Tempo (dias)</th></tr>
+        </thead>
+        <tbody id="gradeMetas"></tbody>
+      </table>
+    </div>
+    <div class="msg" id="metaMsg"></div>
+    <div class="savebar">
+      <button class="btn btn-primary" id="salvarPeriodo">Salvar como novo período</button>
+      <span class="dirty" id="dirtyChip">Alterações não salvas</span>
+    </div>
+  </div>
+  <!-- USUÁRIOS -->
+  <div class="pane hidden" id="pUsers">
+    <h2>Matrículas autorizadas</h2>
+    <p class="desc">Somente quem tem a matrícula cadastrada aqui consegue entrar no SAMP. O sistema trata a pessoa pelo nome informado.</p>
+    <div class="row">
+      <div class="field"><label>Matrícula</label><input type="text" id="uMatricula" maxlength="30" autocomplete="off"></div>
+      <div class="field"><label>Nome completo</label><input type="text" id="uNome" maxlength="120" autocomplete="off" style="min-width:280px"></div>
+      <button class="btn btn-primary" id="uSalvar">Cadastrar</button>
+      <button class="btn hidden" id="uCancelar">Cancelar edição</button>
+    </div>
+    <div class="msg" id="userMsg"></div>
+    <div class="row"><div class="field"><label>Buscar</label><input type="text" id="uBusca" placeholder="Nome ou matrícula" style="min-width:260px"></div><span class="chip" id="uTotal"></span></div>
+    <div class="grid-wrap" style="margin-top:0">
+      <table class="usr">
+        <thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead>
+        <tbody id="uLista"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(function () {
+  const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG;
+  const sb = window.criarClienteLeitura({ senha: () => senha });
+  const $ = (id) => document.getElementById(id);
+  const CAMPOS = ['recebidos', 'calculados', 'acervo', 'tempo'];
+  const NOMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  let senha = '';
+
+  function toast(texto, tipo) {
+    const t = document.createElement('div'); t.className = 'toastx ' + (tipo || ''); t.textContent = texto;
+    $('toasts').appendChild(t); setTimeout(() => t.remove(), 4500);
+  }
+  let dirty = false;
+  function setDirty(v) { dirty = v; $('dirtyChip').classList.toggle('on', v); }
+  const descartar = () => !dirty || confirm('Há alterações não salvas no período. Deseja descartá-las?');
+  window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  const msg = (id, texto, tipo) => { const e = $(id); e.textContent = texto || ''; e.className = 'msg ' + (tipo || ''); };
+  const label = (ym) => { const [a, m] = ym.split('-'); return `${NOMES[parseInt(m) - 1]}/${a}`; };
+
+  /* ---------- chamada à função protegida ---------- */
+  async function api(action, dados) {
+    try {
+      return await window.chamarSAMP({ senha, action, ...dados });
+    } catch (e) {
+      if (e.status === 401) { sair(); throw new Error(e.message || 'Senha incorreta'); }
+      throw e;
+    }
+  }
+
+  /* ---------- acesso ---------- */
+  async function entrar(valor, silencioso) {
+    senha = valor;
+    try {
+      await api('verify');
+      try { sessionStorage.setItem('cad_senha', valor); } catch (e) {}
+      $('gateWrap').classList.add('hidden'); $('app').classList.remove('hidden');
+      iniciar();
+    } catch (e) {
+      senha = '';
+      if (!silencioso) $('gateMsg').textContent = e.message === 'Failed to fetch' ? 'Não foi possível contatar o servidor. A função "cadastros-function" foi publicada?' : e.message;
+    }
+  }
+  function sair() {
+    senha = ''; try { sessionStorage.removeItem('cad_senha'); } catch (e) {}
+    $('app').classList.add('hidden'); $('gateWrap').classList.remove('hidden'); $('senha').value = '';
+  }
+  $('entrar').onclick = () => { $('gateMsg').textContent = ''; entrar($('senha').value, false); };
+  $('senha').addEventListener('keypress', (e) => { if (e.key === 'Enter') $('entrar').click(); });
+  $('sair').onclick = sair;
+  document.querySelectorAll('.tab').forEach((t) => t.onclick = () => {
+    document.querySelectorAll('.tab').forEach((x) => x.classList.remove('active')); t.classList.add('active');
+    document.querySelectorAll('.pane').forEach((p) => p.classList.add('hidden')); $(t.dataset.pane).classList.remove('hidden');
+    try { sessionStorage.setItem('cad_aba', t.dataset.pane); } catch (e) {}
+  });
+
+  /* ---------- PROCESSOS ---------- */
+  let preparados = null;
+  async function infoProcessos() {
+    const { count } = await sb.from('processos').select('id', { count: 'exact', head: true });
+    const { data } = await sb.from('processos').select('data_importacao').order('data_importacao', { ascending: false }).limit(1);
+    $('procInfo').textContent = count
+      ? `${count} processos cadastrados. Última importação: ${new Date(data[0].data_importacao).toLocaleString('pt-BR')}.`
+      : 'Nenhum processo cadastrado.';
+  }
+  /* ---------- prévia da unificação das varas ---------- */
+  async function previaVaras(lista) {
+    const box = $('previaVaras'); box.innerHTML = '<p class="desc">Analisando as varas da planilha...</p>';
+    const cont = new Map();
+    lista.forEach((p) => cont.set(p.orgao_julgador, (cont.get(p.orgao_julgador) || 0) + 1));
+    try {
+      const r = await api('processos_previa', { unidades: [...cont].map(([texto, qtd]) => ({ texto, qtd })) });
+      const esc = (x) => String(x).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+      const avisos = r.linhas.filter((l) => l.aviso).length;
+      const tipo = (l) => (l.tipo ? (l.adjunto ? 'Adjunto ' + (l.tipo === 'jef' ? 'JEF' : 'Cível') : (l.tipo === 'jef' ? 'Vara JEF' : 'Vara comum')) : '-');
+      box.innerHTML = `<div class="vara-box"><h3>Unificação das varas</h3>` +
+        `<div class="sub">${r.linhas.length} texto(s) diferente(s) na planilha viram ${r.varas.length} vara(s).` +
+        `${avisos ? ' <b style="color:var(--warn)">' + avisos + ' linha(s) com aviso (destacadas): confira antes de importar.</b>' : ' Nenhum aviso.'}</div>` +
+        `<div class="vara-scroll"><table class="vr"><thead><tr><th>Texto na planilha</th><th>Vara unificada</th><th>Tipo da unidade</th><th class="n">Processos</th></tr></thead><tbody>` +
+        r.linhas.map((l) => `<tr${l.aviso ? ' class="aviso" title="' + esc(l.aviso) + '"' : ''}><td>${esc(l.texto)}</td>` +
+          `<td${l.texto !== l.nome ? ' class="mudou"' : ''}>${esc(l.nome)}</td><td>${tipo(l)}${l.aviso ? ' - ' + esc(l.aviso) : ''}</td><td class="n">${l.qtd}</td></tr>`).join('') +
+        '</tbody></table></div></div>';
+    } catch (e) {
+      box.innerHTML = `<p class="desc">Não foi possível exibir a prévia das varas (${esc2(e.message)}). A unificação será aplicada mesmo assim na importação.</p>`;
+    }
+  }
+  const esc2 = (x) => String(x).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  $('renormalizar').onclick = async () => {
+    if (!confirm('Aplicar a unificação das varas a todos os processos já cadastrados?')) return;
+    $('renormalizar').disabled = true;
+    try { const r = await api('processos_renormalizar'); msg('procMsg', `Unificação aplicada: ${r.processos} processos, ${r.textos_distintos} texto(s) de vara.`, 'ok'); toast('Varas unificadas na base atual.', 'ok'); infoProcessos(); }
+    catch (e) { msg('procMsg', e.message, 'err'); }
+    $('renormalizar').disabled = false;
+  };
+
+  $('arquivo').onchange = (ev) => {
+    preparados = null; $('importar').disabled = true; msg('procMsg', ''); $('preview').innerHTML = ''; $('previaVaras').innerHTML = '';
+    const file = ev.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        const headers = Object.keys(json[0] || {}), col = {};
+        for (const exp of ['Unidade', 'Número do Processo', 'Assunto', 'Dias na Tarefa', 'Advogado do Polo Ativo (principal)', 'Polo Passivo (principal)'])
+          for (const h of headers) if (h.trim() === exp) { col[exp] = h; break; }
+        if (!col['Número do Processo']) return msg('procMsg', 'Coluna "Número do Processo" não encontrada.', 'err');
+        const rx = /^\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}$/, vistos = new Set(), lista = [];
+        for (const row of json) {
+          const num = row[col['Número do Processo']]?.toString().trim() || '';
+          if (!rx.test(num) || vistos.has(num)) continue;
+          vistos.add(num);
+          lista.push({
+            numero_processo: num,
+            orgao_julgador: row[col['Unidade']]?.toString().trim() || 'Não informada',
+            dias_chegada: parseInt(row[col['Dias na Tarefa']]) || 0,
+            assunto_principal: row[col['Assunto']]?.toString().trim() || 'Sem assunto',
+            polo_passivo: row[col['Polo Passivo (principal)']]?.toString().trim() || 'Não informado',
+            advogado_polo_ativo: row[col['Advogado do Polo Ativo (principal)']]?.toString().trim() || 'Não informado'
+          });
+        }
+        if (!lista.length) return msg('procMsg', 'Nenhum processo válido encontrado na planilha.', 'err');
+        preparados = lista; $('importar').disabled = false; previaVaras(lista);
+        const esc = (x) => String(x).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+        $('preview').innerHTML = '<table class="prev"><thead><tr><th>Processo</th><th>Unidade</th><th>Assunto</th><th>Dias</th></tr></thead><tbody>' +
+          lista.slice(0, 5).map((p) => `<tr><td>${esc(p.numero_processo)}</td><td>${esc(p.orgao_julgador)}</td><td>${esc(p.assunto_principal)}</td><td>${p.dias_chegada}</td></tr>`).join('') +
+          '</tbody></table>';
+        msg('procMsg', `${lista.length} processos válidos prontos para importar. A base atual será substituída.`, 'ok');
+      } catch (err) { msg('procMsg', 'Não foi possível ler o arquivo.', 'err'); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  $('importar').onclick = async () => {
+    if (!preparados || !confirm(`Substituir toda a base por ${preparados.length} processos?`)) return;
+    $('importar').disabled = true; msg('procMsg', 'Enviando...');
+    try {
+      const r = await api('processos_substituir', { rows: preparados });
+      msg('procMsg', `${r.total} processos importados.`, 'ok'); toast(`${r.total} processos importados.`, 'ok'); $('preview').innerHTML = ''; $('previaVaras').innerHTML = ''; preparados = null; $('arquivo').value = ''; infoProcessos();
+    } catch (e) { msg('procMsg', e.message, 'err'); $('importar').disabled = false; }
+  };
+  $('excluirProc').onclick = async () => {
+    if (!confirm('Excluir TODOS os processos cadastrados? Esta ação não pode ser desfeita.')) return;
+    try { await api('processos_excluir_todos'); msg('procMsg', 'Todos os processos foram excluídos.', 'ok'); toast('Todos os processos foram excluídos.', 'ok'); infoProcessos(); }
+    catch (e) { msg('procMsg', e.message, 'err'); }
+  };
+
+  /* ---------- PRAZOS ---------- */
+  async function carregarPrazos() {
+    const { data } = await sb.from('configuracoes').select('chave, valor');
+    const m = { normal: 60, atencao: 120, atrasado: 121 };
+    (data || []).forEach((i) => {
+      if (i.chave === 'prazo_normal_max') m.normal = parseInt(i.valor);
+      if (i.chave === 'prazo_atencao_max') m.atencao = parseInt(i.valor);
+      if (i.chave === 'prazo_atrasado_min') m.atrasado = parseInt(i.valor);
+    });
+    $('pNormal').value = m.normal; $('pAtencao').value = m.atencao; $('pAtrasado').value = m.atrasado;
+  }
+  $('salvarPrazos').onclick = async () => {
+    const p = { normal_max: +$('pNormal').value, atencao_max: +$('pAtencao').value, atrasado_min: +$('pAtrasado').value };
+    if (!(p.normal_max < p.atencao_max && p.atencao_max < p.atrasado_min)) return msg('prazoMsg', 'Os valores devem ser crescentes: Normal < Atenção < Atrasado.', 'err');
+    try { await api('prazos_salvar', { prazos: p }); msg('prazoMsg', 'Prazos salvos.', 'ok'); toast('Prazos salvos.', 'ok'); }
+    catch (e) { msg('prazoMsg', e.message, 'err'); }
+  };
+
+  /* ---------- METAS ---------- */
+  let meses = [], D = vazio(0);
+  function vazio(n) { const f = () => ({ recebidos: Array(n).fill(0), calculados: Array(n).fill(0), acervo: Array(n).fill(0), tempo: Array(n).fill(0) }); return { varas: f(), jef: f() }; }
+
+  function desenhar() {
+    const tb = $('gradeMetas'); tb.innerHTML = '';
+    meses.forEach((ym, i) => {
+      const tr = tb.insertRow();
+      const c0 = tr.insertCell(); c0.className = 'm'; c0.textContent = label(ym);
+      for (const aba of ['varas', 'jef']) for (const campo of CAMPOS) {
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.inputMode = campo === 'tempo' ? 'decimal' : 'numeric';
+        inp.value = D[aba][campo][i] ?? 0;
+        inp.onchange = () => {
+          const v = parseFloat(String(inp.value).replace(',', '.'));
+          D[aba][campo][i] = isFinite(v) && v >= 0 ? (campo === 'tempo' ? Math.round(v * 10) / 10 : Math.round(v)) : 0;
+          inp.value = D[aba][campo][i]; setDirty(true);
+        };
+        tr.insertCell().appendChild(inp);
+      }
+      const cx = tr.insertCell(); const x = document.createElement('button');
+      x.className = 'x'; x.textContent = '✕'; x.title = 'Remover este mês';
+      x.onclick = () => remover(i); cx.appendChild(x);
+    });
+  }
+  function remover(i) {
+    if (meses.length <= 1) return msg('metaMsg', 'O período precisa ter ao menos um mês.', 'err');
+    meses.splice(i, 1); setDirty(true);
+    for (const a of ['varas', 'jef']) for (const c of CAMPOS) D[a][c].splice(i, 1);
+    desenhar();
+  }
+  function somar(ym, d) { let [a, m] = ym.split('-').map(Number); m += d; if (m < 1) { m = 12; a--; } if (m > 12) { m = 1; a++; } return `${a}-${String(m).padStart(2, '0')}`; }
+  $('addPrev').onclick = () => { setDirty(true); meses.unshift(somar(meses[0], -1)); for (const a of ['varas', 'jef']) for (const c of CAMPOS) D[a][c].unshift(0); desenhar(); };
+  $('addNext').onclick = () => { setDirty(true); meses.push(somar(meses[meses.length - 1], 1)); for (const a of ['varas', 'jef']) for (const c of CAMPOS) D[a][c].push(0); desenhar(); };
+  $('delFirst').onclick = () => remover(0);
+  $('delLast').onclick = () => remover(meses.length - 1);
+
+  async function listarPeriodos(selecionar) {
+    const { data } = await sb.from('config_periodos').select('id, nome_periodo').order('id', { ascending: false });
+    const s = $('selPeriodo'); s.innerHTML = '';
+    (data || []).forEach((p) => s.add(new Option(p.nome_periodo, p.id)));
+    if (selecionar) s.value = selecionar;
+    return data || [];
+  }
+  async function carregar(id) {
+    if (!descartar()) return;
+    const { data: per } = await sb.from('config_periodos').select('*').eq('id', id).single();
+    const { data: dados } = await sb.from('dados_processos').select('*').eq('periodo_id', id);
+    meses = [...per.meses]; D = vazio(meses.length);
+    for (const a of ['varas', 'jef']) for (const c of CAMPOS) {
+      const reg = (dados || []).find((r) => r.aba === a && r.tipo === c);
+      if (reg?.valores) D[a][c] = [...reg.valores];
+    }
+    desenhar(); setDirty(false); msg('metaMsg', `Período carregado: ${per.nome_periodo}`, 'ok');
+  }
+  $('carregarPeriodo').onclick = () => $('selPeriodo').value && carregar($('selPeriodo').value);
+  $('novoPeriodo').onclick = () => {
+    if (!descartar()) return;
+    const h = new Date(); meses = [`${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}`]; D = vazio(1);
+    desenhar(); setDirty(false); msg('metaMsg', 'Período em branco. Use "+ Mês anterior" para adicionar meses.', '');
+  };
+  $('salvarPeriodo').onclick = async () => {
+    if (!confirm(`Salvar novo período com ${meses.length} meses (${label(meses[0])} a ${label(meses[meses.length - 1])})?`)) return;
+    try {
+      const r = await api('periodo_salvar', { meses, labels: meses.map(label), varas: D.varas, jef: D.jef });
+      await listarPeriodos(r.id); setDirty(false); msg('metaMsg', 'Período salvo. Já aparece em Metas Processuais.', 'ok'); toast('Período salvo.', 'ok');
+    } catch (e) { msg('metaMsg', e.message, 'err'); }
+  };
+  $('excluirPeriodo').onclick = async () => {
+    const id = $('selPeriodo').value; if (!id) return;
+    if (!confirm(`Excluir o período "${$('selPeriodo').selectedOptions[0].text}"? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await api('periodo_excluir', { id: +id });
+      const lista = await listarPeriodos(); msg('metaMsg', 'Período excluído.', 'ok'); toast('Período excluído.', 'ok');
+      setDirty(false);
+      if (lista.length) carregar(lista[0].id);
+    } catch (e) { msg('metaMsg', e.message, 'err'); }
+  };
+
+
+  /* ---------- USUÁRIOS ---------- */
+  let usuarios = [], editando = null;
+  const escH = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  async function carregarUsuarios() {
+    try { usuarios = (await api('usuarios_listar')).data || []; desenharUsuarios(); }
+    catch (e) { msg('userMsg', e.message, 'err'); }
+  }
+  function desenharUsuarios() {
+    const q = $('uBusca').value.trim().toLowerCase();
+    const vis = usuarios.filter((u) => !q || u.nome.toLowerCase().includes(q) || u.matricula.toLowerCase().includes(q));
+    $('uTotal').textContent = `${usuarios.filter((u) => u.ativo).length} ativos de ${usuarios.length}`;
+    $('uLista').innerHTML = vis.length ? vis.map((u) => `<tr>
+      <td>${escH(u.matricula)}</td><td>${escH(u.nome)}</td>
+      <td><span class="${u.ativo ? 'tag-on' : 'tag-off'}">${u.ativo ? 'Autorizada' : 'Bloqueada'}</span></td>
+      <td>${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : '-'}</td>
+      <td><button class="lnk" data-a="ed" data-m="${escH(u.matricula)}">Editar</button>
+          <button class="lnk" data-a="at" data-m="${escH(u.matricula)}">${u.ativo ? 'Bloquear' : 'Autorizar'}</button>
+          <button class="lnk rm" data-a="ex" data-m="${escH(u.matricula)}">Excluir</button></td></tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center!important;color:var(--muted)">Nenhuma matrícula cadastrada.</td></tr>';
+  }
+  function limparFormUsuario() {
+    editando = null; $('uMatricula').value = ''; $('uNome').value = ''; $('uMatricula').disabled = false;
+    $('uSalvar').textContent = 'Cadastrar'; $('uCancelar').classList.add('hidden');
+  }
+  $('uBusca').oninput = desenharUsuarios;
+  $('uCancelar').onclick = () => { limparFormUsuario(); msg('userMsg', ''); };
+  $('uSalvar').onclick = async () => {
+    const matricula = $('uMatricula').value.trim(), nome = $('uNome').value.trim();
+    if (!matricula || !nome) return msg('userMsg', 'Informe a matrícula e o nome.', 'err');
+    try {
+      await api('usuarios_salvar', { matricula, nome });
+      toast(editando ? 'Cadastro atualizado.' : 'Matrícula cadastrada.', 'ok'); msg('userMsg', '');
+      limparFormUsuario(); carregarUsuarios();
+    } catch (e) { msg('userMsg', e.message, 'err'); }
+  };
+  $('uLista').onclick = async (ev) => {
+    const b = ev.target.closest('button[data-a]'); if (!b) return;
+    const u = usuarios.find((x) => x.matricula === b.dataset.m); if (!u) return;
+    try {
+      if (b.dataset.a === 'ed') {
+        editando = u.matricula; $('uMatricula').value = u.matricula; $('uMatricula').disabled = true; $('uNome').value = u.nome;
+        $('uSalvar').textContent = 'Salvar alterações'; $('uCancelar').classList.remove('hidden'); $('uNome').focus();
+      } else if (b.dataset.a === 'at') {
+        await api('usuarios_ativar', { matricula: u.matricula, ativo: !u.ativo });
+        toast(u.ativo ? 'Acesso bloqueado.' : 'Acesso autorizado.', 'ok'); carregarUsuarios();
+      } else if (b.dataset.a === 'ex') {
+        if (!confirm(`Excluir a matrícula ${u.matricula} (${u.nome})? A pessoa perderá o acesso ao SAMP.`)) return;
+        await api('usuarios_excluir', { matricula: u.matricula });
+        toast('Matrícula excluída.', 'ok'); carregarUsuarios();
+      }
+    } catch (e) { msg('userMsg', e.message, 'err'); }
+  };
+
+  async function iniciar() {
+    try { const a = sessionStorage.getItem('cad_aba'); if (a && $(a)) document.querySelector(`.tab[data-pane="${a}"]`).click(); } catch (e) {}
+    infoProcessos(); carregarPrazos(); carregarUsuarios();
+    const lista = await listarPeriodos();
+    if (lista.length) carregar(lista[0].id); else $('novoPeriodo').click();
+  }
+
+  let guardada = ''; try { guardada = sessionStorage.getItem('cad_senha') || ''; } catch (e) {}
+  if (guardada) entrar(guardada, true);
+})();
+</script>
+</body>
+</html>

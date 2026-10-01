@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>SAMP - Análise de Processos</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="config.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0f2b3d 0%, #1a4a6e 100%);
+            color: white;
+            padding: 28px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: clamp(24px, 5vw, 32px);
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .header h1 span {
+            font-weight: 300;
+            opacity: 0.9;
+        }
+        .header p {
+            font-size: clamp(13px, 4vw, 15px);
+            opacity: 0.85;
+        }
+
+        .stats-section {
+            max-width: 1400px;
+            margin: 24px auto 16px auto;
+            padding: 0 16px;
+        }
+        .stats-grid {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 20px;
+            padding: 16px 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+            border: 1px solid #e8edf2;
+            text-align: center;
+            transition: all 0.3s ease;
+            min-width: 260px;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #8a9bb0;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        .stat-value {
+            font-size: 16px;
+            font-weight: 500;
+            color: #1e2f3e;
+            line-height: 1.4;
+        }
+        .stat-value small {
+            font-size: 13px;
+            color: #8a9bb0;
+        }
+        
+        .action-buttons {
+            display: flex;
+            justify-content: flex-end;
+        }
+        .refresh-btn {
+            background: white;
+            border: 1px solid #e8edf2;
+            border-radius: 40px;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a4a6e;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .refresh-btn:hover {
+            background: #1a4a6e;
+            color: white;
+            border-color: #1a4a6e;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 24px;
+            padding: 28px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            animation: modalFadeIn 0.3s ease;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1e2f3e;
+            margin-bottom: 8px;
+        }
+        .modal-subtitle {
+            font-size: 14px;
+            color: #8a9bb0;
+            margin-bottom: 24px;
+        }
+        .modal-input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid #dce3ec;
+            border-radius: 14px;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .modal-input:focus {
+            outline: none;
+            border-color: #1a4a6e;
+            box-shadow: 0 0 0 3px rgba(26,74,110,0.1);
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 40px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        .modal-btn.confirm {
+            background: #1a4a6e;
+            color: white;
+        }
+        .modal-btn.confirm:hover {
+            background: #0f2b3d;
+        }
+        .modal-btn.cancel {
+            background: #eef2f7;
+            color: #5a6e7c;
+        }
+        .error-message {
+            color: #e74c3c;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .error-message.show {
+            display: block;
+        }
+
+        .settings-panel {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .settings-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e2f3e;
+            margin-bottom: 16px;
+        }
+        .settings-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .settings-row label {
+            width: 110px;
+            font-size: 13px;
+            color: #4a5e6c;
+        }
+        .settings-row input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #dce3ec;
+            border-radius: 10px;
+            font-size: 13px;
+            min-width: 120px;
+        }
+        .settings-note {
+            font-size: 11px;
+            color: #8a9bb0;
+            margin-top: 8px;
+            font-style: italic;
+        }
+
+        .admin-panel {
+            background: white;
+            border-radius: 20px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            border: 1px solid #e8edf2;
+        }
+        .admin-panel.active {
+            display: flex;
+        }
+        .admin-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e2f3e;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .admin-badge {
+            background: #27ae60;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 11px;
+        }
+        .admin-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .settings-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 40px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .upload-card {
+            background: #fafcff;
+            border-radius: 16px;
+            padding: 10px 20px;
+            text-align: center;
+            border: 2px dashed #dce3ec;
+            cursor: pointer;
+        }
+        .upload-card:hover {
+            border-color: #1a4a6e;
+        }
+        .upload-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e2f3e;
+        }
+        .upload-btn {
+            background: #1a4a6e;
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 6px;
+        }
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 40px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        input[type="file"] { display: none; }
+
+        .tabs-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: white;
+            border-radius: 16px 16px 0 0;
+            padding: 0 4px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .tab {
+            padding: 14px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            color: #8a9bb0;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .tab:hover { color: #1a4a6e; }
+        .tab.active { color: #1a4a6e; border-bottom-color: #1a4a6e; }
+
+        .main-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 16px 48px;
+        }
+        .tab-content { display: none; animation: fadeIn 0.3s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .search-container {
+            margin-bottom: 24px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid #dce3ec;
+            border-radius: 14px;
+            font-size: 14px;
+            background: white;
+            transition: all 0.2s;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #1a4a6e;
+            box-shadow: 0 0 0 3px rgba(26,74,110,0.1);
+        }
+
+        .section-card {
+            background: white;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #e8edf2;
+            overflow: hidden;
+        }
+        .section-header {
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            border-bottom: 1px solid #f0f4f9;
+            transition: background 0.2s;
+        }
+        .section-header:hover { background: #fafcff; }
+        .section-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .section-badge {
+            width: 4px;
+            height: 24px;
+            border-radius: 2px;
+        }
+        .section-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e2f3e;
+        }
+        .section-count {
+            background: #eef2f7;
+            color: #5a6e7c;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 12px;
+        }
+        .toggle-icon {
+            font-size: 18px;
+            color: #b0c0ce;
+        }
+        .section-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease;
+        }
+        .section-content.expanded { max-height: 100000px; }
+
+        .sub-card {
+            margin: 0;
+            border-bottom: 1px solid #f0f4f9;
+        }
+        .sub-card:last-child { border-bottom: none; }
+        .sub-header {
+            background: #fafcff;
+            padding: 12px 20px 12px 40px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+        .sub-header:hover { background: #f5f8fc; }
+        .sub-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .sub-icon {
+            width: 6px;
+            height: 6px;
+            background: #c0d0de;
+            border-radius: 50%;
+        }
+        .sub-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #4a5e6c;
+        }
+        .sub-count {
+            background: #e8edf2;
+            color: #6a7e8c;
+            padding: 2px 10px;
+            border-radius: 30px;
+            font-size: 11px;
+        }
+        .sub-toggle {
+            font-size: 14px;
+            color: #c0d0de;
+        }
+        .sub-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .sub-content.expanded { max-height: 50000px; }
+
+        .process-table { width: 100%; }
+        .process-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 12px 20px 12px 60px;
+            border-bottom: 1px solid #f5f7fc;
+            gap: 8px;
+        }
+        .process-row:hover { background: #fef9e8; }
+        .process-number {
+            flex: 2;
+            min-width: 200px;
+            font-family: monospace;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .copy-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            color: #b0c0ce;
+            font-size: 14px;
+        }
+        .copy-btn:hover { background: #eef2f7; color: #1a4a6e; }
+        .copy-btn.copied { color: #27ae60; }
+        .process-days { flex: 0.8; min-width: 80px; text-align: center; }
+        .days-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .days-badge.normal { background: #e6f7ef; color: #27ae60; }
+        .days-badge.warning { background: #feefdd; color: #e67e22; }
+        .days-badge.delayed { background: #fee8e6; color: #e74c3c; }
+        .process-orgao {
+            flex: 2;
+            min-width: 180px;
+            font-size: 13px;
+            color: #7a8e9c;
+            text-align: right;
+        }
+        .process-assunto {
+            flex: 2;
+            min-width: 180px;
+            font-size: 13px;
+            color: #1a4a6e;
+            text-align: left;
+            font-weight: 500;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        .chart-card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid #e8edf2;
+        }
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #eef2f7;
+        }
+        .chart-wrapper { height: 300px; position: relative; }
+        .ranking-list {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .ranking-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f4f9;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .ranking-name { font-size: 13px; color: #4a5e6c; flex: 1; }
+        .ranking-value {
+            font-weight: 600;
+            color: #1a4a6e;
+            background: #eef2f7;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 12px;
+        }
+        .ranking-position {
+            width: 26px;
+            height: 26px;
+            background: #eef2f7;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+        .ranking-position.top1 { background: #f39c12; color: white; }
+        .ranking-position.top2 { background: #b0c0ce; color: white; }
+        .ranking-position.top3 { background: #e67e22; color: white; }
+
+        .analysis-search {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .analysis-search input {
+            width: 100%;
+            padding: 12px 16px;
+            padding-left: 40px;
+            border: 1px solid #dce3ec;
+            border-radius: 12px;
+            font-size: 14px;
+        }
+        .analysis-search input:focus {
+            outline: none;
+            border-color: #1a4a6e;
+        }
+        .analysis-search::before {
+            content: "";
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            opacity: 0.5;
+        }
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #8a9bb0;
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 20px;
+        }
+        .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+        .loading {
+            text-align: center;
+            padding: 60px;
+            background: white;
+            border-radius: 20px;
+        }
+        .spinner {
+            border: 3px solid #eef2f7;
+            border-top: 3px solid #1a4a6e;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #1e2f3e;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            z-index: 1000;
+            animation: slideInRight 0.3s ease;
+        }
+        .toast.success { background: #27ae60; }
+        .toast.error { background: #e74c3c; }
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .process-row {
+                flex-direction: column;
+                align-items: flex-start;
+                padding-left: 20px;
+            }
+            .process-number, .process-orgao, .process-days, .process-assunto {
+                width: 100%;
+                text-align: left;
+            }
+            .process-days { text-align: left; }
+            .sub-header { padding-left: 20px; }
+            .admin-panel { flex-direction: column; align-items: stretch; }
+            .admin-actions { justify-content: center; }
+            .stats-grid { flex-direction: column; }
+            .action-buttons { justify-content: center; }
+            .tab { padding: 12px 16px; font-size: 13px; }
+            .section-header { padding: 14px 16px; }
+        }
+
+        @media (max-width: 480px) {
+            .stat-card { padding: 12px 20px; min-width: auto; }
+            .section-name { font-size: 14px; }
+            .ranking-name { font-size: 12px; }
+        }
+
+        .print-btn {
+            background: #1a4a6e;
+            color: white;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 40px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .print-btn:hover { background: #0f2b3d; }
+        .print-btn:disabled { opacity: 0.6; cursor: wait; }
+
+        .print-only { display: none; }
+        .print-report { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: #1e2f3e; }
+        .pr-header { text-align: center; border-bottom: 3px solid #1a4a6e; padding-bottom: 16px; margin-bottom: 26px; }
+        .pr-header h1 { font-size: 24px; color: #0f2b3d; margin-bottom: 6px; }
+        .pr-subtitle { font-size: 13px; color: #5a6e7c; margin-bottom: 10px; }
+        .pr-meta { font-size: 11px; color: #8a9bb0; }
+        .pr-section { margin-bottom: 30px; }
+        .pr-section h2 { font-size: 16px; color: #1a4a6e; border-left: 4px solid #1a4a6e; padding-left: 10px; margin-bottom: 14px; }
+        .pr-summary-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+        .pr-summary-card { flex: 1; min-width: 110px; text-align: center; border: 1px solid #dce3ec; border-radius: 10px; padding: 14px 6px; }
+        .pr-summary-value { font-size: 22px; font-weight: 700; color: #1a4a6e; }
+        .pr-summary-label { font-size: 9.5px; color: #8a9bb0; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+        .pr-chart-row { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+        .pr-chart-row .pr-table { flex: 1; min-width: 260px; }
+        .pr-chart-img { max-width: 260px; flex-shrink: 0; }
+        .pr-chart-img-full { max-width: 100%; margin-bottom: 16px; }
+        .pr-chart-block { margin-bottom: 28px; }
+        .pr-chart-block:last-child { margin-bottom: 0; }
+        .pr-chart-subtitle { font-size: 13px; font-weight: 600; color: #4a5e6c; margin-bottom: 10px; }
+        .pr-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .pr-table th { background: #1a4a6e; color: white; text-align: left; padding: 6px 10px; }
+        .pr-table td { padding: 5px 10px; border-bottom: 1px solid #eef2f7; }
+        .pr-table tbody tr:nth-child(even) { background: #f8fafc; }
+        .pr-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+        .pr-c-normal { color: #27ae60; font-weight: 600; }
+        .pr-c-atencao { color: #e67e22; font-weight: 600; }
+        .pr-c-atrasado { color: #e74c3c; font-weight: 600; }
+        .pr-footer { text-align: center; font-size: 10px; color: #8a9bb0; margin-top: 30px; border-top: 1px solid #eef2f7; padding-top: 12px; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #printReportArea, #printReportArea * { visibility: visible; }
+            #printReportArea { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+            .pr-summary-grid, .pr-chart-row, .pr-chart-block { page-break-inside: avoid; }
+            .pr-table thead { display: table-header-group; }
+            .pr-table tr { page-break-inside: avoid; }
+            @page { margin: 16mm 12mm; }
+        }
+    </style>
+    <link rel="stylesheet" href="theme.css">
+</head>
+<body data-page="analise">
+<script src="layout.js"></script>
+    <div class="page">
+    <div class="header">
+        <div class="header-content">
+            <h1>Análise de Processos</h1>
+            <p>Organização por assunto, vara, polo passivo e advogado do polo ativo</p>
+        </div>
+    </div>
+
+    <div class="kpis" id="statsSection" style="display: none;">
+        <div class="kpi"><span class="k-l">Processos</span><span class="k-v" id="kTotal">-</span></div>
+        <div class="kpi"><span class="k-l">Assuntos</span><span class="k-v" id="kAssuntos">-</span></div>
+        <div class="kpi ok"><span class="k-l">No prazo</span><span class="k-v" id="kNormal">-</span></div>
+        <div class="kpi warn"><span class="k-l">Atenção</span><span class="k-v" id="kAtencao">-</span></div>
+        <div class="kpi bad"><span class="k-l">Atrasados</span><span class="k-v" id="kAtrasado">-</span></div>
+        <div class="kpi"><span class="k-l">Última sincronização</span><span class="k-s" id="ultimaAtualizacao">-</span></div>
+    </div>
+
+    <div class="tabs-container">
+        <div class="tabs">
+            <button class="tab active" data-tab="assuntos">Assuntos</button>
+            <button class="tab" data-tab="poloPassivo">Polo Passivo</button>
+            <button class="tab" data-tab="advogadoAtivo">Advogado Polo Ativo</button>
+            <button class="tab" data-tab="analises">Análises</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div id="tab-assuntos" class="tab-content active"><div id="assuntosContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
+        <div id="tab-poloPassivo" class="tab-content"><div id="poloPassivoContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
+        <div id="tab-advogadoAtivo" class="tab-content"><div id="advogadoAtivoContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
+        <div id="tab-analises" class="tab-content"><div id="analisesContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
+    </div>
+
+    </div>
+
+    <div id="printReportArea" class="print-only"></div>
+
+    <script>
+        (function() {
+            const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG;
+            const supabaseClient = window.criarClienteLeitura();
+            
+            let currentData = null, currentPoloData = null, currentAdvogadoData = null;
+            let searchTerm = '', poloSearchTerm = '', advogadoSearchTerm = '';
+            let expandedSubjects = new Set(), expandedPolos = new Set(), expandedAdvogados = new Set();
+            let expandedPoloCourts = new Set(), expandedAdvogadoCourts = new Set();
+            let subjectChart = null, courtChart = null;
+            let lastProc = [], lastUpdateDate = null, searchTimeout = null, courtSearchTerm = '';
+            
+            let prazoConfig = { normal_max: 60, atencao_max: 120, atrasado_min: 121 };
+
+            async function loadConfiguracoes() {
+                try {
+                    const { data } = await supabaseClient.from('configuracoes').select('chave, valor');
+                    if (data) data.forEach(item => {
+                        if (item.chave === 'prazo_normal_max') prazoConfig.normal_max = parseInt(item.valor);
+                        if (item.chave === 'prazo_atencao_max') prazoConfig.atencao_max = parseInt(item.valor);
+                        if (item.chave === 'prazo_atrasado_min') prazoConfig.atrasado_min = parseInt(item.valor);
+                    });
+                } catch(e) { console.log(e); }
+            }
+
+            function showToast(msg, type) {
+                const existing = document.querySelector('.toast');
+                if (existing) existing.remove();
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = msg;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+
+            function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+            function getDaysBadgeClass(days) { if (days <= prazoConfig.normal_max) return 'normal'; if (days <= prazoConfig.atencao_max) return 'warning'; return 'delayed'; }
+            function getDaysLabel(days) { if (days === 0) return 'Hoje'; if (days === 1) return '1 dia'; return `${days} dias`; }
+            function filterBySearch(arr) { if (!searchTerm) return arr; const term = searchTerm.toLowerCase(); return arr.filter(p => p.numeroProcesso.toLowerCase().includes(term) || p.orgaoJulgador.toLowerCase().includes(term) || p.assuntoPrincipal.toLowerCase().includes(term)); }
+            function filterPoloBySearch(arr) { if (!poloSearchTerm) return arr; const term = poloSearchTerm.toLowerCase(); return arr.filter(p => p.numeroProcesso.toLowerCase().includes(term) || p.orgaoJulgador.toLowerCase().includes(term) || p.assuntoPrincipal.toLowerCase().includes(term)); }
+            function filterAdvogadoBySearch(arr) {
+                if (!advogadoSearchTerm) return arr;
+                const term = advogadoSearchTerm.toLowerCase();
+                return arr.filter(p => [p.numeroProcesso, p.orgaoJulgador, p.assuntoPrincipal, p.advogadoAtivo, p.poloPassivo].some(v => String(v || '').toLowerCase().includes(term)));
+            }
+            function convertToBrasiliaTime(d) { if (!d) return '-'; const date = new Date(d); date.setHours(date.getHours() - 3); return date.toLocaleString('pt-BR'); }
+            function extractVaraNumber(name) { const m = name.match(/(\d+)[ªº]?\s*Vara/i); return m ? parseInt(m[1]) : 999; }
+
+            function processData(data, importDate = null) {
+                const unique = new Map();
+                data.forEach(item => {
+                    const num = item.numero_processo;
+                    if (num && !unique.has(num)) unique.set(num, {
+                        numeroProcesso: num,
+                        orgaoJulgador: item.orgao_julgador,
+                        diasChegada: item.dias_chegada,
+                        assuntoPrincipal: item.assunto_principal,
+                        poloPassivo: item.polo_passivo || 'Não informado',
+                        advogadoAtivo: item.advogado_polo_ativo || 'Não informado'
+                    });
+                });
+                const proc = Array.from(unique.values());
+                lastProc = proc;
+
+                // Assuntos
+                const bySubject = {};
+                proc.forEach(p => { const s = p.assuntoPrincipal; if (!bySubject[s]) bySubject[s] = []; bySubject[s].push(p); });
+                for (let s in bySubject) {
+                    const byCourt = {};
+                    bySubject[s].forEach(p => { const c = p.orgaoJulgador; if (!byCourt[c]) byCourt[c] = []; byCourt[c].push(p); });
+                    for (let c in byCourt) byCourt[c].sort((a,b) => b.diasChegada - a.diasChegada);
+                    bySubject[s] = { byCourt, sortedCourts: Object.keys(byCourt).sort((a,b) => byCourt[b].length - byCourt[a].length), totalProcesses: bySubject[s].length };
+                }
+
+                // Polo Passivo
+                const byPolo = {};
+                proc.forEach(p => {
+                    const po = p.poloPassivo;
+                    if (!byPolo[po]) byPolo[po] = { processes: [], byCourt: {} };
+                    byPolo[po].processes.push(p);
+                    const c = p.orgaoJulgador;
+                    if (!byPolo[po].byCourt[c]) byPolo[po].byCourt[c] = [];
+                    byPolo[po].byCourt[c].push(p);
+                });
+                for (let po in byPolo) {
+                    for (let c in byPolo[po].byCourt) byPolo[po].byCourt[c].sort((a,b) => b.diasChegada - a.diasChegada);
+                    byPolo[po].sortedCourts = Object.keys(byPolo[po].byCourt).sort((a,b) => byPolo[po].byCourt[b].length - byPolo[po].byCourt[a].length);
+                    byPolo[po].totalProcesses = byPolo[po].processes.length;
+                }
+                const sortedPolos = Object.keys(byPolo).sort((a,b) => byPolo[b].totalProcesses - byPolo[a].totalProcesses);
+
+                // Advogado Polo Ativo - Advogado > Vara > Assunto
+                const byAdvogado = {};
+                proc.forEach(p => {
+                    const A = byAdvogado[p.advogadoAtivo] || (byAdvogado[p.advogadoAtivo] = { total: 0, varas: {} });
+                    A.total++;
+                    const V = A.varas[p.orgaoJulgador] || (A.varas[p.orgaoJulgador] = { total: 0, assuntos: {} });
+                    V.total++;
+                    (V.assuntos[p.assuntoPrincipal] || (V.assuntos[p.assuntoPrincipal] = [])).push(p);
+                });
+                const sortedAdvogados = Object.keys(byAdvogado).sort((x, y) => (byAdvogado[y].total - byAdvogado[x].total) || x.localeCompare(y, 'pt-BR'));
+                for (const adv of sortedAdvogados) {
+                    const A = byAdvogado[adv];
+                    A.sortedVaras = Object.keys(A.varas).sort((x, y) => (A.varas[y].total - A.varas[x].total) || (extractVaraNumber(x) - extractVaraNumber(y)));
+                    for (const vara of A.sortedVaras) {
+                        const V = A.varas[vara];
+                        V.sortedAssuntos = Object.keys(V.assuntos).sort((x, y) => (V.assuntos[y].length - V.assuntos[x].length) || x.localeCompare(y, 'pt-BR'));
+                        for (const ass of V.sortedAssuntos) V.assuntos[ass].sort((x, y) => y.diasChegada - x.diasChegada);   // mais antigos primeiro
+                    }
+                }
+
+                const subjectCounts = {}, courtCounts = {}, poloCounts = {}, advogadoCounts = {};
+                proc.forEach(p => {
+                    subjectCounts[p.assuntoPrincipal] = (subjectCounts[p.assuntoPrincipal] || 0) + 1;
+                    courtCounts[p.orgaoJulgador] = (courtCounts[p.orgaoJulgador] || 0) + 1;
+                    poloCounts[p.poloPassivo] = (poloCounts[p.poloPassivo] || 0) + 1;
+                    advogadoCounts[p.advogadoAtivo] = (advogadoCounts[p.advogadoAtivo] || 0) + 1;
+                });
+
+                // ORDENAÇÃO DAS VARAS POR NÚMERO (CRESCENTE) PARA O RANKING
+                const sortedCourtEntries = Object.entries(courtCounts).sort((a,b) => {
+                    const numA = extractVaraNumber(a[0]);
+                    const numB = extractVaraNumber(b[0]);
+                    return numA - numB;
+                });
+
+                currentData = {
+                    bySubject, sortedSubjects: Object.keys(bySubject).sort((a,b) => bySubject[b].totalProcesses - bySubject[a].totalProcesses),
+                    totalProcesses: proc.length, totalSubjects: Object.keys(bySubject).length,
+                    rawData: proc, subjectCounts, courtCounts,
+                    sortedCourtEntries,
+                    poloCounts, sortedPoloEntries: Object.entries(poloCounts).sort((a,b) => b[1] - a[1]),
+                    advogadoCounts, sortedAdvogadoEntries: Object.entries(advogadoCounts).sort((a,b) => b[1] - a[1])
+                };
+                currentPoloData = { byPolo, sortedPolos, totalPolos: Object.keys(byPolo).length };
+                currentAdvogadoData = { byAdvogado, sortedAdvogados, totalAdvogados: Object.keys(advogadoCounts).length };
+
+                updateStats(importDate);
+                const activeTab = document.querySelector('.tab.active')?.dataset.tab || 'assuntos';
+                if (activeTab === 'assuntos') renderAssuntosTab();
+                else if (activeTab === 'poloPassivo') renderPoloPassivoTab();
+                else if (activeTab === 'advogadoAtivo') renderAdvogadoAtivoTab();
+                else renderAnalisesTab();
+            }
+
+            function updateStats(d) {
+                if (!currentData) return;
+                document.getElementById('statsSection').style.display = 'grid';
+                if (d) lastUpdateDate = d;
+                document.getElementById('ultimaAtualizacao').textContent = convertToBrasiliaTime(lastUpdateDate);
+                const c = { normal: 0, warning: 0, delayed: 0 };
+                lastProc.forEach(p => c[getDaysBadgeClass(p.diasChegada)]++);
+                const fmt = n => n.toLocaleString('pt-BR');
+                document.getElementById('kTotal').textContent = fmt(currentData.totalProcesses);
+                document.getElementById('kAssuntos').textContent = fmt(currentData.totalSubjects);
+                document.getElementById('kNormal').textContent = fmt(c.normal);
+                document.getElementById('kAtencao').textContent = fmt(c.warning);
+                document.getElementById('kAtrasado').textContent = fmt(c.delayed);
+            }
+
+            function renderAssuntosTab() {
+                const container = document.getElementById('assuntosContent');
+                if (!currentData || !currentData.totalProcesses) { container.innerHTML = `<div class="empty-state"><div class="empty-icon"></div><div>Nenhum processo encontrado</div></div>`; return; }
+                let html = `<div class="search-container"><input type="text" class="search-input" id="searchInput" placeholder="Buscar por número, órgão ou assunto..." autocomplete="off"></div>`;
+                currentData.sortedSubjects.forEach((subject, idx) => {
+                    const subjectData = currentData.bySubject[subject];
+                    const subjectId = `subject-${idx}`;
+                    const filtered = {};
+                    const filteredNames = [];
+                    subjectData.sortedCourts.forEach(court => {
+                        const proc = filterBySearch(subjectData.byCourt[court]);
+                        if (proc.length) { filtered[court] = proc; filteredNames.push(court); }
+                    });
+                    if (!filteredNames.length) return;
+                    const isExp = expandedSubjects.has(subjectId);
+                    const total = filteredNames.reduce((s, c) => s + filtered[c].length, 0);
+                    html += `<div class="section-card"><div class="section-header" onclick="toggleSubject('${subjectId}')"><div class="section-info"><div class="section-badge" style="background:#1a4a6e"></div><span class="section-name">${escapeHtml(subject)}</span><span class="section-count">${total}</span></div><div class="toggle-icon" id="${subjectId}-icon">${isExp ? '−' : '+'}</div></div><div class="section-content ${isExp ? 'expanded' : ''}" id="${subjectId}-content">`;
+                    filteredNames.forEach((court, ci) => {
+                        const courtId = `${subjectId}-court-${ci}`;
+                        const procs = filtered[court];
+                        html += `<div class="sub-card"><div class="sub-header" onclick="toggleCourt('${courtId}')"><div class="sub-info"><div class="sub-icon"></div><span class="sub-name">${escapeHtml(court)}</span><span class="sub-count">${procs.length}</span></div><div class="sub-toggle" id="${courtId}-icon">+</div></div><div class="sub-content" id="${courtId}-content"><div class="process-table">`;
+                        procs.forEach(p => { html += `<div class="process-row"><div class="process-number"><span>${escapeHtml(p.numeroProcesso)}</span><button class="copy-btn" onclick="copyToClipboard('${escapeHtml(p.numeroProcesso)}', this)">⎘</button></div><div class="process-days"><span class="days-badge ${getDaysBadgeClass(p.diasChegada)}">${getDaysLabel(p.diasChegada)}</span></div><div class="process-orgao">${escapeHtml(p.orgaoJulgador)}</div></div>`; });
+                        html += `</div></div></div>`;
+                    });
+                    html += `</div></div>`;
+                });
+                container.innerHTML = html;
+                const inp = document.getElementById('searchInput');
+                if (inp) {
+                    inp.value = searchTerm;
+                    inp.addEventListener('input', (e) => { if (searchTimeout) clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { searchTerm = e.target.value; renderAssuntosTab(); const i = document.getElementById('searchInput'); if(i) { i.focus(); i.setSelectionRange(searchTerm.length, searchTerm.length); } }, 300); });
+                    inp.focus(); inp.setSelectionRange(searchTerm.length, searchTerm.length);
+                }
+            }
+
+            function renderPoloPassivoTab() {
+                const container = document.getElementById('poloPassivoContent');
+                if (!currentPoloData || !currentPoloData.totalPolos) { container.innerHTML = `<div class="empty-state"><div class="empty-icon"></div><div>Nenhum polo passivo encontrado</div></div>`; return; }
+                let html = `<div class="search-container"><input type="text" class="search-input" id="poloSearchInput" placeholder="Buscar por número, órgão, assunto ou polo..." autocomplete="off"></div>`;
+                currentPoloData.sortedPolos.forEach((polo, idx) => {
+                    const poloId = `polo-${idx}`;
+                    const poloData = currentPoloData.byPolo[polo];
+                    const filtered = filterPoloBySearch(poloData.processes);
+                    if (!filtered.length) return;
+                    const isExp = expandedPolos.has(poloId);
+                    html += `<div class="section-card"><div class="section-header" onclick="togglePolo('${poloId}')"><div class="section-info"><div class="section-badge" style="background:#e67e22"></div><span class="section-name">${escapeHtml(polo)}</span><span class="section-count">${filtered.length}</span></div><div class="toggle-icon" id="${poloId}-icon">${isExp ? '−' : '+'}</div></div><div class="section-content ${isExp ? 'expanded' : ''}" id="${poloId}-content">`;
+                    const byCourt = {};
+                    filtered.forEach(p => { const c = p.orgaoJulgador; if (!byCourt[c]) byCourt[c] = []; byCourt[c].push(p); });
+                    const sortedCourts = Object.keys(byCourt).sort((a,b) => byCourt[b].length - byCourt[a].length);
+                    sortedCourts.forEach((court, ci) => {
+                        const courtId = `${poloId}-court-${ci}`;
+                        const procs = byCourt[court];
+                        const isCourtExp = expandedPoloCourts.has(courtId);
+                        html += `<div class="sub-card"><div class="sub-header" onclick="togglePoloCourt('${courtId}')"><div class="sub-info"><div class="sub-icon"></div><span class="sub-name">${escapeHtml(court)}</span><span class="sub-count">${procs.length}</span></div><div class="sub-toggle" id="${courtId}-icon">${isCourtExp ? '−' : '+'}</div></div><div class="sub-content ${isCourtExp ? 'expanded' : ''}" id="${courtId}-content"><div class="process-table">`;
+                        procs.forEach(p => { html += `<div class="process-row"><div class="process-number"><span>${escapeHtml(p.numeroProcesso)}</span><button class="copy-btn" onclick="copyToClipboard('${escapeHtml(p.numeroProcesso)}', this)">⎘</button></div><div class="process-assunto"><span style="background:#eef2f7;padding:4px 12px;border-radius:20px;font-size:12px;">${escapeHtml(p.assuntoPrincipal)}</span></div><div class="process-days"><span class="days-badge ${getDaysBadgeClass(p.diasChegada)}">${getDaysLabel(p.diasChegada)}</span></div><div class="process-orgao">${escapeHtml(p.orgaoJulgador)}</div></div>`; });
+                        html += `</div></div></div>`;
+                    });
+                    html += `</div></div>`;
+                });
+                container.innerHTML = html;
+                const inp = document.getElementById('poloSearchInput');
+                if (inp) {
+                    inp.value = poloSearchTerm;
+                    inp.addEventListener('input', (e) => { if (searchTimeout) clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { poloSearchTerm = e.target.value; renderPoloPassivoTab(); }, 300); });
+                }
+            }
+
+function renderAdvogadoAtivoTab() {
+    const container = document.getElementById('advogadoAtivoContent');
+    if (!currentAdvogadoData || !currentAdvogadoData.totalAdvogados) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-icon"></div><div>Nenhum advogado do polo ativo encontrado</div></div>`;
+        return;
+    }
+
+    let html = `<div class="search-container"><input type="text" class="search-input" id="advogadoSearchInput" placeholder="Buscar por advogado, número, vara, assunto ou polo passivo..." autocomplete="off"></div>`;
+    const busca = !!advogadoSearchTerm;   // com busca ativa, os níveis já aparecem abertos
+    let achou = false;
+
+    // Hierarquia: Advogado > Vara > Assunto > Processos
+    currentAdvogadoData.sortedAdvogados.forEach((adv, ai) => {
+        const A = currentAdvogadoData.byAdvogado[adv];
+        const varasVis = [];
+        let totalAdv = 0;
+        A.sortedVaras.forEach((vara, vi) => {
+            const V = A.varas[vara], assVis = [];
+            let totalVara = 0;
+            V.sortedAssuntos.forEach((ass, si) => {
+                const lista = filterAdvogadoBySearch(V.assuntos[ass]);
+                if (lista.length) { assVis.push([ass, si, lista]); totalVara += lista.length; }
+            });
+            if (assVis.length) { varasVis.push([vara, vi, assVis, totalVara]); totalAdv += totalVara; }
+        });
+        if (!varasVis.length) return;
+        achou = true;
+
+        const advId = `adv-${ai}`;
+        const isAdvExp = busca || expandedAdvogados.has(advId);
+        html += `<div class="section-card"><div class="section-header" onclick="toggleAdvogado('${advId}')"><div class="section-info"><div class="section-badge"></div><span class="section-name">${escapeHtml(adv)}</span><span class="section-count">${totalAdv}</span></div><div class="toggle-icon" id="${advId}-icon">${isAdvExp ? '−' : '+'}</div></div><div class="section-content ${isAdvExp ? 'expanded' : ''}" id="${advId}-content">`;
+
+        varasVis.forEach(([vara, vi, assVis, totalVara]) => {
+            const varaId = `${advId}-v${vi}`;
+            const isVaraExp = busca || expandedAdvogadoCourts.has(varaId);
+            html += `<div class="sub-card"><div class="sub-header" onclick="toggleAdvogadoCourt('${varaId}')"><div class="sub-info"><div class="sub-icon"></div><span class="sub-name">${escapeHtml(vara)}</span><span class="sub-count">${totalVara}</span></div><div class="sub-toggle" id="${varaId}-icon">${isVaraExp ? '−' : '+'}</div></div><div class="sub-content ${isVaraExp ? 'expanded' : ''}" id="${varaId}-content">`;
+
+            assVis.forEach(([ass, si, lista]) => {
+                const assId = `${varaId}-a${si}`;
+                const isAssExp = busca || expandedPoloCourts.has(assId);
+                html += `<div class="sub-card"><div class="sub-header" style="padding-left:60px" onclick="togglePoloCourt('${assId}')"><div class="sub-info"><span style="font-weight:600">${escapeHtml(ass)}</span><span class="sub-count">${lista.length}</span></div><div class="sub-toggle" id="${assId}-icon">${isAssExp ? '−' : '+'}</div></div><div class="sub-content ${isAssExp ? 'expanded' : ''}" id="${assId}-content"><div class="process-table">`;
+                lista.forEach(p => {
+                    html += `<div class="process-row"><div class="process-number"><span>${escapeHtml(p.numeroProcesso)}</span><button class="copy-btn" onclick="copyToClipboard('${escapeHtml(p.numeroProcesso)}', this)">⎘</button></div><div class="process-days"><span class="days-badge ${getDaysBadgeClass(p.diasChegada)}">${getDaysLabel(p.diasChegada)}</span></div><div class="process-orgao">${escapeHtml(p.poloPassivo)}</div></div>`;
+                });
+                html += `</div></div></div>`;
+            });
+            html += `</div></div>`;
+        });
+        html += `</div></div>`;
+    });
+
+    if (!achou) html += `<div class="empty-state"><div>Nenhum resultado para a busca.</div></div>`;
+    container.innerHTML = html;
+
+    const inp = document.getElementById('advogadoSearchInput');
+    if (inp) {
+        inp.value = advogadoSearchTerm;
+        inp.addEventListener('input', (e) => {
+            if (searchTimeout) clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                advogadoSearchTerm = e.target.value;
+                renderAdvogadoAtivoTab();
+                const novo = document.getElementById('advogadoSearchInput');
+                if (novo) { novo.focus(); novo.setSelectionRange(novo.value.length, novo.value.length); }
+            }, 300);
+        });
+    }
+}
+            function renderAnalisesTab() {
+                const container = document.getElementById('analisesContent');
+                if (!currentData || !currentData.totalProcesses) { container.innerHTML = `<div class="empty-state"><div class="empty-icon"></div><div>Nenhum dado disponível</div></div>`; return; }
+                const subjectEntries = Object.entries(currentData.subjectCounts).sort((a,b) => b[1] - a[1]);
+                const courtEntries = Object.entries(currentData.courtCounts).sort((a,b) => b[1] - a[1]);
+                const filteredCourtEntries = currentData.sortedCourtEntries.filter(([c]) => !courtSearchTerm || c.toLowerCase().includes(courtSearchTerm.toLowerCase()));
+                let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:16px;"><button class="print-btn" id="printReportBtn" onclick="printAnalysisReport()">Imprimir Relatório</button></div><div class="charts-container"><div class="chart-card"><div class="chart-title">Distribuição por Assunto</div><div class="chart-wrapper"><canvas id="subjectChart"></canvas></div><div class="ranking-list"><div style="font-weight:600;margin-bottom:12px;">RANKING DE ASSUNTOS</div>`;
+                subjectEntries.slice(0,5).forEach(([s,c],i) => { html += `<div class="ranking-item"><div><span class="ranking-position ${i===0?'top1':i===1?'top2':i===2?'top3':''}">${i+1}</span><span class="ranking-name">${escapeHtml(s.length>40?s.substring(0,37)+'...':s)}</span></div><span class="ranking-value">${c}</span></div>`; });
+                html += `</div></div><div class="chart-card"><div class="chart-title">Distribuição por Vara</div><div class="chart-wrapper"><canvas id="courtChart"></canvas></div><div class="ranking-list"><div style="font-weight:600;margin-bottom:12px;">RANKING DE VARAS</div>`;
+                courtEntries.slice(0,5).forEach(([v,c],i) => { html += `<div class="ranking-item"><div><span class="ranking-position ${i===0?'top1':i===1?'top2':i===2?'top3':''}">${i+1}</span><span class="ranking-name">${escapeHtml(v.length>40?v.substring(0,37)+'...':v)}</span></div><span class="ranking-value">${c}</span></div>`; });
+                html += `</div></div></div><div class="chart-card"><div class="chart-title">Análise Completa por Vara</div><div class="analysis-search"><input type="text" id="courtSearchInput" placeholder="Buscar vara..."></div><div class="ranking-list">`;
+                if (!filteredCourtEntries.length) html += `<div class="no-results">Nenhuma vara encontrada</div>`;
+                else filteredCourtEntries.forEach(([v,c],i) => { html += `<div class="ranking-item"><div><span class="ranking-position" style="background:#eef2f7;">${i+1}</span><span class="ranking-name">${escapeHtml(v)}</span></div><div><span class="ranking-value">${c}</span><span style="font-size:11px;color:#8a9bb0;margin-left:8px;">${((c/currentData.totalProcesses)*100).toFixed(1)}%</span></div></div>`; });
+                html += `</div></div>`;
+                container.innerHTML = html;
+                const cs = document.getElementById('courtSearchInput');
+                if (cs) { cs.value = courtSearchTerm; cs.addEventListener('input', (e) => { courtSearchTerm = e.target.value; renderAnalisesTab(); }); }
+                setTimeout(() => {
+                    if (subjectChart) subjectChart.destroy();
+                    if (courtChart) courtChart.destroy();
+                    const ctx1 = document.getElementById('subjectChart')?.getContext('2d');
+                    const ctx2 = document.getElementById('courtChart')?.getContext('2d');
+                    if (ctx1) subjectChart = new Chart(ctx1, { type: 'bar', data: { labels: subjectEntries.slice(0,10).map(([n])=>n.length>20?n.substring(0,17)+'...':n), datasets: [{ label: 'Processos', data: subjectEntries.slice(0,10).map(([,c])=>c), backgroundColor: '#12355b', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } } });
+                    if (ctx2) courtChart = new Chart(ctx2, { type: 'bar', data: { labels: courtEntries.slice(0,10).map(([n])=>n.length>20?n.substring(0,17)+'...':n), datasets: [{ label: 'Processos', data: courtEntries.slice(0,10).map(([,c])=>c), backgroundColor: '#6c8cb0', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } } });
+                }, 100);
+            }
+
+            function createChartImage(config, width, height) {
+                return new Promise((resolve) => {
+                    const holder = document.createElement('div');
+                    holder.style.position = 'fixed';
+                    holder.style.left = '-99999px';
+                    holder.style.top = '0';
+                    holder.style.width = width + 'px';
+                    holder.style.height = height + 'px';
+                    document.body.appendChild(holder);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    holder.appendChild(canvas);
+                    config.options = Object.assign({ animation: false, responsive: false, maintainAspectRatio: false, devicePixelRatio: 2 }, config.options);
+                    const chart = new Chart(canvas.getContext('2d'), config);
+                    requestAnimationFrame(() => requestAnimationFrame(() => {
+                        const img = chart.toBase64Image('image/png', 1);
+                        chart.destroy();
+                        document.body.removeChild(holder);
+                        resolve(img);
+                    }));
+                });
+            }
+
+            window.printAnalysisReport = async function() {
+                if (!currentData || !currentData.totalProcesses) { showToast('Nenhum dado disponível para o relatório', 'error'); return; }
+                const btn = document.getElementById('printReportBtn');
+                if (btn) { btn.disabled = true; btn.textContent = 'Gerando relatório...'; }
+                try {
+                    const total = currentData.totalProcesses;
+                    const subjectEntries = Object.entries(currentData.subjectCounts).sort((a,b) => b[1] - a[1]);
+                    const courtEntriesByCount = Object.entries(currentData.courtCounts).sort((a,b) => b[1] - a[1]);
+
+                    let normalCount = 0, atencaoCount = 0, atrasadoCount = 0;
+                    const subjectPrazo = {};
+                    currentData.rawData.forEach(p => {
+                        const cls = getDaysBadgeClass(p.diasChegada);
+                        if (cls === 'normal') normalCount++; else if (cls === 'warning') atencaoCount++; else atrasadoCount++;
+                        const s = p.assuntoPrincipal;
+                        if (!subjectPrazo[s]) subjectPrazo[s] = { normal: 0, atencao: 0, atrasado: 0 };
+                        if (cls === 'normal') subjectPrazo[s].normal++; else if (cls === 'warning') subjectPrazo[s].atencao++; else subjectPrazo[s].atrasado++;
+                    });
+
+                    const varas = Object.keys(currentData.courtCounts).length;
+                    const polos = currentPoloData ? currentPoloData.totalPolos : 0;
+                    const advogados = currentAdvogadoData ? currentAdvogadoData.totalAdvogados : 0;
+                    const geradoEm = new Date().toLocaleString('pt-BR');
+                    const ultimaSync = convertToBrasiliaTime(lastUpdateDate);
+
+                    const [prazoImg, subjectImg, courtImg] = await Promise.all([
+                        createChartImage({
+                            type: 'doughnut',
+                            data: { labels: ['Normal', 'Atenção', 'Atrasado'], datasets: [{ data: [normalCount, atencaoCount, atrasadoCount], backgroundColor: ['#2f7d5b', '#b7791f', '#b3261e'] }] },
+                            options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 13 } } } } }
+                        }, 480, 380),
+                        createChartImage({
+                            type: 'bar',
+                            data: { labels: subjectEntries.slice(0,20).map(([n]) => n.length > 34 ? n.substring(0,31) + '...' : n), datasets: [{ label: 'Processos', data: subjectEntries.slice(0,20).map(([,c]) => c), backgroundColor: '#12355b', borderRadius: 6 }] },
+                            options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true }, y: { ticks: { font: { size: 11 } } } } }
+                        }, 900, Math.max(420, subjectEntries.slice(0,20).length * 26)),
+                        createChartImage({
+                            type: 'bar',
+                            data: { labels: courtEntriesByCount.slice(0,20).map(([n]) => n.length > 34 ? n.substring(0,31) + '...' : n), datasets: [{ label: 'Processos', data: courtEntriesByCount.slice(0,20).map(([,c]) => c), backgroundColor: '#6c8cb0', borderRadius: 6 }] },
+                            options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true }, y: { ticks: { font: { size: 11 } } } } }
+                        }, 900, Math.max(420, courtEntriesByCount.slice(0,20).length * 26))
+                    ]);
+
+                    let html = `<div class="print-report">
+                        <div class="pr-header">
+                            <h1>Relatório de Análise de Processos</h1>
+                            <div class="pr-subtitle">SAMP — Organização por Assunto, Vara, Polo Passivo e Advogado do Polo Ativo</div>
+                            <div class="pr-meta">Gerado em ${geradoEm} &nbsp;|&nbsp; Última sincronização dos dados: ${ultimaSync}</div>
+                        </div>
+
+                        <div class="pr-section">
+                            <h2>1. Resumo Executivo</h2>
+                            <div class="pr-summary-grid">
+                                <div class="pr-summary-card"><div class="pr-summary-value">${total}</div><div class="pr-summary-label">Total de Processos</div></div>
+                                <div class="pr-summary-card"><div class="pr-summary-value">${subjectEntries.length}</div><div class="pr-summary-label">Assuntos Distintos</div></div>
+                                <div class="pr-summary-card"><div class="pr-summary-value">${varas}</div><div class="pr-summary-label">Varas / Órgãos</div></div>
+                                <div class="pr-summary-card"><div class="pr-summary-value">${polos}</div><div class="pr-summary-label">Polos Passivos</div></div>
+                                <div class="pr-summary-card"><div class="pr-summary-value">${advogados}</div><div class="pr-summary-label">Advogados (Polo Ativo)</div></div>
+                            </div>
+                        </div>
+
+                        <div class="pr-section">
+                            <h2>2. Distribuição por Prazo de Tramitação</h2>
+                            <div class="pr-chart-row">
+                                <img class="pr-chart-img" src="${prazoImg}">
+                                <table class="pr-table">
+                                    <thead><tr><th>Classificação</th><th>Critério</th><th>Quantidade</th><th>%</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><span class="pr-dot" style="background:#27ae60"></span>Normal</td><td>até ${prazoConfig.normal_max} dias</td><td>${normalCount}</td><td>${(normalCount/total*100).toFixed(1)}%</td></tr>
+                                        <tr><td><span class="pr-dot" style="background:#e67e22"></span>Atenção</td><td>${prazoConfig.normal_max+1} a ${prazoConfig.atencao_max} dias</td><td>${atencaoCount}</td><td>${(atencaoCount/total*100).toFixed(1)}%</td></tr>
+                                        <tr><td><span class="pr-dot" style="background:#e74c3c"></span>Atrasado</td><td>acima de ${prazoConfig.atencao_max} dias</td><td>${atrasadoCount}</td><td>${(atrasadoCount/total*100).toFixed(1)}%</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="pr-section">
+                            <h2>3. Distribuição por Assunto e por Vara</h2>
+                            <div class="pr-chart-block">
+                                <div class="pr-chart-subtitle">Processos por Assunto</div>
+                                <img class="pr-chart-img-full" src="${subjectImg}">
+                            </div>
+                            <div class="pr-chart-block">
+                                <div class="pr-chart-subtitle">Processos por Vara / Órgão Julgador</div>
+                                <img class="pr-chart-img-full" src="${courtImg}">
+                            </div>
+                        </div>
+
+                        <div class="pr-section">
+                            <h2>4. Detalhamento por Assunto e Prazo</h2>
+                            <table class="pr-table">
+                                <thead><tr><th>Assunto</th><th>Total</th><th>Normal</th><th>Atenção</th><th>Atrasado</th></tr></thead>
+                                <tbody>${subjectEntries.map(([s]) => { const sp = subjectPrazo[s] || { normal:0, atencao:0, atrasado:0 }; return `<tr><td>${escapeHtml(s)}</td><td>${sp.normal+sp.atencao+sp.atrasado}</td><td class="pr-c-normal">${sp.normal}</td><td class="pr-c-atencao">${sp.atencao}</td><td class="pr-c-atrasado">${sp.atrasado}</td></tr>`; }).join('')}</tbody>
+                            </table>
+                        </div>
+
+                        <div class="pr-section">
+                            <h2>5. Ranking de Polo Passivo</h2>
+                            <table class="pr-table">
+                                <thead><tr><th>#</th><th>Polo Passivo</th><th>Quantidade</th><th>%</th></tr></thead>
+                                <tbody>${(currentData.sortedPoloEntries || []).map(([p,c],i) => `<tr><td>${i+1}</td><td>${escapeHtml(p)}</td><td>${c}</td><td>${(c/total*100).toFixed(1)}%</td></tr>`).join('')}</tbody>
+                            </table>
+                        </div>
+
+                        <div class="pr-section">
+                            <h2>6. Ranking de Advogados do Polo Ativo</h2>
+                            <table class="pr-table">
+                                <thead><tr><th>#</th><th>Advogado</th><th>Quantidade</th><th>%</th></tr></thead>
+                                <tbody>${(currentData.sortedAdvogadoEntries || []).map(([a,c],i) => `<tr><td>${i+1}</td><td>${escapeHtml(a)}</td><td>${c}</td><td>${(c/total*100).toFixed(1)}%</td></tr>`).join('')}</tbody>
+                            </table>
+                        </div>
+
+                        <div class="pr-footer">Relatório gerado automaticamente pelo SAMP — Análise de Processos.</div>
+                    </div>`;
+
+                    document.getElementById('printReportArea').innerHTML = html;
+                    requestAnimationFrame(() => setTimeout(() => { window.print(); if (btn) { btn.disabled = false; btn.textContent = 'Imprimir Relatório'; } }, 150));
+                } catch (e) {
+                    console.error(e);
+                    showToast('Erro ao gerar relatório', 'error');
+                    if (btn) { btn.disabled = false; btn.textContent = 'Imprimir Relatório'; }
+                }
+            };
+
+            function showLoading() {
+                document.getElementById('assuntosContent').innerHTML = `<div class="loading"><div class="spinner"></div><div>Carregando...</div></div>`;
+                document.getElementById('poloPassivoContent').innerHTML = `<div class="loading"><div class="spinner"></div><div>Carregando...</div></div>`;
+                document.getElementById('advogadoAtivoContent').innerHTML = `<div class="loading"><div class="spinner"></div><div>Carregando...</div></div>`;
+                document.getElementById('analisesContent').innerHTML = `<div class="loading"><div class="spinner"></div><div>Carregando...</div></div>`;
+            }
+
+            window.toggleSubject = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; expandedSubjects.delete(id); } else { c.classList.add('expanded'); i.textContent = '−'; expandedSubjects.add(id); } } };
+            window.toggleCourt = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; } else { c.classList.add('expanded'); i.textContent = '−'; } } };
+            window.togglePolo = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; expandedPolos.delete(id); } else { c.classList.add('expanded'); i.textContent = '−'; expandedPolos.add(id); } } };
+            window.togglePoloCourt = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; expandedPoloCourts.delete(id); } else { c.classList.add('expanded'); i.textContent = '−'; expandedPoloCourts.add(id); } } };
+            window.toggleAdvogado = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; expandedAdvogados.delete(id); } else { c.classList.add('expanded'); i.textContent = '−'; expandedAdvogados.add(id); } } };
+            window.toggleAdvogadoCourt = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; expandedAdvogadoCourts.delete(id); } else { c.classList.add('expanded'); i.textContent = '−'; expandedAdvogadoCourts.add(id); } } };
+            window.copyToClipboard = function(t, btn) { navigator.clipboard.writeText(t).then(() => { const orig = btn.textContent; btn.textContent = '✓'; btn.classList.add('copied'); showToast(`Copiado: ${t}`, 'success'); setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500); }); };
+            window.switchTab = function(tab) { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); event.target.classList.add('active'); document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.getElementById(`tab-${tab}`).classList.add('active'); if (tab === 'assuntos' && currentData) renderAssuntosTab(); else if (tab === 'poloPassivo' && currentPoloData) renderPoloPassivoTab(); else if (tab === 'advogadoAtivo' && currentAdvogadoData) renderAdvogadoAtivoTab(); else if (tab === 'analises' && currentData) renderAnalisesTab(); };
+
+            async function loadDataFromSupabase() {
+                try {
+                    showLoading();
+                    let allData = [], offset = 0;
+                    while (true) {
+                        const { data, error } = await supabaseClient.from('processos').select('*').range(offset, offset + 999);
+                        if (error) throw error;
+                        if (!data || !data.length) break;
+                        allData.push(...data);
+                        offset += 1000;
+                        if (data.length < 1000) break;
+                    }
+                    if (allData.length) processData(allData, allData[0]?.data_importacao);
+                    else { document.getElementById('assuntosContent').innerHTML = `<div class="empty-state"><div class="empty-icon"></div><div>Nenhum processo encontrado</div></div>`; }
+                } catch(e) { console.error(e); showToast('Erro ao carregar dados', 'error'); }
+            }
+
+            document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+            
+            loadConfiguracoes().then(loadDataFromSupabase);
+            
+        })();
+    </script>
+<script src="sampinha.js"></script>
+</body>
+</html>
