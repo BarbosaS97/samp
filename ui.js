@@ -16,7 +16,7 @@
   window.addEventListener('pageshow', (e) => { if (e.persisted) document.body.classList.remove('saindo'); });
 
   /* ---------- números que "contam" até o valor ---------- */
-  const SEL = '.kpi .k-v, .stat-card .value';
+  const SEL = '.kpi .k-v, .stat-card .value, .kp2-v, .mt-v';
   function interpretar(txt) {
     const t = txt.trim();
     if (!/^[\d.,]+$/.test(t)) return null;
@@ -36,7 +36,7 @@
     const t0 = performance.now(), D = 750;
     el.dataset.animando = '1';
     (function passo(t) {
-      const k = Math.min(1, (t - t0) / D), suave = 1 - Math.pow(1 - k, 3);
+      const k = Math.max(0, Math.min(1, (t - t0) / D)), suave = 1 - Math.pow(1 - k, 3);
       if (k < 1) { el.textContent = formatar(p.n * suave, p.dec); requestAnimationFrame(passo); }
       else { el.textContent = final; delete el.dataset.animando; }
     })(t0);

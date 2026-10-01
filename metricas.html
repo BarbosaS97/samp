@@ -144,49 +144,38 @@
 <script src="layout.js?v=20261001a"></script>
 <div class="loading" id="loading"><div class="spinner-box">Processando...</div></div>
 <div class="container">
-    <div class="header" style="display:block">
-        <div class="title">
+    <div class="header mt-cab">
+        <div class="mt-cab-txt">
             <h1>Estatísticas Consolidadas</h1>
-            <p>Metas processuais | Varas Comuns, JEF e Geral consolidado</p>
+            <p>Metas processuais · Varas Comuns, JEF e Geral consolidado</p>
+            <div class="meta" id="metaPeriodo"></div>
         </div>
-        <div class="meta" id="metaPeriodo"></div>
+        <div class="mt-cab-acoes">
+            <button class="btn btn-outline" id="refreshFromDBBtn">Recarregar dados</button>
+            <button class="btn btn-primary" id="exportCompletePDFBtn">Exportar PDF completo</button>
+        </div>
     </div>
-    
-    <nav class="subnav" aria-label="Seções">
-        <a href="#secVaras">Varas Comuns</a><a href="#secJef">JEF</a><a href="#secGeral">Geral Consolidado</a>
-    </nav>
 
-    <div class="filter-panel">
-        <div class="filter-group">
-            <label>Data Inicial</label>
-            <select id="dataInicialSelect"></select>
+    <div class="filter-panel mt-barra">
+        <div class="mt-periodo">
+            <span class="mt-rot">Período</span>
+            <label class="mt-campo"><span>De</span><select id="dataInicialSelect"></select></label>
+            <label class="mt-campo"><span>Até</span><select id="dataFinalSelect"></select></label>
+            <button class="btn btn-secondary" id="aplicarFiltroBtn">Aplicar</button>
+            <button class="btn btn-outline" id="limparFiltroBtn">Limpar</button>
         </div>
-        <div class="filter-group">
-            <label>Data Final</label>
-            <select id="dataFinalSelect"></select>
-        </div>
-        <div class="filter-group">
-            <label>&nbsp;</label>
-            <button class="btn btn-secondary" id="aplicarFiltroBtn">Aplicar Filtro</button>
-        </div>
-        <div class="filter-group">
-            <label>&nbsp;</label>
-            <button class="btn btn-outline" id="limparFiltroBtn">Limpar Filtro</button>
-        </div>
+        <nav class="subnav mt-nav" aria-label="Seções">
+            <a href="#secVaras">Varas Comuns</a><a href="#secJef">JEF</a><a href="#secGeral">Geral consolidado</a>
+        </nav>
     </div>
-    
-    <div class="action-buttons">
-        <button class="btn btn-outline" id="refreshFromDBBtn">Recarregar dados</button>
-        <button class="btn btn-warning" id="exportCompletePDFBtn">Exportar PDF Completo</button>
-    </div>
-    
+
     <div id="filterInfo" class="filter-info" style="display: none;"></div>
     
     <!-- SEÇÃO 1: VARAS COMUNS -->
     <div class="section" id="secVaras">
         <div class="section-header"><h2>1. Varas Comuns</h2></div>
         <div class="section-content">
-            <div class="stats-grid" id="statsVaras"></div>
+            <div class="stats-grid mt-cards" id="statsVaras"></div>
             <div class="table-wrapper">
                 <table id="tableVaras">
                     <thead><tr><th>Mês/Ano</th><th>Processos Recebidos</th><th>Processos Calculados</th><th>Evolução do Acervo</th><th>Tempo de Permanência (dias)</th></tr></thead>
@@ -204,7 +193,7 @@
     <div class="section" id="secJef">
         <div class="section-header"><h2>2. JEF</h2></div>
         <div class="section-content">
-            <div class="stats-grid" id="statsJef"></div>
+            <div class="stats-grid mt-cards" id="statsJef"></div>
             <div class="table-wrapper">
                 <table id="tableJef">
                     <thead><tr><th>Mês/Ano</th><th>Processos Recebidos</th><th>Processos Calculados</th><th>Evolução do Acervo</th><th>Tempo de Permanência (dias)</th></tr></thead>
@@ -224,7 +213,7 @@
             <h2>3. Geral Consolidado <span class="info-badge">(Varas + JEF)</span></h2>
         </div>
         <div class="section-content">
-            <div class="stats-grid" id="statsGeral"></div>
+            <div class="stats-grid mt-cards" id="statsGeral"></div>
             <div class="table-wrapper">
                 <table id="tableGeral">
                     <thead><tr><th>Mês/Ano</th><th>Processos Recebidos</th><th>Processos Calculados</th><th>Evolução do Acervo</th></tr></thead>
@@ -342,27 +331,37 @@
         const medJef = calcularMedias(jefData, true);
         const medGeral = calcularMedias(geralData, false);
         
-        const statsVaras = document.getElementById('statsVaras');
-        if (statsVaras) statsVaras.innerHTML = `
-            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${fmt1(medVaras.rec)}</div></div>
-            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${fmt1(medVaras.calc)}</div></div>
-            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${fmt1(medVaras.ac)}</div></div>
-            <div class="stat-card"><h3>Média Tempo (dias)</h3><div class="value">${fmt1(medVaras.tp)}</div></div>`;
-        
-        const statsJef = document.getElementById('statsJef');
-        if (statsJef) statsJef.innerHTML = `
-            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${fmt1(medJef.rec)}</div></div>
-            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${fmt1(medJef.calc)}</div></div>
-            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${fmt1(medJef.ac)}</div></div>
-            <div class="stat-card"><h3>Média Tempo (dias)</h3><div class="value">${fmt1(medJef.tp)}</div></div>`;
-        
-        const statsGeral = document.getElementById('statsGeral');
-        if (statsGeral) statsGeral.innerHTML = `
-            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${fmt1(medGeral.rec)}</div></div>
-            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${fmt1(medGeral.calc)}</div></div>
-            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${fmt1(medGeral.ac)}</div></div>`;
+        const ult = currentMonthLabels.length ? currentMonthLabels[currentMonthLabels.length - 1] : '';
+        const fmt0 = (x) => Math.round(x).toLocaleString('pt-BR');
+        // linha de tendência em miniatura (a série do período exibido)
+        const spark = (v) => {
+            if (!v || v.length < 2) return '';
+            const mn = Math.min(...v), mx = Math.max(...v), W = 100, H = 30, p = 2;
+            const pts = v.map((x, k) => `${(p + (k / (v.length - 1)) * (W - 2 * p)).toFixed(1)},${(mx === mn ? H / 2 : H - p - ((x - mn) / (mx - mn)) * (H - 2 * p)).toFixed(1)}`);
+            return `<svg class="mt-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.join(' ')}"/><circle cx="${pts[pts.length - 1].split(',')[0]}" cy="${pts[pts.length - 1].split(',')[1]}" r="2.4"/></svg>`;
+        };
+        const cartao = (rotulo, serie, media, casas) => {
+            const u = serie && serie.length ? serie[serie.length - 1] : null;
+            let linha = '';
+            if (u !== null && media > 0) {
+                const d = ((u - media) / media) * 100, sinal = d > 0.05 ? 'up' : d < -0.05 ? 'down' : 'eq';
+                const seta = sinal === 'up' ? '▲' : sinal === 'down' ? '▼' : '■';
+                linha = `<div class="mt-ult"><span class="mt-seta ${sinal}">${seta}</span><span>Último mês <b>${casas ? fmt1(u) : fmt0(u)}</b> <small>(${d > 0 ? '+' : ''}${d.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% vs. média)</small></span></div>`;
+            }
+            return `<div class="mt-card"><div class="mt-top"><span class="mt-l">${rotulo}</span><span class="mt-sub">média mensal</span></div>` +
+                `<span class="mt-v">${fmt1(media)}</span>${linha}${spark(serie)}</div>`;
+        };
+        const blocos = (id, d, m, comTempo) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.innerHTML = cartao('Recebidos', d.recebidos, m.rec) + cartao('Calculados', d.calculados, m.calc) + cartao('Acervo', d.acervo, m.ac) +
+                (comTempo ? cartao('Tempo (dias)', d.tempo, m.tp, 1) : '');
+        };
+        blocos('statsVaras', varasData, medVaras, true);
+        blocos('statsJef', jefData, medJef, true);
+        blocos('statsGeral', geralData, medGeral, false);
     }
-    
+
     function renderizarGraficos(aba, data, hasTempo = true, isGeral = false) {
         const container = document.getElementById(`charts${aba.charAt(0).toUpperCase() + aba.slice(1)}`);
         if (!container) return;

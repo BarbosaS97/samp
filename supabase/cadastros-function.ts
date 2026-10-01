@@ -22,7 +22,7 @@ function igual(a: string, b: string) {
 }
 
 const CAMPOS = ["recebidos", "calculados", "acervo", "tempo"];
-const TABELAS = ["processos", "configuracoes", "config_periodos", "dados_processos"];
+const TABELAS = ["processos", "configuracoes", "config_periodos", "dados_processos", "processos_fotos", "processos_fotos_assuntos"];
 const SESSAO_MS = 8 * 60 * 60 * 1000; // 8 horas
 const nums = (v: unknown, n: number) =>
   Array.isArray(v) && v.length === n && v.every((x) => typeof x === "number" && isFinite(x));
@@ -230,6 +230,53 @@ function sugerirGrupos(finais: Map<string, number>) {
   }).sort((x, y) => y.total - x.total).slice(0, 80);
 }
 
+/* ---------- fotos da importação (histórico real de acervo, entradas e saídas por assunto) ---------- */
+function faixaIdade(d: number): "f0_30" | "f31_60" | "f61_90" | "f91_120" | "f121_180" | "f181_365" | "f366_mais" {
+  return d <= 30 ? "f0_30" : d <= 60 ? "f31_60" : d <= 90 ? "f61_90" : d <= 120 ? "f91_120" : d <= 180 ? "f121_180" : d <= 365 ? "f181_365" : "f366_mais";
+}
+
+async function lerBaseAtual(db: any): Promise<Map<string, string>> {
+  const m = new Map<string, string>();   // número do processo -> assunto
+  for (let off = 0; ; off += 1000) {
+    const { data, error } = await db.from("processos").select("numero_processo,assunto_principal").order("id").range(off, off + 999);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) if (r.numero_processo) m.set(r.numero_processo, r.assunto_principal ?? "");
+    if (!data || data.length < 1000) break;
+  }
+  return m;
+}
+
+async function gravarFoto(db: any, ts: string, novos: any[], antigos: Map<string, string>) {
+  const temAnterior = antigos.size > 0;
+  type Ag = { assunto: string; qtd: number; entradas: number; saidas: number; soma_dias: number; [k: string]: number | string };
+  const por = new Map<string, Ag>();
+  const pega = (assunto: string): Ag => {
+    let a = por.get(assunto);
+    if (!a) { a = { assunto, qtd: 0, entradas: 0, saidas: 0, soma_dias: 0, f0_30: 0, f31_60: 0, f61_90: 0, f91_120: 0, f121_180: 0, f181_365: 0, f366_mais: 0 }; por.set(assunto, a); }
+    return a;
+  };
+  const numerosNovos = new Set<string>();
+  for (const p of novos) {
+    const a = pega(p.assunto_principal ?? "");
+    a.qtd++; a.soma_dias += Number(p.dias_chegada) || 0;
+    (a as any)[faixaIdade(Number(p.dias_chegada) || 0)]++;
+    numerosNovos.add(p.numero_processo);
+    if (temAnterior && !antigos.has(p.numero_processo)) a.entradas++;
+  }
+  if (temAnterior) for (const [num, assunto] of antigos) if (!numerosNovos.has(num)) pega(assunto).saidas++;
+
+  let ent = 0, sai = 0;
+  for (const a of por.values()) { ent += a.entradas; sai += a.saidas; }
+  const { data: foto, error } = await db.from("processos_fotos").insert({ data_foto: ts, total: novos.length, entradas: temAnterior ? ent : null, saidas: temAnterior ? sai : null }).select("id").single();
+  if (error) throw new Error(error.message);
+  const linhas = [...por.values()].map((a) => ({ ...a, foto_id: foto.id, entradas: temAnterior ? a.entradas : null, saidas: temAnterior ? a.saidas : null }));
+  for (let i = 0; i < linhas.length; i += 500) {
+    const { error: e2 } = await db.from("processos_fotos_assuntos").insert(linhas.slice(i, i + 500));
+    if (e2) { await db.from("processos_fotos").delete().eq("id", foto.id); throw new Error(e2.message); }
+  }
+  return { entradas: temAnterior ? ent : null, saidas: temAnterior ? sai : null };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
@@ -327,6 +374,9 @@ Deno.serve(async (req) => {
           advogado_polo_ativo: String(r.advogado_polo_ativo ?? ""),
           data_importacao: ts,
         }));
+        // base anterior (para calcular entradas e saídas desta importação); falha aqui não impede a importação
+        let antigos = new Map<string, string>();
+        try { antigos = await lerBaseAtual(db); } catch { /* sem histórico de entradas/saídas nesta importação */ }
         const inserir = async () => {
           for (let i = 0; i < novos.length; i += 500) {
             const { error } = await db.from("processos").insert(novos.slice(i, i + 500));
@@ -350,7 +400,9 @@ Deno.serve(async (req) => {
           await db.from("processos").delete().eq("data_importacao", ts);
           return falha(erro);
         }
-        return json({ ok: true, total: novos.length });
+        let fluxo: { entradas: number | null; saidas: number | null } | null = null;
+        try { fluxo = await gravarFoto(db, ts, novos, antigos); } catch (e) { console.error("foto da importação não gravada:", (e as Error).message); }
+        return json({ ok: true, total: novos.length, foto: !!fluxo, entradas: fluxo?.entradas ?? null, saidas: fluxo?.saidas ?? null });
       }
 
       /* ---- assuntos: prévia da unificação (não grava nada) ---- */

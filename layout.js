@@ -25,6 +25,7 @@
     return;
   }
 
+  const nomeProprio = (n) => { const p = String(n || '').trim().split(/\s+/)[0] || ''; return p.charAt(0).toLocaleUpperCase('pt-BR') + p.slice(1).toLocaleLowerCase('pt-BR'); };
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   const bar = document.createElement('header');
@@ -36,7 +37,7 @@
       ITENS.map(i =>
         `<a href="${i.href}"${i.id === atual ? ' class="active" aria-current="page"' : ''}>${i.texto}${i.restrito ? '<span class="lock" title="Acesso restrito"></span>' : ''}</a>`
       ).join('') +
-      (sessao ? `<span class="user" title="Matrícula ${esc(sessao.matricula)}">Olá, <b>${esc(sessao.nome.split(' ')[0])}</b></span><button class="logout" id="sairSamp" type="button">Sair</button>` : '') +
+      (sessao ? `<span class="user" title="Matrícula ${esc(sessao.matricula)}">Olá, <b>${esc(nomeProprio(sessao.nome))}</b></span><button class="logout" id="sairSamp" type="button">Sair</button>` : '') +
       '</nav>');
   document.body.prepend(bar);
 

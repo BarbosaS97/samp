@@ -770,14 +770,49 @@
         </div>
     </div>
 
-    <div class="kpis" id="statsSection" style="display: none;">
-        <div class="kpi"><span class="k-l">Processos</span><span class="k-v" id="kTotal">-</span></div>
-        <div class="kpi"><span class="k-l">Assuntos</span><span class="k-v" id="kAssuntos">-</span></div>
-        <div class="kpi ok"><span class="k-l">No prazo</span><span class="k-v" id="kNormal">-</span></div>
-        <div class="kpi warn"><span class="k-l">Atenção</span><span class="k-v" id="kAtencao">-</span></div>
-        <div class="kpi bad"><span class="k-l">Atrasados</span><span class="k-v" id="kAtrasado">-</span></div>
-        <div class="kpi"><span class="k-l">Última sincronização</span><span class="k-s" id="ultimaAtualizacao">-</span></div>
-    </div>
+    <section class="kp2" id="statsSection" style="display: none;" aria-label="Indicadores da base de processos">
+        <div class="kp2-bloco kp2-base">
+            <h3 class="kp2-t">Base atual</h3>
+            <div class="kp2-duo">
+                <div class="kp2-item">
+                    <span class="kp2-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg></span>
+                    <div><span class="kp2-v" id="kTotal">-</span><span class="kp2-l">Processos</span></div>
+                </div>
+                <div class="kp2-item">
+                    <span class="kp2-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span>
+                    <div><span class="kp2-v" id="kAssuntos">-</span><span class="kp2-l">Assuntos</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="kp2-bloco kp2-prazo">
+            <h3 class="kp2-t">Situação por prazo <small>dias na tarefa</small></h3>
+            <div class="kp2-tres">
+                <div class="kp2-sit ok">
+                    <div class="kp2-top"><span class="kp2-l">No prazo</span><span class="kp2-par" id="parNormal">-</span></div>
+                    <span class="kp2-v" id="kNormal">-</span>
+                    <div class="kp2-pct"><b id="pctNormal">-</b><i><u id="barNormal"></u></i></div>
+                </div>
+                <div class="kp2-sit warn">
+                    <div class="kp2-top"><span class="kp2-l">Atenção</span><span class="kp2-par" id="parAtencao">-</span></div>
+                    <span class="kp2-v" id="kAtencao">-</span>
+                    <div class="kp2-pct"><b id="pctAtencao">-</b><i><u id="barAtencao"></u></i></div>
+                </div>
+                <div class="kp2-sit bad">
+                    <div class="kp2-top"><span class="kp2-l">Atrasados</span><span class="kp2-par" id="parAtrasado">-</span></div>
+                    <span class="kp2-v" id="kAtrasado">-</span>
+                    <div class="kp2-pct"><b id="pctAtrasado">-</b><i><u id="barAtrasado"></u></i></div>
+                </div>
+            </div>
+            <div class="kp2-dist" id="distPrazo" aria-hidden="true"><i class="ok"></i><i class="warn"></i><i class="bad"></i></div>
+        </div>
+
+        <div class="kp2-bloco kp2-sync">
+            <h3 class="kp2-t">Atualização</h3>
+            <span class="kp2-data" id="ultimaAtualizacao">-</span>
+            <span class="kp2-rel" id="kSyncRel"></span>
+        </div>
+    </section>
 
     <div class="tabs-container">
         <div class="tabs">
@@ -785,6 +820,7 @@
             <button class="tab" data-tab="poloPassivo">Polo Passivo</button>
             <button class="tab" data-tab="advogadoAtivo">Advogado Polo Ativo</button>
             <button class="tab" data-tab="analises">Análises</button>
+            <button class="tab" data-tab="tendencia">Tendência</button>
         </div>
     </div>
 
@@ -793,6 +829,7 @@
         <div id="tab-poloPassivo" class="tab-content"><div id="poloPassivoContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
         <div id="tab-advogadoAtivo" class="tab-content"><div id="advogadoAtivoContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
         <div id="tab-analises" class="tab-content"><div id="analisesContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
+        <div id="tab-tendencia" class="tab-content"><div id="tendenciaContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
     </div>
 
     </div>
@@ -942,22 +979,55 @@
                 if (activeTab === 'assuntos') renderAssuntosTab();
                 else if (activeTab === 'poloPassivo') renderPoloPassivoTab();
                 else if (activeTab === 'advogadoAtivo') renderAdvogadoAtivoTab();
+                else if (activeTab === 'tendencia') renderTendenciaTab();
                 else renderAnalisesTab();
+            }
+
+            function renderTendenciaTab() {
+                const c = document.getElementById('tendenciaContent');
+                if (!currentData || !window.renderTendencia) { c.innerHTML = '<div class="empty-state"><div>Não foi possível carregar o painel de tendência.</div></div>'; return; }
+                window.renderTendencia(c, { proc: lastProc, ref: lastUpdateDate, prazo: prazoConfig.normal_max, cliente: supabaseClient });
+            }
+
+            function relTempo(d) {
+                if (!d) return '';
+                let t = String(d); if (!/[zZ]|[+-]\d\d:?\d\d$/.test(t)) t += 'Z';
+                const ms = new Date(t).getTime(); if (!isFinite(ms)) return '';
+                const m = Math.round((Date.now() - ms) / 60000);
+                if (m < 1) return 'agora há pouco';
+                if (m < 60) return `há ${m} min`;
+                const h = Math.round(m / 60); if (h < 24) return `há ${h} h`;
+                const dd = Math.round(h / 24); return `há ${dd} dia${dd > 1 ? 's' : ''}`;
             }
 
             function updateStats(d) {
                 if (!currentData) return;
                 document.getElementById('statsSection').style.display = 'grid';
                 if (d) lastUpdateDate = d;
-                document.getElementById('ultimaAtualizacao').textContent = convertToBrasiliaTime(lastUpdateDate);
+                const $ = (id) => document.getElementById(id);
+                $('ultimaAtualizacao').textContent = convertToBrasiliaTime(lastUpdateDate);
+                $('kSyncRel').textContent = relTempo(lastUpdateDate);
                 const c = { normal: 0, warning: 0, delayed: 0 };
                 lastProc.forEach(p => c[getDaysBadgeClass(p.diasChegada)]++);
                 const fmt = n => n.toLocaleString('pt-BR');
-                document.getElementById('kTotal').textContent = fmt(currentData.totalProcesses);
-                document.getElementById('kAssuntos').textContent = fmt(currentData.totalSubjects);
-                document.getElementById('kNormal').textContent = fmt(c.normal);
-                document.getElementById('kAtencao').textContent = fmt(c.warning);
-                document.getElementById('kAtrasado').textContent = fmt(c.delayed);
+                const total = currentData.totalProcesses || 0;
+                const pct = (n) => total ? (n / total) * 100 : 0;
+                const pTxt = (n) => pct(n).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '% do total';
+                $('kTotal').textContent = fmt(total);
+                $('kAssuntos').textContent = fmt(currentData.totalSubjects);
+                $('kNormal').textContent = fmt(c.normal);
+                $('kAtencao').textContent = fmt(c.warning);
+                $('kAtrasado').textContent = fmt(c.delayed);
+                // parâmetros que definem cada situação (configurados em Cadastros > Prazos)
+                $('parNormal').textContent = `até ${prazoConfig.normal_max} dias`;
+                $('parAtencao').textContent = `${prazoConfig.normal_max + 1} a ${prazoConfig.atencao_max} dias`;
+                $('parAtrasado').textContent = `acima de ${prazoConfig.atencao_max} dias`;
+                [['Normal', c.normal], ['Atencao', c.warning], ['Atrasado', c.delayed]].forEach(([k, n]) => {
+                    $('pct' + k).textContent = pTxt(n);
+                    $('bar' + k).style.width = pct(n) + '%';
+                });
+                const dist = $('distPrazo').children;
+                dist[0].style.width = pct(c.normal) + '%'; dist[1].style.width = pct(c.warning) + '%'; dist[2].style.width = pct(c.delayed) + '%';
             }
 
             function renderAssuntosTab() {
@@ -1293,7 +1363,7 @@ function renderAdvogadoAtivoTab() {
             window.toggleAdvogado = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; expandedAdvogados.delete(id); } else { c.classList.add('expanded'); i.textContent = '−'; expandedAdvogados.add(id); } } };
             window.toggleAdvogadoCourt = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; expandedAdvogadoCourts.delete(id); } else { c.classList.add('expanded'); i.textContent = '−'; expandedAdvogadoCourts.add(id); } } };
             window.copyToClipboard = function(t, btn) { navigator.clipboard.writeText(t).then(() => { const orig = btn.textContent; btn.textContent = '✓'; btn.classList.add('copied'); showToast(`Copiado: ${t}`, 'success'); setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500); }); };
-            window.switchTab = function(tab) { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); event.target.classList.add('active'); document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.getElementById(`tab-${tab}`).classList.add('active'); if (tab === 'assuntos' && currentData) renderAssuntosTab(); else if (tab === 'poloPassivo' && currentPoloData) renderPoloPassivoTab(); else if (tab === 'advogadoAtivo' && currentAdvogadoData) renderAdvogadoAtivoTab(); else if (tab === 'analises' && currentData) renderAnalisesTab(); };
+            window.switchTab = function(tab) { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); event.target.classList.add('active'); document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.getElementById(`tab-${tab}`).classList.add('active'); if (tab === 'assuntos' && currentData) renderAssuntosTab(); else if (tab === 'poloPassivo' && currentPoloData) renderPoloPassivoTab(); else if (tab === 'advogadoAtivo' && currentAdvogadoData) renderAdvogadoAtivoTab(); else if (tab === 'analises' && currentData) renderAnalisesTab(); else if (tab === 'tendencia' && currentData) renderTendenciaTab(); };
 
             async function loadDataFromSupabase() {
                 try {
@@ -1318,6 +1388,7 @@ function renderAdvogadoAtivoTab() {
             
         })();
     </script>
+<script src="tendencia.js?v=20261001a"></script>
 <script src="sampinha.js?v=20261001a"></script>
 </body>
 </html>

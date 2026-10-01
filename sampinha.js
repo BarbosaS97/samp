@@ -37,6 +37,7 @@
   let atualId = null;          // conversa aberta (vive no banco)
   let mensagens = [];          // mensagens da conversa aberta [{role, content}]
   let ocupado = false;
+  let iniciado = false;   // conteúdo já montado (minimizar e abrir não redesenha a conversa)
   let tempoBusca = null, seqLista = 0;
   try { atualId = sessionStorage.getItem('sampinha_ativa') || null; } catch (e) {}
   const guardarAtiva = () => { try { sessionStorage.setItem('sampinha_ativa', atualId || ''); } catch (e) {} };
@@ -69,6 +70,12 @@
           const ids = { assuntos: 'searchInput', poloPassivo: 'poloSearchInput', advogadoAtivo: 'advogadoSearchInput' };
           const inp = ids[aba.dataset.tab] && document.getElementById(ids[aba.dataset.tab]);
           if (inp && inp.value.trim()) c.busca = inp.value.trim();
+          if (aba.dataset.tab === 'tendencia') {
+            const sel = document.querySelector('.tn-heat tr.sel');
+            if (sel) c.assunto_selecionado = sel.dataset.assunto;
+            const modo = document.querySelector('.tn-seg button.on'); if (modo) c.visao = modo.textContent.trim();
+            const rec = document.getElementById('tnEscopo'); if (rec && rec.selectedOptions[0]) c.recorte = rec.selectedOptions[0].textContent.trim();
+          }
         }
       } else if (pagina === 'metricas') {
         const i = document.getElementById('dataInicialSelect'), f = document.getElementById('dataFinalSelect');
@@ -84,8 +91,9 @@
   async function chatStream(corpo, aoAndamento) {
     const sessao = window.SAMP_AUTH.get();
     if (!sessao) { window.SAMP_AUTH.irLogin(); throw new Error('Sessão expirada'); }
+    const ctl = new AbortController(); const limite = setTimeout(() => ctl.abort(), 150000);   // não espera para sempre
     const r = await fetch(window.APP_CONFIG.SUPABASE_URL + '/functions/v1/sampinha-function', {
-      method: 'POST',
+      method: 'POST', signal: ctl.signal,
       headers: { 'Content-Type': 'application/json', apikey: window.APP_CONFIG.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + window.APP_CONFIG.SUPABASE_ANON_KEY },
       body: JSON.stringify({ token: sessao.token, modulo: pagina, contexto: contextoTela(), stream: true, ...corpo })
     });
@@ -93,7 +101,7 @@
       let j = {}; try { j = await r.json(); } catch (e) {}
       if (r.status === 401) { window.SAMP_AUTH.sair(); throw new Error('Sessão expirada'); }
       if (r.ok && j.resposta) return j;   // compatibilidade com a versão anterior da função
-      throw new Error(j.error || (r.ok ? 'A Sampinha não devolveu uma resposta. Tente novamente (se persistir, atualize a página com Ctrl+F5).' : 'Erro ' + r.status));
+      { const er = new Error(j.error || (r.ok ? 'A Sampinha não devolveu uma resposta. Tente novamente (se persistir, atualize a página com Ctrl+F5).' : 'Erro ' + r.status)); er.detalhe = j.detalhe; throw er; }
     }
     const leitor = r.body.getReader(), dec = new TextDecoder();
     let buf = '', final = null;
@@ -109,25 +117,30 @@
         let ev; try { ev = JSON.parse(linha.slice(6)); } catch (e) { continue; }
         if (ev.t === 'status') aoAndamento(ev.m);
         else if (ev.t === 'fim') final = ev;
-        else if (ev.t === 'erro') throw new Error(ev.error);
+        else if (ev.t === 'erro') { const er = new Error(ev.error); er.detalhe = ev.detalhe; throw er; }
       }
     }
+    clearTimeout(limite);
     if (!final) throw new Error('A resposta foi interrompida. Tente novamente.');
     return final;
   }
-  const msgErro = (e) => (e.message === 'Failed to fetch' ? 'Não consegui contatar o servidor. Tente novamente.' : e.message);
+  const msgErro = (e) => (e.name === 'AbortError' ? 'A Sampinha demorou mais do que o esperado. Tente novamente, de preferência com um pedido mais específico.' : e.message === 'Failed to fetch' ? 'Não consegui contatar o servidor. Tente novamente.' : e.message);
 
   /* ---------- estrutura ---------- */
-  const botao = el('button', 'sp-fab', '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg><span>Sampinha</span>');
+  const botao = el('button', 'sp-fab', '<span class="sp-av"><img src="img/sampinha-256.png" alt="" width="56" height="83"></span>' +
+    '<span class="sp-txt"><b>Sampinha</b><small>Assistente de IA</small></span>');
   botao.type = 'button'; botao.setAttribute('aria-label', 'Abrir a Sampinha, assistente do SAMP');
 
   const painel = el('section', 'sp-panel');
   painel.setAttribute('role', 'dialog'); painel.setAttribute('aria-label', 'Sampinha - assistente do SAMP'); painel.hidden = true;
   painel.innerHTML =
-    '<header class="sp-head"><div class="sp-titulo"><strong>Sampinha</strong><small>Assistente de IA do SAMP</small></div>' +
+    '<header class="sp-head"><div class="sp-id"><span class="sp-av sp-av-h"><img src="img/sampinha-cabeca-128.png" alt="" width="44" height="44"></span>' +
+    '<div class="sp-titulo"><strong>Sampinha</strong><small>Assistente de IA</small></div></div>' +
     '<div class="sp-actions"><button type="button" class="sp-hbtn sp-bhist" title="Histórico de conversas">Histórico</button>' +
     '<button type="button" class="sp-hbtn sp-bnova" title="Nova conversa">+ Nova</button>' +
+    '<button type="button" class="sp-hbtn sp-bamp" title="Ampliar a janela">Ampliar</button>' +
     '<button type="button" class="sp-x" aria-label="Fechar">&times;</button></div></header>' +
+    '<div class="sp-barra"><label class="sp-fora"><input type="checkbox" class="sp-fora-ck"> Minimizar ao clicar fora da janela</label></div>' +
     '<div class="sp-hist" hidden>' +
       '<div class="sp-hist-top"><input type="search" class="sp-busca" placeholder="Buscar nas conversas..." aria-label="Buscar nas conversas"><button type="button" class="sp-limpar">Limpar tudo</button></div>' +
       '<div class="sp-hist-lista"></div>' +
@@ -136,7 +149,8 @@
     '<div class="sp-chips"></div>' +
     '<form class="sp-form"><textarea rows="1" placeholder="Pergunte sobre os processos ou as metas..." maxlength="1500" aria-label="Sua pergunta"></textarea>' +
     '<button type="submit" class="sp-send" aria-label="Enviar">Enviar</button></form>' +
-    '<div class="sp-aviso">A Sampinha usa IA e pode errar: confira os dados importantes. As perguntas e os dados consultados são processados por um serviço externo de IA. O histórico fica salvo no sistema e só você o vê.</div>';
+    '<div class="sp-aviso"><span>A Sampinha usa IA e pode errar: confira os dados importantes.</span> <button type="button" class="sp-info" aria-expanded="false">Privacidade</button>' +
+      '<div class="sp-aviso-d" hidden>As perguntas e os dados consultados são processados por um serviço externo de IA. O histórico fica salvo no sistema e só você o vê.</div></div>';
 
   // Estilo crítico injetado pelo próprio script: mesmo que o theme.css esteja em cache antigo, o botão fica
   // fixo no canto da tela (e nunca solto no fim da página).
@@ -144,7 +158,9 @@
     const st = document.createElement('style');
     st.id = 'sp-critico';
     st.textContent =
-      '.sp-fab,.sp-panel{position:fixed!important;margin:0!important;transform:none!important;}' +
+      '.sp-fab,.sp-panel{position:fixed!important;margin:0!important;transform:none!important;font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1f2937;text-align:left;}' +
+      '.sp-panel button,.sp-panel input,.sp-panel textarea{font-family:inherit;}' +
+      '.sp-fab{color:#12355b!important;}' +
       '.sp-fab{right:max(20px,env(safe-area-inset-right))!important;bottom:max(20px,env(safe-area-inset-bottom))!important;z-index:2147483000!important;}' +
       '.sp-panel{right:max(20px,env(safe-area-inset-right))!important;bottom:max(20px,env(safe-area-inset-bottom))!important;z-index:2147483001!important;}' +
       '.sp-fab[hidden],.sp-panel[hidden]{display:none!important;}' +
@@ -158,21 +174,44 @@
   const q = (s) => painel.querySelector(s);
   const $msgs = q('.sp-msgs'), $chips = q('.sp-chips'), $form = q('.sp-form'), $txt = q('textarea'), $send = q('.sp-send'),
         $hist = q('.sp-hist'), $lista = q('.sp-hist-lista'), $busca = q('.sp-busca'), $aviso = q('.sp-aviso'),
-        $bHist = q('.sp-bhist'), $bNova = q('.sp-bnova');
+        $bHist = q('.sp-bhist'), $bNova = q('.sp-bnova'), $bAmp = q('.sp-bamp');
 
   /* ---------- renderização das mensagens ---------- */
   const RX_PROC = /\b\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}\b/g;
+  const primeiroNome = () => { const n = String(usuario.nome || '').trim().split(/\s+/)[0] || ''; return n.charAt(0).toLocaleUpperCase('pt-BR') + n.slice(1).toLocaleLowerCase('pt-BR'); };
+
+  // texto da IA -> HTML seguro (títulos, listas, tabelas, negrito, itálico, código e números de processo clicáveis)
   function formatar(texto) {
     const linhas = esc(texto).split('\n');
-    let html = '', lista = false;
-    const inline = (s) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    const inline = (t) => t.replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>')
       .replace(RX_PROC, (n) => `<button type="button" class="sp-proc" data-n="${n}" title="Copiar número">${n}</button>`);
-    for (const l of linhas) {
-      const m = l.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
-      if (m) { if (!lista) { html += '<ul>'; lista = true; } html += `<li>${inline(m[1])}</li>`; }
-      else { if (lista) { html += '</ul>'; lista = false; } if (l.trim()) html += `<p>${inline(l)}</p>`; }
+    const celulas = (l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    const ehTabela = (i) => /^\s*\|.*\|\s*$/.test(linhas[i] || '') && /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(linhas[i + 1] || '');
+    let html = '', lista = null;
+    const fecha = () => { if (lista) { html += `</${lista}>`; lista = null; } };
+    for (let i = 0; i < linhas.length; i++) {
+      const l = linhas[i];
+      if (ehTabela(i)) {
+        fecha();
+        const cab = celulas(l); i += 2;
+        const corpo = [];
+        while (i < linhas.length && /^\s*\|.*\|\s*$/.test(linhas[i])) { corpo.push(celulas(linhas[i])); i++; }
+        i--;
+        html += '<div class="sp-tab"><table><thead><tr>' + cab.map((c) => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>' +
+          corpo.map((r) => '<tr>' + cab.map((_, k) => `<td>${inline(r[k] || '')}</td>`).join('') + '</tr>').join('') + '</tbody></table></div>';
+        continue;
+      }
+      let m;
+      if ((m = l.match(/^\s{0,3}#{1,4}\s+(.*)$/))) { fecha(); html += `<h5>${inline(m[1])}</h5>`; continue; }
+      if (/^\s*(-{3,}|\*{3,})\s*$/.test(l)) { fecha(); html += '<hr>'; continue; }
+      if ((m = l.match(/^\s*[-*•]\s+(.*)$/))) { if (lista !== 'ul') { fecha(); html += '<ul>'; lista = 'ul'; } html += `<li>${inline(m[1])}</li>`; continue; }
+      if ((m = l.match(/^\s*\d+[.)]\s+(.*)$/))) { if (lista !== 'ol') { fecha(); html += '<ol>'; lista = 'ol'; } html += `<li>${inline(m[1])}</li>`; continue; }
+      fecha();
+      if (l.trim()) html += `<p>${inline(l)}</p>`;
     }
-    return html + (lista ? '</ul>' : '');
+    fecha();
+    return html;
   }
   function separarSugestoes(texto) {
     texto = String(texto == null ? '' : texto);
@@ -194,9 +233,14 @@
     lista.forEach((s) => { const c = el('button', 'sp-chip'); c.type = 'button'; c.textContent = s; c.onclick = () => enviar(s); $chips.appendChild(c); });
   }
   function boasVindas() {
-    mensagens = []; $msgs.innerHTML = '';
-    bolha('bot', `Olá, ${usuario.nome.split(' ')[0]}! Eu sou a Sampinha. Eu consulto os processos e as metas, gero relatórios em PDF e abro telas e filtros para você. Se eu tiver dúvida sobre o que você quer, pergunto antes de responder. Escolha um exemplo ou escreva a sua pergunta.`);
-    mostrarChips(SUGESTOES[pagina] || SUGESTOES.analise);
+    mensagens = []; $msgs.innerHTML = ''; $chips.innerHTML = '';
+    const w = el('div', 'sp-welcome',
+      `<div class="sp-w-top"><img class="sp-w-av" src="img/sampinha-256.png" alt="Sampinha" width="84" height="84"><div class="sp-w-t">Olá, ${esc(primeiroNome())}!</div></div>` +
+      '<p>Eu sou a Sampinha. Consulto os processos e as metas, gero relatórios em PDF e abro telas e filtros para você. Se eu tiver dúvida sobre o que você quer, pergunto antes de responder.</p>' +
+      '<div class="sp-w-l">Experimente perguntar</div><div class="sp-sug"></div>');
+    const caixa = w.querySelector('.sp-sug');
+    (SUGESTOES[pagina] || SUGESTOES.analise).forEach((txt) => { const b = el('button', 'sp-s'); b.type = 'button'; b.textContent = txt; b.onclick = () => enviar(txt); caixa.appendChild(b); });
+    $msgs.appendChild(w);
   }
   function desenharMensagens() {
     $msgs.innerHTML = '';
@@ -269,6 +313,10 @@
   }
   $bHist.onclick = () => { if (!ocupado) modoHistorico($hist.hidden); };
   $bNova.onclick = novaConversa;
+  const aplicarTamanho = (g) => { painel.classList.toggle('sp-grande', g); $bAmp.textContent = g ? 'Reduzir' : 'Ampliar'; $bAmp.title = g ? 'Voltar ao tamanho normal' : 'Ampliar a janela'; try { localStorage.setItem('sampinha_grande', g ? '1' : ''); } catch (e) {} };
+  $bAmp.onclick = () => aplicarTamanho(!painel.classList.contains('sp-grande'));
+  try { if (localStorage.getItem('sampinha_grande')) aplicarTamanho(true); } catch (e) {}
+  const $info = q('.sp-info'); $info.onclick = () => { const d = q('.sp-aviso-d'); d.hidden = !d.hidden; $info.setAttribute('aria-expanded', String(!d.hidden)); };
   $busca.addEventListener('input', () => { clearTimeout(tempoBusca); tempoBusca = setTimeout(atualizarHistorico, 300); });
   $lista.addEventListener('click', async (e) => {
     const del = e.target.closest('[data-del]');
@@ -293,11 +341,11 @@
   };
 
   /* ---------- envio ---------- */
-  function bloquear(v) { ocupado = v; $send.disabled = v; $txt.disabled = v; $bHist.disabled = v; $bNova.disabled = v; }
+  function bloquear(v) { ocupado = v; botao.classList.toggle('sp-ocupado', v && painel.hidden); $send.disabled = v; $txt.disabled = v; $bHist.disabled = v; $bNova.disabled = v; }
   async function enviar(texto) {
     texto = (texto || '').trim();
     if (!texto || ocupado) return;
-    bloquear(true); $chips.innerHTML = '';
+    bloquear(true); $chips.innerHTML = ''; let ancorar = false;
     if (!mensagens.length) $msgs.innerHTML = '';   // sai a tela de boas-vindas ao começar a conversa
     bolha('user', texto);
     const espera = bolha('bot', '');
@@ -313,13 +361,15 @@
       if (j.relatorio) anexarRelatorio(espera, j.relatorio);
       adicionarAcoes(espera, s.corpo);
       mostrarChips(s.sugestoes);
+      if (espera.offsetHeight > $msgs.clientHeight * 0.6) { ancorar = true; $msgs.scrollTop = Math.max(0, espera.getBoundingClientRect().top - $msgs.getBoundingClientRect().top + $msgs.scrollTop - 10); }   // resposta longa: mostra o começo
       if (j.acoes && j.acoes.length) executarAcoes(j.acoes);
     } catch (e) {
       espera.classList.remove('sp-wait'); espera.classList.add('sp-erro');
-      espera.innerHTML = `<p>${esc(msgErro(e))}</p>`;
+      espera.innerHTML = `<p>${esc(msgErro(e))}</p>` + (e.detalhe ? `<p class="sp-det">Detalhe técnico: ${esc(e.detalhe)}</p>` : '');
       mostrarChips([texto]);   // a pergunta não foi salva: permite repeti-la com um clique
     } finally {
-      bloquear(false); $txt.focus(); $msgs.scrollTop = $msgs.scrollHeight;
+      bloquear(false); if (painel.hidden) botao.classList.add('sp-novo'); else $txt.focus();
+      if (!ancorar) $msgs.scrollTop = $msgs.scrollHeight;
     }
   }
 
@@ -363,7 +413,7 @@
   const NOMES_MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const rotMes = (ym) => NOMES_MES[parseInt(ym.slice(5), 10) - 1] + '/' + ym.slice(0, 4);
   const INPUT_BUSCA = { assuntos: 'searchInput', poloPassivo: 'poloSearchInput', advogadoAtivo: 'advogadoSearchInput' };
-  const NOME_ABA = { assuntos: 'Assuntos', poloPassivo: 'Polo Passivo', advogadoAtivo: 'Advogado Polo Ativo', analises: 'Análises' };
+  const NOME_ABA = { assuntos: 'Assuntos', poloPassivo: 'Polo Passivo', advogadoAtivo: 'Advogado Polo Ativo', analises: 'Análises', tendencia: 'Tendência' };
   const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
   async function esperar(fn, ms) {
     const t0 = Date.now();
@@ -373,7 +423,7 @@
   function nota(texto) {
     const n = el('div', 'sp-nota', esc(texto)); $msgs.appendChild(n); $msgs.scrollTop = $msgs.scrollHeight;
   }
-  const moduloDa = (a) => (a.acao === 'abrir_modulo' ? a.modulo : a.acao.startsWith('analise') ? 'analise' : a.acao.startsWith('metricas') ? 'metricas' : null);
+  const moduloDa = (a) => (a.acao === 'abrir_modulo' ? a.modulo : (a.acao.startsWith('analise') || a.acao.startsWith('tendencia')) ? 'analise' : a.acao.startsWith('metricas') ? 'metricas' : null);
 
   async function executarAcao(a) {
     switch (a.acao) {
@@ -390,6 +440,25 @@
         if (!inp) return 'Não consegui acessar o campo de busca (os dados ainda estão carregando?).';
         inp.value = a.texto; inp.dispatchEvent(new Event('input', { bubbles: true }));
         return `Busquei por "${a.texto}" na aba "${NOME_ABA[a.aba]}".`;
+      }
+      case 'tendencia_assunto': {
+        const tab = await esperar(() => document.querySelector('.tab[data-tab="tendencia"]'));
+        if (!tab) return 'Não encontrei a aba Tendência.';
+        if (!tab.classList.contains('active')) tab.click();
+        const linhas = await esperar(() => { const l = [...document.querySelectorAll('.tn-heat tr[data-assunto]')]; return l.length ? l : null; });
+        if (!linhas) return 'O painel de Tendência ainda não carregou; tente novamente.';
+        const norm = (x) => String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const alvo = norm(a.texto);
+        const tr = linhas.find((l) => norm(l.dataset.assunto) === alvo) || linhas.find((l) => norm(l.dataset.assunto).includes(alvo));
+        if (!tr) return `O assunto "${a.texto}" não aparece entre os assuntos exibidos na Tendência (use "Mostrar todos").`;
+        tr.click(); return `Selecionei o assunto "${tr.dataset.assunto}" na aba Tendência.`;
+      }
+      case 'tendencia_modo': {
+        const tab = await esperar(() => document.querySelector('.tab[data-tab="tendencia"]'));
+        if (tab && !tab.classList.contains('active')) tab.click();
+        const b = await esperar(() => document.querySelector(`.tn-seg button[data-modo="${a.modo}"]`));
+        if (!b) return 'Não encontrei o seletor do mapa de calor.';
+        b.click(); return a.modo === 'mes' ? 'Mapa de calor por mês de chegada.' : 'Mapa de calor por faixa de idade.';
       }
       case 'metricas_filtrar': {
         const ini = await esperar(() => { const s = document.getElementById('dataInicialSelect'); return s && s.options.length > 1 ? s : null; });
@@ -450,14 +519,37 @@
   function abrir(v) {
     painel.hidden = !v; botao.hidden = v;
     try { sessionStorage.setItem('sampinha_aberta', v ? '1' : ''); } catch (e) {}
-    if (!v) return;
-    modoHistorico(false);
-    if (atualId && !mensagens.length) carregarConversa(atualId); else if (mensagens.length) desenharMensagens(); else boasVindas();
+    if (!v) { botao.classList.toggle('sp-ocupado', ocupado); return; }   // minimizada: avisa no botão se ainda está respondendo
+    botao.classList.remove('sp-ocupado', 'sp-novo');
+    if (!iniciado) {   // primeira abertura nesta página: monta a conversa. Depois, a janela continua exatamente como estava.
+      iniciado = true;
+      modoHistorico(false);
+      if (atualId && !mensagens.length) carregarConversa(atualId); else if (mensagens.length) desenharMensagens(); else boasVindas();
+    }
     $txt.focus();
   }
   botao.onclick = () => abrir(true);
   q('.sp-x').onclick = () => abrir(false);
+  // Clicar na barra azul (em qualquer ponto que não seja um dos botões) minimiza a janela.
+  const $cab = q('.sp-head'); $cab.title = 'Clique na barra para minimizar';
+  $cab.addEventListener('click', (e) => { if (e.target.closest('button, a, input, label')) return; abrir(false); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !painel.hidden) abrir(false); });
+
+  // Minimizar ao clicar fora: opção no topo da janela (ligada por padrão; a escolha fica guardada).
+  // Usa 'pointerdown' (clique real do mouse/toque): os cliques automáticos que a própria Sampinha faz na tela (element.click()) não disparam esse evento.
+  const $fora = q('.sp-fora-ck');
+  let minimizarFora = true;
+  try { minimizarFora = localStorage.getItem('sampinha_fora') !== '0'; } catch (e) {}
+  $fora.checked = minimizarFora;
+  $fora.onchange = () => { minimizarFora = $fora.checked; try { localStorage.setItem('sampinha_fora', minimizarFora ? '1' : '0'); } catch (e) {} };
+  document.addEventListener('pointerdown', (e) => {
+    if (!minimizarFora || painel.hidden) return;
+    const alvo = e.target;
+    if (!alvo || painel.contains(alvo) || botao.contains(alvo)) return;
+    if (alvo.closest && alvo.closest('dialog, .toastx')) return;                                   // janelas modais da página (ex.: glossário) não contam como "fora"
+    if (e.clientX >= document.documentElement.clientWidth || e.clientY >= document.documentElement.clientHeight) return;   // barras de rolagem da página
+    abrir(false);
+  }, true);
 
   document.addEventListener('keydown', (e) => { if (e.altKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); abrir(painel.hidden); } });   // Alt+S abre/fecha
 

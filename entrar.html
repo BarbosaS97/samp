@@ -275,7 +275,7 @@
 
   /* ---------- sequência de boas-vindas ---------- */
   function boasVindas(nome) {
-    $('olaNome').textContent = 'Olá, ' + String(nome).split(' ')[0] + '!';
+    const p = String(nome || '').trim().split(/\s+/)[0] || ''; $('olaNome').textContent = 'Olá, ' + p.charAt(0).toLocaleUpperCase('pt-BR') + p.slice(1).toLocaleLowerCase('pt-BR') + '!';
     $('cartao').classList.add('concluido');
     setTimeout(() => { document.body.classList.add('saindo'); setTimeout(() => location.replace(destino), reduzir ? 30 : 380); }, reduzir ? 500 : 2100);
   }
