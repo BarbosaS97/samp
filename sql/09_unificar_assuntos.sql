@@ -18,3 +18,6 @@ revoke all on public.assuntos_equivalencias from anon, authenticated;
 -- (sem policy: só a função "cadastros-function" lê e grava)
 
 alter table public.processos add column if not exists assunto_original text;
+
+-- Atualiza o cache de esquema da API (evita erro de coluna inexistente logo após criar a coluna)
+notify pgrst, 'reload schema';

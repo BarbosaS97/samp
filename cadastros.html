@@ -136,7 +136,8 @@
     <div id="preview"></div>
     <div class="danger-zone" style="border-top:none;margin-top:8px;padding-top:0">
       <h2 style="font-size:.95rem;margin:4px 0">Unificação de varas e assuntos</h2>
-      <p class="desc" style="margin-bottom:10px">As varas são unificadas pela numeração (1 a 22 = Varas Comuns; 23 a 27 = JEF; adjuntos somam na vara correspondente). Assuntos escritos de formas diferentes também são unificados (grafia igual: automático; nomes parecidos: você confirma na prévia do upload, e a escolha vira regra). Use o botão abaixo para aplicar as regras aos processos que já estão cadastrados, sem precisar importar a planilha de novo.</p>
+      <p class="desc" style="margin-bottom:10px">As varas são unificadas pela numeração (1 a 22 = Varas Comuns; 23 a 27 = JEF; adjuntos somam na vara correspondente). Assuntos escritos de formas diferentes também são unificados (grafia igual: automático; nomes parecidos: você confirma na prévia do upload, e a escolha vira regra). Para os processos que já estão cadastrados, use "Revisar assuntos da base atual" (mostra os nomes parecidos e aplica ao confirmar) ou "Reaplicar" (aplica só a grafia igual e as regras já salvas), sem precisar importar a planilha de novo.</p>
+      <button class="btn" id="revisarBase">Revisar assuntos da base atual</button>
       <button class="btn" id="renormalizar">Reaplicar unificação na base atual</button>
       <details class="eq-box" id="eqBox"><summary>Regras de assuntos cadastradas <span class="chip" id="eqTotal"></span></summary>
         <div class="vara-scroll"><table class="vr"><thead><tr><th>Nome na planilha</th><th>Passa a ser</th><th></th></tr></thead><tbody id="eqLista"></tbody></table></div>
@@ -280,7 +281,7 @@
       ? `${count} processos cadastrados. Última importação: ${new Date(data[0].data_importacao).toLocaleString('pt-BR')}.`
       : 'Nenhum processo cadastrado.';
   }
-  /* ---------- prévia da unificação dos assuntos ---------- */
+  /* ---------- unificação dos assuntos (planilha e base atual) ---------- */
   let gruposAssunto = [];
   async function previaAssuntos(lista) {
     const box = $('previaAssuntos'); box.innerHTML = '<p class="desc">Analisando os assuntos da planilha...</p>';
@@ -288,42 +289,61 @@
     lista.forEach((p) => cont.set(p.assunto_principal, (cont.get(p.assunto_principal) || 0) + 1));
     try {
       const r = await api('assuntos_previa', { assuntos: [...cont].map(([texto, qtd]) => ({ texto, qtd })) });
-      gruposAssunto = r.grupos;
-      const esc = esc2;
-      const auto = r.automaticos.length
-        ? `<details class="vara-box" style="border-left:0;border-right:0;border-radius:0;margin:0"><summary>${r.automaticos.length} nome(s) unificado(s) automaticamente (mesma grafia ou regra já salva)</summary>` +
-          `<div class="vara-scroll"><table class="vr"><thead><tr><th>Na planilha</th><th>Passa a ser</th><th>Motivo</th><th class="n">Processos</th></tr></thead><tbody>` +
-          r.automaticos.map((a) => `<tr><td>${esc(a.de)}</td><td class="mudou">${esc(a.para)}</td><td>${a.motivo === 'regra' ? 'Regra salva' : 'Só muda a grafia'}</td><td class="n">${a.qtd}</td></tr>`).join('') +
-          '</tbody></table></div></details>'
-        : '';
-      const grupos = r.grupos.length
-        ? r.grupos.map((g, gi) => `<div class="grp" data-g="${gi}">
-            <div class="grp-top"><input type="checkbox" class="g-ok" id="gok${gi}" checked><label for="gok${gi}">Unificar este grupo (parecido: ${Math.round(g.similaridade * 100)}%) - escolha o nome final:</label></div>
-            ${g.variantes.map((v, vi) => `<label class="var"><input type="radio" name="gn${gi}" value="${vi}"${vi === 0 ? ' checked' : ''}><span>${esc(v.texto)}</span><small>${v.qtd} processo(s)</small></label>`).join('')}
-          </div>`).join('') +
-          `<div class="grp-acoes"><button class="btn btn-primary" id="salvarGrupos">Unificar os grupos marcados e salvar a regra</button><span class="desc" style="margin:0">A regra vale para as próximas planilhas também.</span></div>`
-        : '<div class="sub" style="padding:10px 12px;font-size:.82rem;color:var(--muted)">Nenhum assunto parecido para revisar.</div>';
-      box.innerHTML = `<div class="vara-box"><h3>Unificação de assuntos</h3>` +
-        `<div class="sub">${r.total_textos} nome(s) de assunto na planilha, ${r.total_finais} depois da unificação. ` +
-        `${r.grupos.length ? '<b style="color:var(--warn)">' + r.grupos.length + ' grupo(s) de nomes parecidos para você revisar:</b>' : 'Nada a revisar.'}</div>` + grupos + auto + '</div>';
-      const btn = $('salvarGrupos');
-      if (btn) btn.onclick = async () => {
-        const escolhidos = [...box.querySelectorAll('.grp')].filter((el) => el.querySelector('.g-ok').checked).map((el) => {
-          const g = gruposAssunto[+el.dataset.g], sel = +el.querySelector('input[type=radio]:checked').value;
-          return { canonico: g.variantes[sel].texto, variantes: g.variantes.map((v) => v.texto) };
-        });
-        if (!escolhidos.length) return toast('Nenhum grupo marcado.', 'err');
-        btn.disabled = true;
-        try {
-          const rs = await api('assuntos_equivalencias_salvar', { grupos: escolhidos });
-          toast(`${rs.regras} regra(s) salva(s). Os assuntos serão unificados na importação.`, 'ok');
-          previaAssuntos(lista); carregarEquivalencias();
-        } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
-      };
+      desenharAssuntos(r, { base: false, recarregar: () => previaAssuntos(lista) });
     } catch (e) {
-      box.innerHTML = `<p class="desc">Não foi possível analisar os assuntos (${esc2(e.message)}). A unificação automática será aplicada na importação, se a função estiver atualizada.</p>`;
+      gruposAssunto = [];
+      box.innerHTML = `<p class="desc">Não foi possível analisar os assuntos (${esc2(e.message)}). Verifique se o SQL 09 foi executado e a função publicada.</p>`;
     }
   }
+  async function revisarBase() {
+    const box = $('previaAssuntos'); box.innerHTML = '<p class="desc">Analisando os assuntos da base atual...</p>';
+    try {
+      const r = await api('assuntos_previa_base');
+      desenharAssuntos(r, { base: true, recarregar: revisarBase });
+    } catch (e) {
+      box.innerHTML = `<p class="desc">Não foi possível analisar a base (${esc2(e.message)}). Verifique se o SQL 09 foi executado e a função publicada.</p>`;
+    }
+  }
+  function desenharAssuntos(r, opc) {
+    const box = $('previaAssuntos'), esc = esc2;
+    gruposAssunto = opc.base ? [] : r.grupos;
+    const lista = r.grupos;
+    const auto = r.automaticos.length
+      ? `<details class="vara-box" style="border-left:0;border-right:0;border-radius:0;margin:0"><summary>${r.automaticos.length} nome(s) ${opc.base ? 'ainda não unificado(s) na base, mas que serão unificados' : 'unificado(s) automaticamente'} (mesma grafia ou regra já salva)</summary>` +
+        `<div class="vara-scroll"><table class="vr"><thead><tr><th>Texto original</th><th>Passa a ser</th><th>Motivo</th><th class="n">Processos</th></tr></thead><tbody>` +
+        r.automaticos.map((a) => `<tr><td>${esc(a.de)}</td><td class="mudou">${esc(a.para)}</td><td>${a.motivo === 'regra' ? 'Regra salva' : 'Só muda a grafia'}</td><td class="n">${a.qtd}</td></tr>`).join('') +
+        '</tbody></table></div></details>'
+      : '';
+    const grupos = lista.length
+      ? lista.map((g, gi) => `<div class="grp" data-g="${gi}">
+          <div class="grp-top"><input type="checkbox" class="g-ok" id="gok${gi}" checked><label for="gok${gi}">Unificar este grupo (parecido: ${Math.round(g.similaridade * 100)}%) - escolha o nome final:</label></div>
+          ${g.variantes.map((v, vi) => `<label class="var"><input type="radio" name="gn${gi}" value="${vi}"${vi === 0 ? ' checked' : ''}><span>${esc(v.texto)}</span><small>${v.qtd} processo(s)</small></label>`).join('')}
+        </div>`).join('') +
+        `<div class="grp-acoes"><button class="btn btn-primary" id="salvarGrupos">${opc.base ? 'Unificar os grupos marcados agora' : 'Unificar os grupos marcados e salvar a regra'}</button><span class="desc" style="margin:0">${opc.base ? 'Atualiza os processos já cadastrados e vale para as próximas planilhas.' : 'A regra vale para as próximas planilhas também.'}</span></div>`
+      : '<div class="sub" style="padding:10px 12px;font-size:.82rem;color:var(--muted)">Nenhum assunto parecido para revisar.</div>';
+    box.innerHTML = `<div class="vara-box"><h3>${opc.base ? 'Assuntos da base atual' : 'Unificação de assuntos'}</h3>` +
+      `<div class="sub">${r.total_textos} nome(s) de assunto ${opc.base ? 'na base' : 'na planilha'}, ${r.total_finais} depois da unificação. ` +
+      `${lista.length ? '<b style="color:var(--warn)">' + lista.length + ' grupo(s) de nomes parecidos para você revisar:</b>' : 'Nada a revisar.'}</div>` + grupos + auto + '</div>';
+    const btn = $('salvarGrupos');
+    if (btn) btn.onclick = async () => {
+      const escolhidos = [...box.querySelectorAll('.grp')].filter((el) => el.querySelector('.g-ok').checked).map((el) => {
+        const g = lista[+el.dataset.g], sel = +el.querySelector('input[type=radio]:checked').value;
+        return { canonico: g.variantes[sel].texto, variantes: g.variantes.map((v) => v.texto) };
+      });
+      if (!escolhidos.length) return toast('Nenhum grupo marcado.', 'err');
+      btn.disabled = true;
+      try {
+        const rs = await api('assuntos_equivalencias_salvar', { grupos: escolhidos });
+        if (opc.base) {
+          const ap = await api('processos_renormalizar');
+          toast(`${rs.regras} regra(s) salva(s); ${ap.assuntos_unificados || 0} assunto(s) unificado(s) na base.`, 'ok');
+          infoProcessos();
+        } else toast(`${rs.regras} regra(s) salva(s). Os assuntos serão unificados na importação.`, 'ok');
+        opc.recarregar(); carregarEquivalencias();
+      } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
+    };
+  }
+  $('revisarBase').onclick = revisarBase;
   async function carregarEquivalencias() {
     try {
       const r = await api('assuntos_equivalencias_listar');
@@ -421,10 +441,11 @@
   };
   $('importar').onclick = async () => {
     if (!preparados || !confirm(`Substituir toda a base por ${preparados.length} processos?`)) return;
+    if (gruposAssunto.length && !confirm(`Atenção: há ${gruposAssunto.length} grupo(s) de assuntos parecidos ainda NÃO unificados (por exemplo "Lei" x "LL"). Se importar agora, eles continuarão separados.\n\nImportar mesmo assim? (Você poderá unificá-los depois em "Revisar assuntos da base atual".)`)) return;
     $('importar').disabled = true; msg('procMsg', 'Enviando...');
     try {
       const r = await api('processos_substituir', { rows: preparados });
-      msg('procMsg', `${r.total} processos importados.`, 'ok'); toast(`${r.total} processos importados.`, 'ok'); $('preview').innerHTML = ''; $('previaVaras').innerHTML = ''; $('previaAssuntos').innerHTML = ''; preparados = null; $('arquivo').value = ''; $('dropNome').textContent = ''; infoProcessos();
+      msg('procMsg', `${r.total} processos importados.`, 'ok'); toast(`${r.total} processos importados.`, 'ok'); $('preview').innerHTML = ''; $('previaVaras').innerHTML = ''; $('previaAssuntos').innerHTML = ''; preparados = null; revisarBase(); $('arquivo').value = ''; $('dropNome').textContent = ''; infoProcessos();
     } catch (e) { msg('procMsg', e.message, 'err'); $('importar').disabled = false; }
   };
   $('excluirProc').onclick = async () => {

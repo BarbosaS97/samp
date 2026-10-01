@@ -127,6 +127,19 @@ function normalizarVara(original: unknown): InfoVara {
    Nunca se sugere unir nomes cujos NÚMEROS são diferentes (ex.: "Índice de 13,23%" x "Índice de 3,17%"). */
 const chaveAssunto = (t: unknown) => semAcento(String(t ?? "")).replace(/[^a-z0-9]+/g, " ").trim();
 
+function montarPrevia(cont: Map<string, number>, eq: Map<string, string>) {
+  const mapa = mapearAssuntos(cont, eq);
+  const finais = new Map<string, number>();
+  const automaticos: { de: string; para: string; motivo: string; qtd: number }[] = [];
+  for (const [texto, qtd] of cont) {
+    const m = mapa.get(texto)!;
+    finais.set(m.final, (finais.get(m.final) ?? 0) + qtd);
+    if (m.motivo) automaticos.push({ de: texto, para: m.final, motivo: m.motivo, qtd });
+  }
+  automaticos.sort((x, y) => y.qtd - x.qtd);
+  return { ok: true, total_textos: cont.size, total_finais: finais.size, automaticos, grupos: sugerirGrupos(finais) };
+}
+
 async function carregarEquivalencias(db: any): Promise<Map<string, string>> {
   const m = new Map<string, string>();
   const { data } = await db.from("assuntos_equivalencias").select("chave,canonico");
@@ -345,16 +358,19 @@ Deno.serve(async (req) => {
         const lista = Array.isArray(b.assuntos) ? b.assuntos.slice(0, 3000) : [];
         const cont = new Map<string, number>();
         for (const x of lista) { const t = String(x?.texto ?? ""); cont.set(t, (cont.get(t) ?? 0) + (Number(x?.qtd) || 0)); }
-        const mapa = mapearAssuntos(cont, await carregarEquivalencias(db));
-        const finais = new Map<string, number>();
-        const automaticos: { de: string; para: string; motivo: string; qtd: number }[] = [];
-        for (const [texto, qtd] of cont) {
-          const m = mapa.get(texto)!;
-          finais.set(m.final, (finais.get(m.final) ?? 0) + qtd);
-          if (m.motivo) automaticos.push({ de: texto, para: m.final, motivo: m.motivo, qtd });
+        return json(montarPrevia(cont, await carregarEquivalencias(db)));
+      }
+
+      /* ---- assuntos: revisão da base já cadastrada (não grava nada) ---- */
+      case "assuntos_previa_base": {
+        const cont = new Map<string, number>();
+        for (let off = 0; ; off += 1000) {
+          const { data, error } = await db.from("processos").select("assunto_principal,assunto_original").order("id").range(off, off + 999);
+          if (error) return falha(error);
+          for (const r of data ?? []) { const t = r.assunto_original ?? r.assunto_principal ?? ""; cont.set(t, (cont.get(t) ?? 0) + 1); }
+          if (!data || data.length < 1000) break;
         }
-        automaticos.sort((x, y) => y.qtd - x.qtd);
-        return json({ ok: true, total_textos: cont.size, total_finais: finais.size, automaticos, grupos: sugerirGrupos(finais) });
+        return json(montarPrevia(cont, await carregarEquivalencias(db)));
       }
 
       /* ---- assuntos: salva regras confirmadas pelo usuário ---- */
