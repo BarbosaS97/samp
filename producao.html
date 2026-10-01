@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAMP - Produção Individual</title>
+<link rel="icon" href="icone.png">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="config.js?v=20261001a"></script>
+<link rel="stylesheet" href="theme.css?v=20261001a">
+<style>
+  .pr-bar { position: sticky; top: 56px; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px; margin-bottom: 18px; box-shadow: var(--shadow-sm); }
+  .pr-bar .field { display: flex; align-items: center; gap: 9px; }
+  .pr-bar label { font-size: .68rem; text-transform: uppercase; letter-spacing: .9px; color: var(--muted); font-weight: 700; }
+  .pr-bar select { padding: 7px 10px; min-width: 170px; font-size: .86rem; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; color: var(--ink); }
+  .pr-bar .pr-info-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; background: none; border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 12px; font-size: .78rem; color: var(--navy); font-weight: 600; cursor: pointer; }
+  .pr-bar .pr-info-btn:hover { background: var(--navy-soft); border-color: var(--navy); }
+  .pr-bar .pr-info-btn i { font-style: normal; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--navy); color: #fff; font-size: .68rem; font-weight: 700; }
+  .pr-info { display: none; background: #fbf7ec; border: 1px solid #e7d9b3; border-left: 3px solid var(--gold); border-radius: var(--radius); padding: 12px 16px; font-size: .84rem; color: #5b4a1c; margin: -6px 0 18px; line-height: 1.5; }
+  .pr-info.on { display: block; animation: th-abre .25s ease both; }
+  .pr-info b { color: #43370f; }
+  .pr-fresco { display: flex; gap: 22px; align-items: stretch; }
+  .pr-fresco div { border-left: 1px solid var(--line); padding-left: 18px; display: flex; flex-direction: column; justify-content: center; }
+  .pr-fresco span { font-size: .66rem; text-transform: uppercase; letter-spacing: .9px; color: var(--muted); font-weight: 700; }
+  .pr-fresco b { font-size: 1.15rem; color: var(--navy); font-weight: 600; margin-top: 2px; }
+  .pr-modo { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .pr-modo button { border: 0; background: #fff; padding: 9px 18px; font-size: .84rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .pr-modo button + button { border-left: 1px solid var(--line); }
+  .pr-modo button.on { background: var(--navy); color: #fff; }
+  .pr-vazio { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 40px 24px; text-align: center; color: var(--muted); }
+  .pr-vazio h2 { color: var(--navy); font-size: 1.1rem; margin-bottom: 6px; }
+  .pr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .pr-box { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; min-width: 0; }
+  .pr-box h3 { font-size: .95rem; color: var(--navy); font-weight: 600; margin-bottom: 2px; }
+  .pr-box .sub { font-size: .78rem; color: var(--muted); margin-bottom: 10px; }
+  .pr-box.larga { grid-column: 1 / -1; }
+  .pr-box canvas { max-width: 100%; }
+  .pr-ch { position: relative; height: 290px; }
+  .pr-ch.alto { height: 380px; }
+  .pr-tab { overflow: auto; max-height: 520px; border: 1px solid var(--line); border-radius: var(--radius); }
+  .pr-tab table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  .pr-tab th, .pr-tab td { padding: 7px 10px; border-bottom: 1px solid var(--line-soft); text-align: right; white-space: nowrap; }
+  .pr-tab th:first-child, .pr-tab td:first-child { text-align: left; }
+  .pr-tab thead th { position: sticky; top: 0; background: var(--navy); color: #fff; font-weight: 600; font-size: .75rem; z-index: 1; cursor: default; }
+  .pr-tab thead th.ord { cursor: pointer; }
+  .pr-tab tbody tr.cl { cursor: pointer; }
+  .pr-tab tbody tr.cl:hover td { background: var(--navy-soft); }
+  .pr-tab td.zero { color: #b3bcc8; }
+  .pr-tab tfoot td { font-weight: 700; background: var(--navy-soft); position: sticky; bottom: 0; }
+  .pr-var.up { color: var(--ok); } .pr-var.down { color: var(--bad); }
+  .pr-heat table { table-layout: fixed; }
+  .pr-heat th, .pr-heat td { text-align: center; padding: 9px 4px; border-right: 1px solid #fff; }
+  .pr-heat th:first-child, .pr-heat td:first-child { text-align: left; width: 64px; padding-left: 14px; }
+  .pr-heat th:last-child, .pr-heat td:last-child { width: 82px; text-align: center; border-right: 0; }
+  .pr-heat td.h { font-variant-numeric: tabular-nums; }
+  /* a linha toda não muda ao passar o mouse: só o bloco sob o cursor clareia */
+  .pr-heat tbody tr td:not(.h) { background: #fff !important; }
+  .pr-heat tbody td.h { background: var(--bg, #f8f9fb) !important; color: var(--fg, var(--ink)); transition: background .12s, color .12s; }
+  .pr-heat tbody td.h:not(.zero):hover { background: #eef3f8 !important; color: var(--navy); font-weight: 700; box-shadow: inset 0 0 0 2px var(--navy); }
+  .pr-k .kpis { display: none; }
+  .pk-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+  .pk { background: #fff; border: 1px solid var(--line); border-top: 3px solid var(--navy); border-radius: var(--radius); padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 3px; min-width: 0; position: relative; overflow: hidden; transition: box-shadow .2s, transform .2s; animation: th-sobe .5s both; }
+  .pk:hover { box-shadow: 0 6px 18px rgba(12,37,64,.1); transform: translateY(-2px); }
+  .pk.gold { border-top-color: var(--gold); }
+  .pk-l { font-size: .7rem; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); font-weight: 700; }
+  .pk-v, .pk-t { font-size: 1.9rem; font-weight: 600; color: var(--navy); line-height: 1.12; font-variant-numeric: tabular-nums; }
+  .pk-v small, .pk-t small { font-size: .95rem; font-weight: 500; color: var(--muted); margin-left: 3px; }
+  .pk-s { font-size: .8rem; color: var(--ink); line-height: 1.35; }
+  .pk-s small { color: var(--muted); font-size: .74rem; }
+  .pk-badge { display: inline-flex; align-items: center; gap: 4px; font-size: .74rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; width: fit-content; margin-top: 3px; }
+  .pk-badge.up { background: #e3f2ea; color: var(--ok); } .pk-badge.down { background: #fbe9e7; color: var(--bad); } .pk-badge.eq { background: #eef1f5; color: var(--muted); }
+  .pk-spark { width: 100%; height: 34px; margin-top: 6px; display: block; }
+  .pk-spark .ar { fill: rgba(18,53,91,.09); stroke: none; }
+  .pk-spark .ln { fill: none; stroke: var(--navy); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  .pk-spark .dot { fill: none; stroke: var(--gold); stroke-width: 6; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+  .pk-comp { display: flex; height: 9px; border-radius: 5px; overflow: hidden; background: #e8edf3; margin: 8px 0 6px; gap: 2px; }
+  .pk-comp i { display: block; height: 100%; transition: width .6s cubic-bezier(.4,0,.2,1); }
+  .pk-leg { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: .72rem; color: var(--muted); }
+  .pk-leg span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; background: var(--c); vertical-align: baseline; }
+  .pk-leg b { color: var(--ink); font-weight: 600; }
+  @media (max-width: 1000px) { .pk-grid { grid-template-columns: repeat(2, 1fr); } .pr-fresco { display: none; } }
+  @media (max-width: 560px) { .pk-grid { grid-template-columns: 1fr; } .pr-bar select { min-width: 0; } .pr-bar .pr-info-btn { margin-left: 0; } }
+  @media (max-width: 560px) { .pr-grid { grid-template-columns: 1fr; } .pr-ch { height: 250px; } }
+</style>
+</head>
+<body data-page="producao">
+<script src="layout.js?v=20261001a"></script>
+<main class="page">
+  <div class="header mt-cab">
+    <div class="mt-cab-txt">
+      <h1>Produção Individual</h1>
+      <p>Processos calculados por pessoa e pelo setor, a partir das planilhas de produção</p>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="pr-fresco" id="fresco"></div>
+  </div>
+
+  <div id="conteudo"><div class="pr-vazio">Carregando a produção...</div></div>
+</main>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const DIAS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+  const NAVY = '#12355b', GOLD = '#a68a4e', CINZA = '#9fb0c3', OK = '#2f7d5b';
+  // cada ano tem sempre a mesma cor, em todos os gráficos
+  const CORES_ANO = ['#8a97a6', '#3b9ac4', '#2f9e6e', '#8e5fc0', '#e08a2c', '#cf3b5a', GOLD, NAVY];
+  const corDe = (a) => { const i = a - 2019; return i >= 0 && i < CORES_ANO.length ? CORES_ANO[i] : CORES_ANO[Math.abs(i) % CORES_ANO.length]; };
+  const COR_TIPO = [NAVY, GOLD, '#b8c2cf'];   // meta, acervo, não classificado
+  const NOME_TIPO = ['Meta', 'Acervo', 'Sem classificação'];
+  const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const n0 = (x) => Math.round(x).toLocaleString('pt-BR');
+  const n1 = (x) => x.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const pct = (x) => (x > 0 ? '+' : '') + x.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+
+  let pessoas = [];          // [{ nome, m, g, gn, d, r, total, primeira, ultima }]
+  let modo = 'setor', pessoaSel = '', anoSel = '';
+  let graficos = [];
+  let ordem = { col: 'total', asc: false };
+
+  /* ---------- carga ---------- */
+  async function carregar() {
+    const c = window.criarClienteLeitura();
+    const r = await c.from('producao_resumo').select('*').order('pessoa');
+    if (r.error) return erro('Não foi possível carregar a produção (' + r.error.message + '). Verifique se o SQL 11 foi executado e a função publicada.');
+    pessoas = (r.data || []).map((x) => ({ nome: x.pessoa, total: x.total, primeira: x.primeira_data, ultima: x.ultima_data, atualizado: x.atualizado_em, ...x.dados }));
+    if (!pessoas.length) return $('conteudo').innerHTML = '<div class="pr-vazio"><h2>Nenhuma produção importada ainda</h2><p>Em Cadastros, aba Produção Individual, envie as planilhas "PRODUÇÃO SECAJ - Nome".</p></div>';
+    pessoaSel = pessoas[0].nome;
+    montarEstrutura(); desenhar();
+  }
+  const erro = (t) => { $('conteudo').innerHTML = '<div class="pr-vazio"><h2>Produção indisponível</h2><p>' + esc(t) + '</p></div>'; };
+
+  /* ---------- agregações ---------- */
+  const anosDe = (lista) => [...new Set(lista.flatMap((p) => p.m.map((x) => x[0])))].sort();
+  const filtraAno = (m) => (anoSel ? m.filter((x) => String(x[0]) === anoSel) : m);
+  const ym = (a, m) => a * 12 + (m - 1);
+  const rotYM = (v) => MES[v % 12] + '/' + Math.floor(v / 12);
+  function serieMensal(lista, comAno) {   // { ym -> [meta, acervo, semClass] }
+    const s = new Map();
+    for (const p of lista) for (const x of (comAno ? filtraAno(p.m) : p.m)) {
+      const k = ym(x[0], x[1]); const a = s.get(k) || [0, 0, 0]; a[x[2]] += x[5]; s.set(k, a);
+    }
+    return s;
+  }
+  function resumo(lista) {
+    const ms = lista.flatMap((p) => filtraAno(p.m));
+    const o = { total: 0, meta: 0, acervo: 0, nc: 0, prio: 0, prio60: 0, legal: 0, he: 0, soma: 0, nd: 0 };
+    for (const x of ms) {
+      o.total += x[5]; if (x[2] === 0) o.meta += x[5]; else if (x[2] === 1) o.acervo += x[5]; else o.nc += x[5];
+      if (x[3] === 1) o.prio += x[5]; if (x[3] === 2) o.prio60 += x[5]; if (x[3] === 3) o.legal += x[5];
+      if (x[4]) o.he += x[5]; o.soma += x[6]; o.nd += x[7];
+    }
+    const s = serieMensal(lista, true);
+    o.meses = s.size; o.media = s.size ? o.total / s.size : 0;
+    let melhor = null; for (const [k, v] of s) { const t = v[0] + v[1] + v[2]; if (!melhor || t > melhor.t) melhor = { k, t }; }
+    o.melhor = melhor; o.tempo = o.nd ? o.soma / o.nd : null;
+    return o;
+  }
+  function porGrupo(lista) {
+    const t = new Map();
+    for (const p of lista) for (const x of p.g) { if (anoSel && String(x[0]) !== anoSel) continue; const nome = p.gn[x[1]]; t.set(nome, (t.get(nome) || 0) + x[2]); }
+    return [...t].sort((a, b) => b[1] - a[1]);
+  }
+  function porDiaSemana(lista) {
+    const v = [0, 0, 0, 0, 0, 0, 0], dias = [new Set(), new Set(), new Set(), new Set(), new Set(), new Set(), new Set()];
+    for (const p of lista) for (const [d, q] of p.d) {
+      if (anoSel && d.slice(0, 4) !== anoSel) continue;
+      const w = (new Date(d + 'T12:00:00Z').getUTCDay() + 6) % 7; v[w] += q; dias[w].add(p.nome + d);
+    }
+    return v.map((q, i) => ({ q, dias: dias[i].size }));
+  }
+  const ultimoMes = (lista) => lista.reduce((a, p) => (p.ultima && (!a || p.ultima > a) ? p.ultima : a), '');
+
+  /* ---------- estrutura fixa (controles) ---------- */
+  function montarEstrutura() {
+    const anos = anosDe(pessoas);
+    $('conteudo').innerHTML =
+      '<div class="pr-bar">' +
+      '<div class="field"><label>Visão</label><div class="pr-modo"><button type="button" data-m="setor" class="on">Setor</button><button type="button" data-m="pessoa">Individual</button></div></div>' +
+      '<div class="field" id="fPessoa" style="display:none"><label for="selPessoa">Pessoa</label><select id="selPessoa">' + pessoas.map((p) => `<option>${esc(p.nome)}</option>`).join('') + '</select></div>' +
+      '<div class="field"><label for="selAno">Ano</label><select id="selAno"><option value="">Todos os anos</option>' + anos.slice().reverse().map((a) => `<option>${a}</option>`).join('') + '</select></div>' +
+      '<button type="button" class="pr-info-btn" id="btnInfo" aria-expanded="false"><i>i</i>Como ler estes números</button></div>' +
+      '<div class="pr-info" id="prInfo"><b>De onde vêm:</b> das planilhas individuais, enviadas após a virada de cada mês; o mês em andamento não aparece. ' +
+      '<b>Meta e acervo</b> vêm da coluna TIPO que cada pessoa preenche (em branco = sem classificação, comum em 2019). ' +
+      '<b>Assuntos</b> escritos de várias formas são agrupados automaticamente. <b>Tempo até calcular</b> é a média entre a data de recebimento e a do cálculo, só onde a data de recebimento foi preenchida. ' +
+      'Em caso de dúvida, confira com a planilha de origem.</div><div id="corpo"></div>';
+    $('btnInfo').onclick = () => { const on = $('prInfo').classList.toggle('on'); $('btnInfo').setAttribute('aria-expanded', on); };
+    document.querySelectorAll('.pr-modo button').forEach((b) => b.onclick = () => {
+      modo = b.dataset.m; document.querySelectorAll('.pr-modo button').forEach((x) => x.classList.toggle('on', x === b));
+      $('fPessoa').style.display = modo === 'pessoa' ? '' : 'none'; desenhar();
+    });
+    $('selPessoa').onchange = (e) => { pessoaSel = e.target.value; desenhar(); };
+    $('selAno').onchange = (e) => { anoSel = e.target.value; desenhar(); };
+  }
+
+  function abrirPessoa(nome) {
+    modo = 'pessoa'; pessoaSel = nome; $('selPessoa').value = nome; $('fPessoa').style.display = '';
+    document.querySelectorAll('.pr-modo button').forEach((x) => x.classList.toggle('on', x.dataset.m === 'pessoa'));
+    desenhar(); window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ---------- gráficos ---------- */
+  function grafico(id, cfg) {
+    const el = $(id); if (!el) return;
+    const g = new Chart(el, cfg); graficos.push(g);
+  }
+  const base = { responsive: true, maintainAspectRatio: false, animation: { duration: 500 }, plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } } } };
+  const eixo = { grid: { color: '#eef1f5' }, ticks: { font: { size: 10 }, color: '#5f6b7a' } };
+
+  function graficoMensal(id, lista) {
+    const s = serieMensal(lista, true), ks = [...s.keys()].sort((a, b) => a - b);
+    // preenche meses sem produção para não esconder lacunas
+    const todos = []; if (ks.length) for (let k = ks[0]; k <= ks[ks.length - 1]; k++) todos.push(k);
+    grafico(id, { type: 'bar', data: { labels: todos.map(rotYM), datasets: [0, 1, 2].map((t) => ({ label: NOME_TIPO[t], data: todos.map((k) => (s.get(k) || [0, 0, 0])[t]), backgroundColor: COR_TIPO[t], stack: 'a' })) },
+      options: { ...base, scales: { x: { ...eixo, stacked: true, ticks: { ...eixo.ticks, maxRotation: 60, autoSkip: true, maxTicksLimit: 24 } }, y: { ...eixo, stacked: true, beginAtZero: true } }, plugins: { ...base.plugins, tooltip: { mode: 'index' } } } });
+  }
+  function graficoAnoAno(id, lista) {
+    const anos = anosDe(lista);
+    const s = new Map();
+    for (const p of lista) for (const x of p.m) { const k = x[0] + '|' + x[1]; s.set(k, (s.get(k) || 0) + x[5]); }
+    grafico(id, { type: 'line', data: { labels: MES, datasets: anos.map((a, i) => ({ label: String(a), data: MES.map((_, mi) => (s.has(a + '|' + (mi + 1)) ? s.get(a + '|' + (mi + 1)) : null)), borderColor: corDe(a), pointBackgroundColor: corDe(a), pointBorderColor: corDe(a), backgroundColor: 'transparent', tension: .25, pointRadius: 2.5, borderWidth: a === anos[anos.length - 1] ? 2.8 : 1.6, spanGaps: false })) },
+      options: { ...base, scales: { x: eixo, y: { ...eixo, beginAtZero: true } }, plugins: { ...base.plugins, tooltip: { mode: 'index', intersect: false } } } });
+  }
+  function graficoGrupos(id, lista, topo) {
+    const g = porGrupo(lista).slice(0, topo || 12);
+    grafico(id, { type: 'bar', data: { labels: g.map((x) => x[0]), datasets: [{ label: 'Processos', data: g.map((x) => x[1]), backgroundColor: NAVY }] },
+      options: { ...base, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ...eixo, beginAtZero: true }, y: { ...eixo, ticks: { ...eixo.ticks, font: { size: 11 } } } } } });
+  }
+  function graficoSemana(id, lista) {
+    const v = porDiaSemana(lista);
+    grafico(id, { type: 'bar', data: { labels: DIAS, datasets: [{ label: 'Média por dia trabalhado', data: v.map((x) => (x.dias ? +(x.q / x.dias).toFixed(1) : 0)), backgroundColor: v.map((_, i) => (i > 4 ? '#c9d3df' : NAVY)) }] },
+      options: { ...base, plugins: { legend: { display: false } }, scales: { x: eixo, y: { ...eixo, beginAtZero: true } } } });
+  }
+  function graficoAnual(id, lista) {
+    const t = new Map(); for (const p of lista) for (const x of p.m) t.set(x[0], (t.get(x[0]) || 0) + x[5]);
+    const anos = [...t.keys()].sort();
+    grafico(id, { type: 'bar', data: { labels: anos, datasets: [{ label: 'Processos', data: anos.map((a) => t.get(a)), backgroundColor: anos.map(corDe) }] },
+      options: { ...base, plugins: { legend: { display: false } }, scales: { x: eixo, y: { ...eixo, beginAtZero: true } } } });
+  }
+
+  /* ---------- cartões ---------- */
+  function spark(v) {
+    if (!v || v.length < 2) return '';
+    const mn = Math.min(...v), mx = Math.max(...v), W = 100, H = 34, p = 2;
+    const xy = v.map((x, k) => [p + (k / (v.length - 1)) * (W - 2 * p), mx === mn ? H / 2 : H - p - ((x - mn) / (mx - mn)) * (H - 2 * p)]);
+    const pts = xy.map((q) => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' '), u = xy[xy.length - 1];
+    return `<svg class="pk-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon class="ar" points="${p},${H} ${pts} ${W - p},${H}"/><polyline class="ln" points="${pts}"/><polyline class="dot" points="${u[0].toFixed(2)},${u[1].toFixed(2)} ${(u[0] + 0.01).toFixed(2)},${u[1].toFixed(2)}"/></svg>`;
+  }
+  const comp = (partes) => {   // barra proporcional + legenda: [{ rot, v, cor }]
+    const t = partes.reduce((a, x) => a + x.v, 0) || 1;
+    return '<div class="pk-comp">' + partes.filter((x) => x.v > 0).map((x) => `<i style="width:${((x.v / t) * 100).toFixed(1)}%;background:${x.cor}" title="${x.rot}: ${n0(x.v)}"></i>`).join('') + '</div>' +
+      '<div class="pk-leg">' + partes.map((x) => `<span style="--c:${x.cor}">${x.rot} <b>${n0(x.v)}</b></span>`).join('') + '</div>';
+  };
+  const badge = (d, txt) => `<span class="pk-badge ${d > 0.05 ? 'up' : d < -0.05 ? 'down' : 'eq'}">${d > 0.05 ? '▲' : d < -0.05 ? '▼' : '■'} ${txt}</span>`;
+  function cartoes(lista) {
+    const r = resumo(lista), s = serieMensal(lista, true), ks = [...s.keys()].sort((a, b) => a - b);
+    const tot = (k) => { const a = s.get(k); return a ? a[0] + a[1] + a[2] : 0; };
+    const cheio = []; if (ks.length) for (let k = ks[0]; k <= ks[ks.length - 1]; k++) cheio.push(k);
+    const fim = ks.length ? ks[ks.length - 1] : null;
+    const classif = r.meta + r.acervo;
+    const periodo = ks.length ? rotYM(ks[0]) + ' a ' + rotYM(fim) : '-';
+    // últimos 12 meses contra a média do período inteiro
+    const ult12 = cheio.slice(-12), m12 = ult12.length ? ult12.reduce((a, k) => a + tot(k), 0) / ult12.length : 0;
+    const d12 = r.media > 0 ? ((m12 - r.media) / r.media) * 100 : 0;
+    const dMelhor = r.melhor && r.media > 0 ? ((r.melhor.t - r.media) / r.media) * 100 : 0;
+    let cUlt = '';
+    if (fim !== null) {
+      const u = tot(fim), ant = tot(fim - 1), vs = r.media > 0 ? ((u - r.media) / r.media) * 100 : 0;
+      cUlt = `<div class="pk gold" style="animation-delay:.18s"><span class="pk-l">${anoSel ? 'Último mês de ' + anoSel : 'Último mês fechado'}</span><span class="pk-v">${n0(u)}</span>` +
+        `<span class="pk-s">${rotYM(fim)}${ant ? ' · mês anterior ' + n0(ant) : ''}</span>${badge(vs, pct(vs) + ' vs. média')}</div>`;
+    }
+    const prioTot = r.prio + r.prio60 + r.legal;
+    return '<div class="pr-k"><div class="pk-grid">' +
+      `<div class="pk" style="animation-delay:.02s"><span class="pk-l">Processos no período</span><span class="pk-v">${n0(r.total)}</span><span class="pk-s">${periodo}</span>${spark(cheio.map(tot))}</div>` +
+      `<div class="pk" style="animation-delay:.08s"><span class="pk-l">Média mensal</span><span class="pk-v">${n1(r.media)}</span><span class="pk-s">${r.meses} ${r.meses === 1 ? 'mês' : 'meses'} com produção</span>` +
+        (ult12.length >= 6 && cheio.length > 12 ? badge(d12, pct(d12) + ' nos últimos 12 meses') : '') + '</div>' +
+      `<div class="pk" style="animation-delay:.13s"><span class="pk-l">Melhor mês</span><span class="pk-v">${r.melhor ? n0(r.melhor.t) : '-'}</span><span class="pk-s">${r.melhor ? rotYM(r.melhor.k) : ''}</span>${r.melhor ? badge(dMelhor, pct(dMelhor) + ' acima da média') : ''}</div>` +
+      cUlt + '</div>' +
+      '<div class="pk-grid">' +
+      `<div class="pk" style="animation-delay:.22s"><span class="pk-l">Meta / Acervo</span><span class="pk-t">${classif ? Math.round((r.meta / classif) * 100) + '% <small>/</small> ' + Math.round((r.acervo / classif) * 100) + '%' : '-'}</span>` +
+        comp([{ rot: 'Meta', v: r.meta, cor: NAVY }, { rot: 'Acervo', v: r.acervo, cor: GOLD }, { rot: 'Sem classificação', v: r.nc, cor: '#c3ccd8' }]) + '</div>' +
+      `<div class="pk" style="animation-delay:.26s"><span class="pk-l">Prioritários</span><span class="pk-v">${n0(prioTot)}</span>` +
+        comp([{ rot: '> 60 dias', v: r.prio60, cor: '#b3261e' }, { rot: 'Legal', v: r.legal, cor: GOLD }, { rot: 'Outros', v: r.prio, cor: NAVY }]) + '</div>' +
+      `<div class="pk" style="animation-delay:.3s"><span class="pk-l">Tempo até calcular</span><span class="pk-t">${r.tempo === null ? '-' : n0(r.tempo) + ' <small>dias</small>'}</span><span class="pk-s">Do recebimento ao cálculo (média)</span><span class="pk-s"><small>${n0(r.nd)} processos com data de recebimento</small></span></div>` +
+      `<div class="pk" style="animation-delay:.34s"><span class="pk-l">Hora extra</span><span class="pk-v">${n0(r.he)}</span><span class="pk-s">${r.total ? (r.he / r.total * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '% da produção' : ''}</span>` +
+        comp([{ rot: 'Hora extra', v: r.he, cor: GOLD }, { rot: 'Horário normal', v: Math.max(0, r.total - r.he), cor: '#d5dde8' }]).replace(/<div class="pk-leg">.*<\/div>$/, '') + '</div>' +
+      '</div></div>';
+  }
+
+  /* ---------- tabelas ---------- */
+  function linhaPessoa(p) {
+    const r = resumo([p]);
+    const s = serieMensal([p], false), ks = [...s.keys()].sort((a, b) => a - b);
+    const fimGeral = ym(+ultimoMes(pessoas).slice(0, 4), +ultimoMes(pessoas).slice(5, 7));
+    const ultK = fimGeral;   // último mês fechado do setor: quem não produziu nele aparece com zero
+    const tot = (k) => { const a = s.get(k); return a ? a[0] + a[1] + a[2] : 0; };
+    const u = tot(ultK);
+    const vs = r.media > 0 ? ((u - r.media) / r.media) * 100 : null;
+    const classif = r.meta + r.acervo;
+    return { nome: p.nome, total: r.total, media: r.media, meses: r.meses, ultimo: u, vs, metaPct: classif ? (r.meta / classif) * 100 : null, prio: r.prio + r.prio60 + r.legal, tempo: r.tempo, primeira: p.primeira, ultimaData: p.ultima, fim: ultK };
+  }
+  function tabelaRanking() {
+    const ls = pessoas.map(linhaPessoa).filter((x) => x.total > 0);
+    const cmp = (a, b) => { const x = a[ordem.col], y = b[ordem.col]; const nx = x == null ? -Infinity : x, ny = y == null ? -Infinity : y; return (typeof nx === 'string' ? nx.localeCompare(ny) : nx - ny) * (ordem.asc ? 1 : -1); };
+    ls.sort(cmp);
+    const soma = ls.reduce((a, x) => a + x.total, 0);
+    const th = (col, txt) => `<th class="ord" data-c="${col}">${txt}${ordem.col === col ? (ordem.asc ? ' ▲' : ' ▼') : ''}</th>`;
+    const fim = ls.length ? ls[0].fim : 0;
+    return '<div class="pr-tab"><table><thead><tr>' + th('nome', 'Pessoa') + th('total', 'Processos') + th('media', 'Média/mês') + th('ultimo', fim ? 'Último mês (' + rotYM(fim) + ')' : 'Último mês') + th('vs', 'vs. própria média') + th('metaPct', '% meta') + th('prio', 'Prioritários') + th('tempo', 'Tempo médio (dias)') + '<th>Período</th></tr></thead><tbody>' +
+      ls.map((x) => `<tr class="cl" data-p="${esc(x.nome)}"><td><b>${esc(x.nome)}</b></td><td>${n0(x.total)}</td><td>${n1(x.media)}</td><td${x.ultimo ? '' : ' class="zero"'}>${n0(x.ultimo)}</td>` +
+        `<td>${x.vs === null ? '-' : `<span class="pr-var ${x.vs >= 0 ? 'up' : 'down'}">${pct(x.vs)}</span>`}</td><td>${x.metaPct === null ? '-' : Math.round(x.metaPct) + '%'}</td><td>${n0(x.prio)}</td><td>${x.tempo === null ? '-' : n0(x.tempo)}</td>` +
+        `<td>${x.primeira ? MES[+x.primeira.slice(5, 7) - 1] + '/' + x.primeira.slice(0, 4) : '-'} a ${x.ultimaData ? MES[+x.ultimaData.slice(5, 7) - 1] + '/' + x.ultimaData.slice(0, 4) : '-'}</td></tr>`).join('') +
+      `</tbody><tfoot><tr><td>Total do setor</td><td>${n0(soma)}</td><td colspan="7"></td></tr></tfoot></table></div>`;
+  }
+  function quadroMensal(lista) {   // o mesmo quadro Jan-Dez x ano das planilhas, com mapa de calor
+    const t = new Map(); for (const p of lista) for (const x of p.m) { const k = x[0] + '|' + x[1]; t.set(k, (t.get(k) || 0) + x[5]); }
+    const anos = anosDe(lista); let mx = 0; t.forEach((v) => { if (v > mx) mx = v; });
+    const cel = (v) => v ? `<td class="h" style="--bg:rgba(18,53,91,${(0.08 + 0.55 * (v / mx)).toFixed(2)});--fg:${v / mx > .55 ? '#fff' : 'var(--ink)'}">${n0(v)}</td>` : '<td class="h zero">-</td>';
+    return '<div class="pr-tab pr-heat"><table><thead><tr><th>Ano</th>' + MES.map((m) => `<th>${m}</th>`).join('') + '<th>Total</th></tr></thead><tbody>' +
+      anos.map((a) => { let s = 0; const cs = MES.map((_, i) => { const v = t.get(a + '|' + (i + 1)) || 0; s += v; return cel(v); }).join(''); return `<tr><td><b>${a}</b></td>${cs}<td><b>${n0(s)}</b></td></tr>`; }).join('') + '</tbody></table></div>';
+  }
+
+  /* ---------- desenho ---------- */
+  function desenhar() {
+    graficos.forEach((g) => g.destroy()); graficos = [];
+    const lista = modo === 'setor' ? pessoas : pessoas.filter((p) => p.nome === pessoaSel);
+    const fim = ultimoMes(pessoas);
+    const ate = fim ? MES[+fim.slice(5, 7) - 1] + '/' + fim.slice(0, 4) : '-';
+    const imp = pessoas.reduce((a, p) => (p.atualizado > a ? p.atualizado : a), '');
+    const anosHist = anosDe(pessoas);
+    $('meta').innerHTML = `<span class="chip"><b>${pessoas.length}</b> pessoas</span>` + (anosHist.length ? `<span class="chip"><b>${anosHist[0]}</b> a <b>${anosHist[anosHist.length - 1]}</b></span>` : '') + `<span class="chip">Só meses fechados</span>`;
+    $('fresco').innerHTML = `<div><span>Dados até</span><b>${ate}</b></div><div><span>Última importação</span><b>${imp ? new Date(imp).toLocaleDateString('pt-BR') : '-'}</b></div>`;
+    let h = cartoes(lista);
+    if (modo === 'setor') {
+      h += '<div class="pr-grid">' +
+        '<div class="pr-box larga"><h3>Produção mensal do setor</h3><div class="sub">Processos calculados por mês, separados em meta, acervo e sem classificação</div><div class="pr-ch alto"><canvas id="g1"></canvas></div></div>' +
+        '<div class="pr-box"><h3>Produção por ano</h3><div class="sub">Total do setor em cada ano, com as mesmas cores do gráfico ao lado (o último pode estar incompleto)</div><div class="pr-ch"><canvas id="g2"></canvas></div></div>' +
+        '<div class="pr-box"><h3>Comparação mês a mês entre os anos</h3><div class="sub">Cada cor é um ano; a linha mais grossa é o ano mais recente</div><div class="pr-ch"><canvas id="g3"></canvas></div></div>' +
+        '<div class="pr-box"><h3>Assuntos mais calculados</h3><div class="sub">Assuntos agrupados</div><div class="pr-ch alto"><canvas id="g4"></canvas></div></div>' +
+        '<div class="pr-box"><h3>Dia da semana</h3><div class="sub">Média de processos por dia trabalhado</div><div class="pr-ch"><canvas id="g5"></canvas></div></div>' +
+        '<div class="pr-box larga"><h3>Quadro mensal do setor</h3><div class="sub">Total de cada mês (quanto mais escuro, maior a produção)</div>' + quadroMensal(pessoas) + '</div>' +
+        '<div class="pr-box larga"><h3>Produção por pessoa</h3><div class="sub">Clique no nome para ver o detalhe individual. Cabeçalhos ordenam a tabela. As médias consideram só os meses em que a pessoa produziu.</div><div id="rank">' + tabelaRanking() + '</div></div>' +
+        '</div>';
+    } else {
+      const p = lista[0];
+      h += '<div class="pr-grid">' +
+        `<div class="pr-box larga"><h3>Produção mensal de ${esc(p.nome)}</h3><div class="sub">Processos calculados por mês, em meta, acervo e sem classificação</div><div class="pr-ch alto"><canvas id="g1"></canvas></div></div>` +
+        '<div class="pr-box"><h3>Comparação mês a mês entre os anos</h3><div class="sub">Cada linha é um ano</div><div class="pr-ch"><canvas id="g3"></canvas></div></div>' +
+        '<div class="pr-box"><h3>Produção por ano</h3><div class="sub">Total de cada ano</div><div class="pr-ch"><canvas id="g2"></canvas></div></div>' +
+        '<div class="pr-box"><h3>Assuntos mais calculados</h3><div class="sub">Assuntos agrupados</div><div class="pr-ch alto"><canvas id="g4"></canvas></div></div>' +
+        '<div class="pr-box"><h3>Dia da semana</h3><div class="sub">Média de processos por dia trabalhado</div><div class="pr-ch"><canvas id="g5"></canvas></div></div>' +
+        '<div class="pr-box larga"><h3>Quadro mensal</h3><div class="sub">Mesmo quadro da planilha: processos por mês e ano</div>' + quadroMensal(lista) + '</div>' +
+        `<div class="pr-box larga"><h3>Observações sobre os dados</h3><div class="sub">Processos refeitos: ${n0(p.r.refeitos)} lançamentos repetidos do mesmo número (${n0(p.r.repetidos)} processos aparecem mais de uma vez). Primeiro lançamento: ${p.primeira ? p.primeira.split('-').reverse().join('/') : '-'}; último: ${p.ultima ? p.ultima.split('-').reverse().join('/') : '-'}. Importado em ${new Date(p.atualizado).toLocaleString('pt-BR')}.</div></div>` +
+        '</div>';
+    }
+    h += '<p class="desc" style="color:var(--muted);font-size:.78rem;margin:0 0 24px">Assuntos: os nomes digitados nas planilhas (por exemplo "INSS", "inss" e "Benefício previdenciário") são reunidos em grupos como Previdenciário, Diferenças salariais, PSS e Imposto de renda; o que não se encaixa vai para "Outros". Confira sempre com a planilha de origem em caso de dúvida.</p>';
+    $('corpo').innerHTML = h;
+    graficoMensal('g1', lista); graficoAnual('g2', lista); graficoAnoAno('g3', lista); graficoGrupos('g4', lista); graficoSemana('g5', lista);
+    const rk = $('rank');
+    if (rk) { rk.onclick = (ev) => { const th = ev.target.closest('th[data-c]'); if (th) { const c = th.dataset.c; ordem = { col: c, asc: ordem.col === c ? !ordem.asc : c === 'nome' }; rk.innerHTML = tabelaRanking(); return; } const tr = ev.target.closest('tr[data-p]'); if (tr) abrirPessoa(tr.dataset.p); }; }
+  }
+
+  if (!window.criarClienteLeitura || !window.SAMP_USUARIO) return;
+  carregar().catch((e) => erro(e.message));
+})();
+</script>
+<script src="sampinha.js?v=20261001a"></script>
+</body>
+</html>

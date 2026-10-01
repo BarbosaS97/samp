@@ -1,10 +1,11 @@
 // Estrutura comum do SAMP: controle de acesso por matrícula, barra de navegação e rodapé.
-// Cada página informa a sua posição com <body data-page="inicio|analise|metricas|cadastros|entrar">.
+// Cada página informa a sua posição com <body data-page="inicio|analise|metricas|producao|cadastros|entrar">.
 (function () {
   const ITENS = [
     { id: 'inicio',    href: 'index.html',     texto: 'Início' },
     { id: 'analise',   href: 'analise.html',   texto: 'Análise de Processos' },
     { id: 'metricas',  href: 'metricas.html',  texto: 'Metas Processuais' },
+    { id: 'producao',  href: 'producao.html',  texto: 'Produção Individual' },
     { id: 'cadastros', href: 'cadastros.html', texto: 'Cadastros', restrito: true }
   ];
   const atual = document.body.dataset.page;

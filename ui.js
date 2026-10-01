@@ -16,7 +16,7 @@
   window.addEventListener('pageshow', (e) => { if (e.persisted) document.body.classList.remove('saindo'); });
 
   /* ---------- números que "contam" até o valor ---------- */
-  const SEL = '.kpi .k-v, .stat-card .value, .kp2-v, .mt-v';
+  const SEL = '.kpi .k-v, .stat-card .value, .kp2-v, .mt-v, .pk-v';
   function interpretar(txt) {
     const t = txt.trim();
     if (!/^[\d.,]+$/.test(t)) return null;

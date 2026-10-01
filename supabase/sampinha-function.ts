@@ -255,13 +255,13 @@ async function consultarTendencia(a: any, db: any) {
 
 /* ---------- ferramentas ---------- */
 type Ctx = {
-  relatorio: any | null; acoes: any[]; modulo: string;
+  relatorio: any | null; acoes: any[]; modulo: string; matricula: string;
   consultas: string[];                                  // consultas feitas (memória para os pedidos seguintes)
   pergunta: { texto: string; opcoes: string[] } | null; // pergunta de esclarecimento ao usuário
   onStatus?: (m: string) => void;
 };
 async function ferramenta(nome: string, a: any, db: any, ctx?: Ctx): Promise<unknown> {
-  if (ctx && ["resumo_base", "buscar_processos", "agrupar_processos", "combinacoes", "listar_assuntos", "consultar_metricas", "listar_periodos", "consultar_tendencia"].includes(nome)) {
+  if (ctx && ["resumo_base", "buscar_processos", "agrupar_processos", "combinacoes", "listar_assuntos", "consultar_metricas", "listar_periodos", "consultar_tendencia", "consultar_producao"].includes(nome)) {
     const { __max, ...limpo } = a ?? {};
     ctx.consultas.push(`${nome} ${JSON.stringify(limpo)}`.slice(0, 280));
   }
@@ -358,6 +358,7 @@ async function ferramenta(nome: string, a: any, db: any, ctx?: Ctx): Promise<unk
     }
     case "consultar_metricas": return await metricas(a, db);
     case "consultar_tendencia": return await consultarTendencia(a, db);
+    case "consultar_producao": return await consultarProducao(a, db, ctx);
     case "gerar_relatorio": return await gerarRelatorio(a, db, ctx);
     case "acao_interface": return acaoInterface(a, ctx);
     case "perguntar_usuario": {
@@ -437,7 +438,11 @@ async function gerarRelatorio(a: any, db: any, ctx?: Ctx) {
         secoes.push({ tipo: "texto", titulo: sec.titulo ? String(sec.titulo).slice(0, 120) : undefined, conteudo: String(sec.conteudo ?? "").slice(0, 4000) });
 
       } else if (sec.tipo === "kpis") {
-        if (sec.fonte === "metricas") {
+        if (String(sec.fonte).startsWith("producao")) {
+          const x = await secaoProducao(sec, db, ctx, false, true);
+          if (x.aviso) { avisos.push(`${rot}: ${x.aviso}`); continue; }
+          secoes.push(x);
+        } else if (sec.fonte === "metricas") {
           const m: any = await metricas({ aba: sec.aba ?? "geral", periodo_id: sec.periodo_id, mes_inicial: sec.mes_inicial, mes_final: sec.mes_final, campos: sec.campos }, db);
           if (m.erro) { avisos.push(`${rot}: ${m.erro}`); continue; }
           const itens: any[] = [];
@@ -457,7 +462,11 @@ async function gerarRelatorio(a: any, db: any, ctx?: Ctx) {
 
       } else if (sec.tipo === "tabela" || sec.tipo === "grafico") {
         const ehGrafico = sec.tipo === "grafico";
-        if (sec.fonte === "processos" && !ehGrafico) {
+        if (String(sec.fonte).startsWith("producao")) {
+          const x = await secaoProducao(sec, db, ctx, ehGrafico, false);
+          if (x.aviso) { avisos.push(`${rot}: ${x.aviso}`); continue; }
+          secoes.push(x);
+        } else if (sec.fonte === "processos" && !ehGrafico) {
           const r: any = await ferramenta("buscar_processos", { ...filtros, ordenar_por: sec.ordenar_por, limite: Math.min(Number(sec.limite) || 50, 200), __max: 200 }, db);
           secoes.push({
             tipo: "tabela", titulo: sec.titulo ?? "Processos",
@@ -565,17 +574,185 @@ const MES_RX = /^\d{4}-(0[1-9]|1[0-2])$/;
 function acaoInterface(a: any, ctx?: Ctx) {
   const ac = a.acao;
   let item: any = null;
-  if (ac === "abrir_modulo" && ["inicio", "analise", "metricas"].includes(a.modulo)) item = { acao: ac, modulo: a.modulo };
+  if (ac === "abrir_modulo" && ["inicio", "analise", "metricas", "producao"].includes(a.modulo)) item = { acao: ac, modulo: a.modulo };
   else if (ac === "analise_aba" && ["assuntos", "poloPassivo", "advogadoAtivo", "analises", "tendencia"].includes(a.aba)) item = { acao: ac, aba: a.aba };
   else if (ac === "analise_buscar" && typeof a.texto === "string") item = { acao: ac, texto: a.texto.slice(0, 120), aba: ["assuntos", "poloPassivo", "advogadoAtivo"].includes(a.aba) ? a.aba : "assuntos" };
   else if (ac === "metricas_filtrar" && MES_RX.test(a.mes_inicial ?? "") && MES_RX.test(a.mes_final ?? "")) item = { acao: ac, mes_inicial: a.mes_inicial, mes_final: a.mes_final };
   else if (ac === "metricas_limpar_filtro") item = { acao: ac };
   else if (ac === "tendencia_assunto" && typeof a.texto === "string" && a.texto.trim()) item = { acao: ac, texto: a.texto.trim().slice(0, 200) };
+  else if (ac === "producao_filtrar") item = { acao: ac, pessoa: typeof a.texto === "string" ? a.texto.trim().slice(0, 80) : "", ano: Number.isInteger(Number(a.ano)) && Number(a.ano) >= 2000 && Number(a.ano) <= 2100 ? Number(a.ano) : null };
   else if (ac === "tendencia_modo" && ["mes", "faixa"].includes(a.modo)) item = { acao: ac, modo: a.modo };
   if (!item) return { erro: "ação inválida ou parâmetros incorretos" };
   if (!ctx || ctx.acoes.length >= 5) return { erro: "limite de ações por resposta atingido" };
   ctx.acoes.push(item);
   return { ok: true, mensagem: "Ação enviada ao navegador do usuário; ele a executa agora." };
+}
+
+/* ---------- Produção Individual (somente leitura; vem do resumo gravado a cada importação das planilhas) ---------- */
+type PessoaProd = { pessoa: string; total: number; primeira: string; ultima: string; atualizado: string; m: number[][]; gn: string[]; g: number[][]; d: [string, number][]; r: any };
+// REGRA DE PRIVACIDADE: hoje qualquer matrícula autorizada vê a produção de todos. Quando a regra for definida
+// (quem vê quem), é só alterar esta função: ela vale para as consultas e para os relatórios da Sampinha.
+function podeVerProducao(_matricula: string, _pessoa: string): boolean { return true; }
+
+async function carregarProducao(db: any, matricula: string): Promise<PessoaProd[]> {
+  const { data, error } = await db.from("producao_resumo").select("pessoa,total,primeira_data,ultima_data,atualizado_em,dados").order("pessoa");
+  if (error) throw new Error("A produção individual ainda não está disponível (" + error.message + ")");
+  return (data ?? []).filter((x: any) => podeVerProducao(matricula, x.pessoa)).map((x: any) => ({
+    pessoa: x.pessoa, total: x.total, primeira: x.primeira_data, ultima: x.ultima_data, atualizado: x.atualizado_em,
+    m: x.dados?.m ?? [], gn: x.dados?.gn ?? [], g: x.dados?.g ?? [], d: x.dados?.d ?? [], r: x.dados?.r ?? {},
+  }));
+}
+const ymProd = (ano: number, mes: number) => ano * 12 + mes - 1;
+const rotYM = (k: number) => `${MESES[k % 12]}/${Math.floor(k / 12)}`;
+const isoYM = (k: number) => `${Math.floor(k / 12)}-${String((k % 12) + 1).padStart(2, "0")}`;
+function periodoProd(a: any) {
+  let ini = -Infinity, fim = Infinity;
+  const ano = Number(a.ano);
+  if (Number.isInteger(ano) && ano >= 2000 && ano <= 2100) { ini = ymProd(ano, 1); fim = ymProd(ano, 12); }
+  if (MES_RX.test(a.mes_inicial ?? "")) ini = Math.max(ini, ymProd(+a.mes_inicial.slice(0, 4), +a.mes_inicial.slice(5)));
+  if (MES_RX.test(a.mes_final ?? "")) fim = Math.min(fim, ymProd(+a.mes_final.slice(0, 4), +a.mes_final.slice(5)));
+  return { ini, fim };
+}
+function acharPessoasProd(ps: PessoaProd[], termo: unknown): { lista: PessoaProd[]; setor: boolean; erro?: any } {
+  const t = norm(String(termo ?? "")).trim();
+  if (!t || /^(setor|todos|todas|geral|secaj|equipe)$/.test(t)) return { lista: ps, setor: true };
+  const exato = ps.filter((p) => norm(p.pessoa) === t);
+  if (exato.length === 1) return { lista: exato, setor: false };
+  const parc = ps.filter((p) => norm(p.pessoa).includes(t) || t.includes(norm(p.pessoa)));
+  if (parc.length === 1) return { lista: parc, setor: false };
+  if (parc.length > 1) return { lista: [], setor: false, erro: { erro: "mais de uma pessoa corresponde ao nome informado", opcoes: parc.map((p) => p.pessoa) } };
+  return { lista: [], setor: false, erro: { erro: "pessoa não encontrada na produção importada", pessoas_disponiveis: ps.map((p) => p.pessoa) } };
+}
+function agregarProd(lista: PessoaProd[], ini: number, fim: number) {
+  const o = { total: 0, meta: 0, acervo: 0, nc: 0, sim: 0, p60: 0, legal: 0, he: 0, soma: 0, nd: 0, porMes: new Map<number, number[]>() };
+  for (const p of lista) for (const x of p.m) {
+    const k = ymProd(x[0], x[1]); if (k < ini || k > fim) continue;
+    const q = x[5];
+    o.total += q; if (x[2] === 0) o.meta += q; else if (x[2] === 1) o.acervo += q; else o.nc += q;
+    if (x[3] === 1) o.sim += q; else if (x[3] === 2) o.p60 += q; else if (x[3] === 3) o.legal += q;
+    if (x[4]) o.he += q; o.soma += x[6]; o.nd += x[7];
+    const a = o.porMes.get(k) ?? [0, 0, 0]; a[x[2]] += q; o.porMes.set(k, a);
+  }
+  return o;
+}
+const totMes = (a?: number[]) => (a ? a[0] + a[1] + a[2] : 0);
+function calcProducao(a: any, ps: PessoaProd[]): any {
+  if (!ps.length) return { erro: "Nenhuma produção foi importada ainda (Cadastros > Produção Individual)." };
+  const alvo = acharPessoasProd(ps, a.pessoa);
+  if (alvo.erro) return alvo.erro;
+  const { ini, fim } = periodoProd(a);
+  const visao = ["resumo", "mensal", "ranking", "assuntos", "dia_semana", "anos", "pessoas"].includes(a.visao) ? a.visao : "resumo";
+  const top = lim(a.top, 15, 40);
+  const ultimoGeral = ps.reduce((x, p) => (p.ultima && p.ultima > x ? p.ultima : x), "");
+  const base: any = { escopo: alvo.setor ? "Setor (todas as pessoas)" : alvo.lista[0].pessoa, dados_ate: ultimoGeral ? rotulo(ultimoGeral.slice(0, 7)) : null,
+    observacao: "Dados das planilhas individuais, só meses fechados. Meta e acervo vêm da coluna TIPO preenchida nas planilhas; o que está em branco aparece como sem classificação." };
+  const ag = agregarProd(alvo.lista, ini, fim);
+  const ks = [...ag.porMes.keys()].sort((x, y) => x - y);
+
+  if (visao === "pessoas") {
+    return { ...base, pessoas: ps.map((p) => ({ pessoa: p.pessoa, processos: p.total, primeiro_lancamento: p.primeira, ultimo_lancamento: p.ultima })) };
+  }
+  if (visao === "ranking") {
+    const ult = ultimoGeral ? ymProd(+ultimoGeral.slice(0, 4), +ultimoGeral.slice(5, 7)) : 0;
+    const linhas = ps.map((p) => {
+      const x = agregarProd([p], ini, fim), cl = x.meta + x.acervo, n = x.porMes.size;
+      return { pessoa: p.pessoa, processos: x.total, media_mensal: n ? r1(x.total / n) : 0, meses_com_producao: n, ultimo_mes: totMes(x.porMes.get(ult)), pct_meta: cl ? r1((x.meta / cl) * 100) : null, prioritarios: x.sim + x.p60 + x.legal, tempo_medio_dias: x.nd ? Math.round(x.soma / x.nd) : null };
+    }).filter((x) => x.processos > 0).sort((x, y) => y.processos - x.processos);
+    return { ...base, escopo: "Ranking por pessoa", mes_do_ultimo: rotYM(ult), total_pessoas: linhas.length, total_setor: linhas.reduce((t, x) => t + x.processos, 0), ranking: linhas.slice(0, top),
+      aviso: "Compare com cautela: a produção depende do tipo e da complexidade dos processos, do tempo de cada pessoa na seção e de afastamentos. Média mensal considera só os meses em que a pessoa produziu." };
+  }
+  if (visao === "mensal") {
+    const cheio: number[] = []; if (ks.length) for (let k = ks[0]; k <= ks[ks.length - 1]; k++) cheio.push(k);
+    return { ...base, meses: cheio.slice(-120).map((k) => { const v = ag.porMes.get(k) ?? [0, 0, 0]; return { mes: isoYM(k), total: totMes(v), meta: v[0], acervo: v[1], sem_classificacao: v[2] }; }) };
+  }
+  if (visao === "anos") {
+    const por = new Map<number, number[]>();
+    for (const k of ks) { const ano = Math.floor(k / 12); const v = por.get(ano) ?? new Array(13).fill(0); v[k % 12] = totMes(ag.porMes.get(k)); v[12] += totMes(ag.porMes.get(k)); por.set(ano, v); }
+    return { ...base, anos: [...por].sort((x, y) => x[0] - y[0]).map(([ano, v]) => ({ ano, total: v[12], por_mes: v.slice(0, 12) })) };
+  }
+  if (visao === "assuntos") {
+    const t = new Map<string, number>();
+    for (const p of alvo.lista) for (const x of p.g) {
+      if (x[0] * 12 + 11 < ini || x[0] * 12 > fim) continue;
+      const nome = p.gn[x[1]]; t.set(nome, (t.get(nome) ?? 0) + x[2]);
+    }
+    const lista = [...t].sort((x, y) => y[1] - x[1]);
+    const soma = lista.reduce((n, x) => n + x[1], 0) || 1;
+    const parcial = Number.isFinite(ini) && Number.isFinite(fim) && (ini % 12 !== 0 || fim % 12 !== 11);
+    return { ...base, assuntos: lista.slice(0, top).map(([assunto, qtd]) => ({ assunto, processos: qtd, pct: r1((qtd / soma) * 100) })), total_grupos: lista.length,
+      aviso: "Assuntos agrupados automaticamente a partir do texto digitado nas planilhas (ex.: INSS e Benefício previdenciário viram Previdenciário)." + (parcial ? " Os assuntos são contados por ano inteiro, não por mês." : "") };
+  }
+  if (visao === "dia_semana") {
+    const nomes = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"], q = [0, 0, 0, 0, 0, 0, 0], dias = [0, 0, 0, 0, 0, 0, 0];
+    for (const p of alvo.lista) for (const [d, n] of p.d) {
+      const k = ymProd(+d.slice(0, 4), +d.slice(5, 7)); if (k < ini || k > fim) continue;
+      const w = (new Date(d + "T12:00:00Z").getUTCDay() + 6) % 7; q[w] += n; dias[w]++;
+    }
+    return { ...base, dias_da_semana: nomes.map((n, i) => ({ dia: n, processos: q[i], media_por_dia_trabalhado: dias[i] ? r1(q[i] / dias[i]) : 0 })) };
+  }
+  // resumo
+  const n = ks.length, cl = ag.meta + ag.acervo;
+  let melhor: any = null; for (const k of ks) { const t = totMes(ag.porMes.get(k)); if (!melhor || t > melhor.qtd) melhor = { mes: isoYM(k), qtd: t }; }
+  const media = n ? ag.total / n : 0, ult = ks.length ? ks[ks.length - 1] : null;
+  const ultQtd = ult === null ? 0 : totMes(ag.porMes.get(ult));
+  return { ...base, periodo: { de: ks.length ? isoYM(ks[0]) : null, ate: ult !== null ? isoYM(ult) : null }, total_processos: ag.total, meses_com_producao: n, media_mensal: r1(media), melhor_mes: melhor,
+    ultimo_mes: ult === null ? null : { mes: isoYM(ult), processos: ultQtd, variacao_vs_media_pct: media ? r1(((ultQtd - media) / media) * 100) : null },
+    meta: ag.meta, acervo: ag.acervo, sem_classificacao: ag.nc, pct_meta_entre_classificados: cl ? r1((ag.meta / cl) * 100) : null,
+    prioritarios: { prioridade_sim: ag.sim, acima_de_60_dias: ag.p60, prioridade_legal: ag.legal }, tempo_medio_do_recebimento_ao_calculo_dias: ag.nd ? Math.round(ag.soma / ag.nd) : null, lancamentos_em_hora_extra: ag.he,
+    ...(alvo.setor ? { pessoas_com_producao: alvo.lista.filter((p) => agregarProd([p], ini, fim).total > 0).length } : { processos_refeitos: alvo.lista[0].r?.refeitos ?? 0, primeiro_lancamento: alvo.lista[0].primeira, ultimo_lancamento: alvo.lista[0].ultima }) };
+}
+async function consultarProducao(a: any, db: any, ctx?: Ctx) {
+  return calcProducao(a, await carregarProducao(db, ctx?.matricula ?? ""));
+}
+
+// seções de relatório da Produção Individual (kpis, tabelas e gráficos), com números calculados pelo servidor
+async function secaoProducao(sec: any, db: any, ctx: Ctx | undefined, ehGrafico: boolean, kpis: boolean): Promise<any> {
+  const ps = await carregarProducao(db, ctx?.matricula ?? "");
+  const pedido = { pessoa: sec.pessoa, ano: sec.ano, mes_inicial: sec.mes_inicial, mes_final: sec.mes_final, top: sec.top };
+  const fonte = String(sec.fonte);
+  const escopo = (r: any) => String(r.escopo ?? "");
+  if (kpis || fonte === "producao_resumo") {
+    const r = calcProducao({ ...pedido, visao: "resumo" }, ps);
+    if (r.erro) return { aviso: r.erro };
+    return { tipo: "kpis", titulo: sec.titulo ?? `Produção: ${escopo(r)}`, itens: [
+      { rotulo: "Processos no período", valor: fmtN(r.total_processos) }, { rotulo: "Média mensal", valor: fmtN(r.media_mensal) },
+      { rotulo: "Melhor mês", valor: r.melhor_mes ? `${fmtN(r.melhor_mes.qtd)} (${rotulo(r.melhor_mes.mes)})` : "-" },
+      { rotulo: "Último mês", valor: r.ultimo_mes ? `${fmtN(r.ultimo_mes.processos)} (${rotulo(r.ultimo_mes.mes)})` : "-" },
+      { rotulo: "% meta (entre classificados)", valor: r.pct_meta_entre_classificados === null ? "-" : fmtN(r.pct_meta_entre_classificados) + "%" },
+      { rotulo: "Prioritários", valor: fmtN(r.prioritarios.prioridade_sim + r.prioritarios.acima_de_60_dias + r.prioritarios.prioridade_legal) },
+      { rotulo: "Tempo médio até calcular (dias)", valor: r.tempo_medio_do_recebimento_ao_calculo_dias === null ? "-" : fmtN(r.tempo_medio_do_recebimento_ao_calculo_dias) },
+      { rotulo: "Hora extra (lançamentos)", valor: fmtN(r.lancamentos_em_hora_extra) },
+    ] };
+  }
+  if (fonte === "producao_mensal") {
+    const r = calcProducao({ ...pedido, visao: "mensal" }, ps);
+    if (r.erro) return { aviso: r.erro };
+    if (ehGrafico) return { tipo: "grafico", grafico: sec.tipo_grafico ?? "barras", titulo: sec.titulo ?? `Produção mensal: ${escopo(r)}`, rotulos: r.meses.map((x: any) => rotulo(x.mes)),
+      series: [{ nome: "Meta", dados: r.meses.map((x: any) => x.meta) }, { nome: "Acervo", dados: r.meses.map((x: any) => x.acervo) }, { nome: "Sem classificação", dados: r.meses.map((x: any) => x.sem_classificacao) }] };
+    return { tipo: "tabela", titulo: sec.titulo ?? `Produção mensal: ${escopo(r)}`, colunas: ["Mês", "Total", "Meta", "Acervo", "Sem classificação"],
+      linhas: r.meses.map((x: any) => [rotulo(x.mes), fmtN(x.total), fmtN(x.meta), fmtN(x.acervo), fmtN(x.sem_classificacao)]).slice(0, 200), nota: r.observacao };
+  }
+  if (fonte === "producao_ranking") {
+    const r = calcProducao({ ...pedido, visao: "ranking" }, ps);
+    if (r.erro) return { aviso: r.erro };
+    if (ehGrafico) return { tipo: "grafico", grafico: sec.tipo_grafico ?? "barras_horizontais", titulo: sec.titulo ?? "Produção por pessoa", rotulos: r.ranking.map((x: any) => cortar(x.pessoa, 40)), series: [{ nome: "Processos", dados: r.ranking.map((x: any) => x.processos) }] };
+    return { tipo: "tabela", titulo: sec.titulo ?? "Produção por pessoa", colunas: ["Pessoa", "Processos", "Média/mês", `Último mês (${r.mes_do_ultimo})`, "% meta", "Prioritários", "Tempo médio (dias)"],
+      linhas: r.ranking.map((x: any) => [x.pessoa, fmtN(x.processos), fmtN(x.media_mensal), fmtN(x.ultimo_mes), x.pct_meta === null ? "-" : fmtN(x.pct_meta) + "%", fmtN(x.prioritarios), x.tempo_medio_dias === null ? "-" : fmtN(x.tempo_medio_dias)]),
+      nota: r.aviso };
+  }
+  if (fonte === "producao_assuntos") {
+    const r = calcProducao({ ...pedido, visao: "assuntos", top: sec.top ?? 10 }, ps);
+    if (r.erro) return { aviso: r.erro };
+    if (ehGrafico) return { tipo: "grafico", grafico: sec.tipo_grafico ?? "barras_horizontais", titulo: sec.titulo ?? `Assuntos mais calculados: ${escopo(r)}`, rotulos: r.assuntos.map((x: any) => cortar(x.assunto, 45)), series: [{ nome: "Processos", dados: r.assuntos.map((x: any) => x.processos) }] };
+    return { tipo: "tabela", titulo: sec.titulo ?? `Assuntos mais calculados: ${escopo(r)}`, colunas: ["Assunto", "Processos", "% do total"], linhas: r.assuntos.map((x: any) => [x.assunto, fmtN(x.processos), fmtN(x.pct) + "%"]), nota: r.aviso };
+  }
+  if (fonte === "producao_anos") {
+    const r = calcProducao({ ...pedido, visao: "anos" }, ps);
+    if (r.erro) return { aviso: r.erro };
+    if (ehGrafico) return { tipo: "grafico", grafico: sec.tipo_grafico ?? "linha", titulo: sec.titulo ?? `Comparação entre os anos: ${escopo(r)}`, rotulos: MESES, series: r.anos.map((x: any) => ({ nome: String(x.ano), dados: x.por_mes })) };
+    return { tipo: "tabela", titulo: sec.titulo ?? `Produção por ano: ${escopo(r)}`, colunas: ["Ano", ...MESES, "Total"], linhas: r.anos.map((x: any) => [String(x.ano), ...x.por_mes.map((v: number) => fmtN(v)), fmtN(x.total)]), nota: r.observacao };
+  }
+  return { aviso: "fonte de produção não suportada" };
 }
 
 const FILTROS = {
@@ -598,9 +775,10 @@ const TOOLS = [
   { type: "function", function: { name: "listar_periodos", description: "Lista os períodos de metas processuais cadastrados.", parameters: { type: "object", properties: {} } } },
   { type: "function", function: { name: "consultar_metricas", description: "Metas processuais mês a mês (recebidos, calculados, acervo, tempo de permanência) das Varas Comuns, do JEF ou do Geral consolidado, com estatísticas calculadas (média, máximo, mínimo, variação, últimos 3 meses). Sem periodo_id usa o mais recente.", parameters: { type: "object", properties: { periodo_id: { type: "number" }, aba: { type: "string", enum: ["varas", "jef", "geral"] }, campos: { type: "array", items: { type: "string", enum: ["recebidos", "calculados", "acervo", "tempo"] } }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" } }, required: ["aba"] } } },
   { type: "function", function: { name: "consultar_tendencia", description: "Perfil de chegada e envelhecimento por assunto (aba Tendência): idade mediana, percentil 90, % acima do prazo, % chegado nos últimos 30 dias e situação (Acervo velho, Chegada alta, Acervo velho e chegada alta, Normal, Poucos processos), comparados com o conjunto. Com \"assunto\" devolve também o detalhe (faixas de idade e chegada por mês). Com incluir_historico traz o acervo, as entradas e as saídas reais registrados a cada importação (existe a partir da 2ª importação). Use para perguntas sobre retenção, pressão, sobrecarga, assuntos que estão envelhecendo ou crescendo.", parameters: { type: "object", properties: { escopo: { type: "string", enum: ["todos", "comum", "jef"], description: "todas as varas, varas comuns (1-22) ou JEF (23-27)" }, assunto: { type: "string", description: "trecho do assunto (opcional); devolve o detalhe do primeiro encontrado" }, ordenar: { type: "string", enum: ["pressao", "retencao", "total", "atencao"] }, top: { type: "number", description: "quantos assuntos listar (máx. 40)" }, detalhe: { type: "boolean", description: "inclui o detalhe do primeiro assunto da lista" }, incluir_historico: { type: "boolean" } } } } },
-  { type: "function", function: { name: "gerar_relatorio", description: "Monta um relatório (PDF no navegador do usuário, e tabelas em CSV) a partir de seções. O SERVIDOR preenche tabelas, gráficos e indicadores com dados reais; você escreve apenas as seções de texto. Use para qualquer pedido de PDF, relatório, resumo para imprimir, planilha ou exportação, e chame-a DE NOVO a cada novo pedido (cada chamada gera um novo arquivo). Inclua APENAS o que o usuário pediu (normalmente 3 a 6 seções); não amplie o escopo por conta própria.", parameters: { type: "object", properties: { titulo: { type: "string" }, subtitulo: { type: "string" }, interpretacao: { type: "string", description: "1 ou 2 frases dizendo exatamente o que você entendeu que o usuário pediu (aba, período, campos, filtros). É mostrada ao usuário para conferência." }, orientacao: { type: "string", enum: ["retrato", "paisagem"], description: "paisagem para tabelas largas (como a lista de processos)" }, secoes: { type: "array", maxItems: 15, items: { type: "object", properties: { tipo: { type: "string", enum: ["texto", "kpis", "tabela", "grafico"] }, titulo: { type: "string" }, conteudo: { type: "string", description: "só para tipo texto" }, fonte: { type: "string", enum: ["base", "processos", "agrupamento", "combinacoes", "situacao_prazos", "metricas", "tendencia", "tendencia_faixas", "tendencia_chegada", "historico"], description: "base: kpis da base; processos: lista (tabela); agrupamento: ranking por campo (tabela ou gráfico); combinacoes: tabela; situacao_prazos: gráfico; metricas: kpis, tabela ou gráfico mensal; tendencia: tabela de perfil de chegada/envelhecimento por assunto (use escopo e ordenar_tendencia); tendencia_faixas e tendencia_chegada: gráficos de UM assunto (campo assunto); historico: gráfico de acervo/entradas/saídas das importações (assunto opcional)" }, tipo_grafico: { type: "string", enum: ["barras", "barras_horizontais", "linha", "pizza"] }, campo: CAMPOS_ENUM, campos: { type: "array", items: { type: "string" }, description: "para combinacoes: campos de agrupamento; para metricas: recebidos/calculados/acervo/tempo" }, filtros: { type: "object", properties: FILTROS }, ordenar_por: { type: "string", enum: ["dias_desc", "dias_asc"] }, limite: { type: "number", description: "linhas (processos, máx. 200)" }, top: { type: "number" }, min_qtd: { type: "number" }, amostra: { type: "number" }, aba: { type: "string", enum: ["varas", "jef", "geral"] }, assunto: { type: "string", description: "nome (ou trecho) do assunto, para as fontes de tendência/histórico" }, escopo: { type: "string", enum: ["todos", "comum", "jef"] }, ordenar_tendencia: { type: "string", enum: ["pressao", "retencao", "total", "atencao"] }, periodo_id: { type: "number" }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" } }, required: ["tipo"] } } }, required: ["titulo", "interpretacao", "secoes"] } } },
+  { type: "function", function: { name: "consultar_producao", description: "Produção Individual: processos calculados por pessoa ou pelo setor, a partir das planilhas de produção (só meses fechados). Informe pessoa (nome ou trecho) para uma pessoa; omita para o setor inteiro. visao: resumo (total, média mensal, melhor mês, último mês, meta/acervo, prioritários, tempo até calcular, hora extra), mensal (série mês a mês), ranking (por pessoa), assuntos (assuntos agrupados), dia_semana, anos (comparação entre anos) ou pessoas (quem tem produção importada). Aceita ano ou mes_inicial/mes_final (AAAA-MM). Use para qualquer pergunta sobre produção, quanto alguém calculou, quem produziu mais, evolução, comparação de períodos e assuntos mais calculados por pessoa.", parameters: { type: "object", properties: { pessoa: { type: "string", description: "nome ou trecho do nome; vazio ou setor para todos" }, visao: { type: "string", enum: ["resumo", "mensal", "ranking", "assuntos", "dia_semana", "anos", "pessoas"] }, ano: { type: "number" }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" }, top: { type: "number", description: "máx. 40" } } } } },
+  { type: "function", function: { name: "gerar_relatorio", description: "Monta um relatório (PDF no navegador do usuário, e tabelas em CSV) a partir de seções. O SERVIDOR preenche tabelas, gráficos e indicadores com dados reais; você escreve apenas as seções de texto. Use para qualquer pedido de PDF, relatório, resumo para imprimir, planilha ou exportação, e chame-a DE NOVO a cada novo pedido (cada chamada gera um novo arquivo). Inclua APENAS o que o usuário pediu (normalmente 3 a 6 seções); não amplie o escopo por conta própria.", parameters: { type: "object", properties: { titulo: { type: "string" }, subtitulo: { type: "string" }, interpretacao: { type: "string", description: "1 ou 2 frases dizendo exatamente o que você entendeu que o usuário pediu (aba, período, campos, filtros). É mostrada ao usuário para conferência." }, orientacao: { type: "string", enum: ["retrato", "paisagem"], description: "paisagem para tabelas largas (como a lista de processos)" }, secoes: { type: "array", maxItems: 15, items: { type: "object", properties: { tipo: { type: "string", enum: ["texto", "kpis", "tabela", "grafico"] }, titulo: { type: "string" }, conteudo: { type: "string", description: "só para tipo texto" }, fonte: { type: "string", enum: ["base", "processos", "agrupamento", "combinacoes", "situacao_prazos", "metricas", "tendencia", "tendencia_faixas", "tendencia_chegada", "historico", "producao_resumo", "producao_mensal", "producao_ranking", "producao_assuntos", "producao_anos"], description: "producao_resumo: kpis da Produção Individual; producao_mensal: série mês a mês (gráfico ou tabela); producao_ranking: por pessoa (tabela ou gráfico); producao_assuntos: assuntos agrupados; producao_anos: comparação entre anos (todas aceitam pessoa, ano, mes_inicial, mes_final, top; sem pessoa = setor). base: kpis da base; processos: lista (tabela); agrupamento: ranking por campo (tabela ou gráfico); combinacoes: tabela; situacao_prazos: gráfico; metricas: kpis, tabela ou gráfico mensal; tendencia: tabela de perfil de chegada/envelhecimento por assunto (use escopo e ordenar_tendencia); tendencia_faixas e tendencia_chegada: gráficos de UM assunto (campo assunto); historico: gráfico de acervo/entradas/saídas das importações (assunto opcional)" }, tipo_grafico: { type: "string", enum: ["barras", "barras_horizontais", "linha", "pizza"] }, campo: CAMPOS_ENUM, campos: { type: "array", items: { type: "string" }, description: "para combinacoes: campos de agrupamento; para metricas: recebidos/calculados/acervo/tempo" }, filtros: { type: "object", properties: FILTROS }, ordenar_por: { type: "string", enum: ["dias_desc", "dias_asc"] }, limite: { type: "number", description: "linhas (processos, máx. 200)" }, top: { type: "number" }, min_qtd: { type: "number" }, amostra: { type: "number" }, aba: { type: "string", enum: ["varas", "jef", "geral"] }, assunto: { type: "string", description: "nome (ou trecho) do assunto, para as fontes de tendência/histórico" }, pessoa: { type: "string", description: "nome da pessoa (fontes producao_*); vazio = setor" }, ano: { type: "number", description: "ano (fontes producao_*)" }, escopo: { type: "string", enum: ["todos", "comum", "jef"] }, ordenar_tendencia: { type: "string", enum: ["pressao", "retencao", "total", "atencao"] }, periodo_id: { type: "number" }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" } }, required: ["tipo"] } } }, required: ["titulo", "interpretacao", "secoes"] } } },
   { type: "function", function: { name: "perguntar_usuario", description: "Faz UMA pergunta de esclarecimento ao usuário ANTES de consultar ou gerar algo, quando o pedido admite mais de uma interpretação plausível que levaria a resultados diferentes e nem o histórico nem a tela resolvem. Encerra o seu turno: não escreva mais nada depois de chamá-la.", parameters: { type: "object", properties: { pergunta: { type: "string", description: "pergunta curta e objetiva" }, opcoes: { type: "array", items: { type: "string" }, description: "de 2 a 4 respostas possíveis, curtas, escritas como o usuário responderia" } }, required: ["pergunta", "opcoes"] } } },
-  { type: "function", function: { name: "acao_interface", description: "Executa uma ação de navegação/visualização no SAMP do usuário (nunca altera dados). Use apenas quando o usuário pedir para abrir, ir, filtrar ou buscar.", parameters: { type: "object", properties: { acao: { type: "string", enum: ["abrir_modulo", "analise_aba", "analise_buscar", "metricas_filtrar", "metricas_limpar_filtro", "tendencia_assunto", "tendencia_modo"] }, modulo: { type: "string", enum: ["inicio", "analise", "metricas"] }, aba: { type: "string", enum: ["assuntos", "poloPassivo", "advogadoAtivo", "analises", "tendencia"] }, texto: { type: "string", description: "termo da busca (analise_buscar) ou nome do assunto (tendencia_assunto)" }, modo: { type: "string", enum: ["mes", "faixa"], description: "eixo do mapa de calor (tendencia_modo)" }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" } }, required: ["acao"] } } },
+  { type: "function", function: { name: "acao_interface", description: "Executa uma ação de navegação/visualização no SAMP do usuário (nunca altera dados). Use apenas quando o usuário pedir para abrir, ir, filtrar ou buscar.", parameters: { type: "object", properties: { acao: { type: "string", enum: ["abrir_modulo", "analise_aba", "analise_buscar", "metricas_filtrar", "metricas_limpar_filtro", "tendencia_assunto", "tendencia_modo", "producao_filtrar"] }, modulo: { type: "string", enum: ["inicio", "analise", "metricas", "producao"] }, ano: { type: "number", description: "ano para producao_filtrar (opcional)" }, aba: { type: "string", enum: ["assuntos", "poloPassivo", "advogadoAtivo", "analises", "tendencia"] }, texto: { type: "string", description: "termo da busca (analise_buscar), nome do assunto (tendencia_assunto) ou nome da pessoa (producao_filtrar; vazio ou setor = visão do setor)" }, modo: { type: "string", enum: ["mes", "faixa"], description: "eixo do mapa de calor (tendencia_modo)" }, mes_inicial: { type: "string", description: "AAAA-MM" }, mes_final: { type: "string", description: "AAAA-MM" } }, required: ["acao"] } } },
 ];
 
 function promptSistema(nome: string, modulo: string, contexto: string) {
@@ -610,6 +788,7 @@ function promptSistema(nome: string, modulo: string, contexto: string) {
 O QUE O SAMP TEM
 1) Análise de Processos: base de processos com número, órgão julgador (vara), dias na tarefa, assunto, polo passivo e advogado do polo ativo. As varas 1 a 22 são Varas Comuns e 23 a 27 são JEF (os adjuntos somam na vara correspondente). Os prazos classificam cada processo em no_prazo, atencao ou atrasado conforme limites cadastrados (use resumo_base para saber os limites).
 3) Tendência (aba da Análise de Processos): perfil de chegada e envelhecimento por assunto. A data de entrada de cada processo é ESTIMADA (data da importação menos os dias na tarefa) e só considera quem AINDA está na fila. Mostra ACERVO VELHO (retenção: % acima do prazo ou idade mediana bem acima do conjunto) e CHEGADA ALTA (pressão: onda de chegada recente, % chegado em 30 dias bem acima do conjunto), com os mesmos nomes da tela; assuntos com menos de 10 processos aparecem como "Poucos processos". Use os nomes da tela (Acervo velho, Chegada alta) ao conversar com o usuário. Existe também o selo independente "Chegada em volume" (assunto que recebe bem mais processos novos do que o tamanho do seu acervo: >= 10 novos em 30 dias, >= 5% dos novos do conjunto e >= 1,3x a sua fatia do acervo); ele pode aparecer em assuntos "Normal" e deve ser citado quando existir. NÃO é entradas x saídas: quem já saiu da fila não aparece. Acervo, entradas e saídas reais por assunto vêm do histórico das importações (consultar_tendencia com incluir_historico), que só existe a partir da 2ª importação; "saída" significa que o processo saiu da fila da planilha, não necessariamente que foi calculado.
+4) Produção Individual: processos calculados por cada pessoa da seção, vindos das planilhas "PRODUÇÃO SECAJ - Nome" (importadas uma vez por mês, após a virada do mês; só entram meses fechados, e os dados vão até o último mês importado). Cada lançamento tem data, número do processo, objeto (assunto digitado à mão e agrupado automaticamente), prioridade, observação, data de recebimento e TIPO (META ou ACERVO). META e ACERVO vêm só do que cada pessoa preencheu na coluna TIPO: o que está em branco é "sem classificação" (em 2019 quase tudo está assim). Não confunda esta produção com as Metas Processuais (aba de recebidos/calculados por vara), que são números diferentes.
 2) Metas Processuais: por mês, para Varas Comuns e JEF: processos recebidos, calculados, evolução do acervo e tempo de permanência (dias). O Geral consolidado soma Varas + JEF (recebidos, calculados e acervo; o tempo não é somado).
 
 COMO VOCÊ TRABALHA (nesta ordem)
@@ -617,6 +796,7 @@ COMO VOCÊ TRABALHA (nesta ordem)
 2) PERGUNTAR QUANDO HOUVER DÚVIDA REAL. Se o pedido admite interpretações que levariam a resultados bem diferentes e nem o histórico nem a tela resolvem (qual aba, vara, período, campo, assunto ou advogado; "faça um relatório" sem dizer de quê; "últimos meses" sem número; um nome que corresponde a vários advogados ou assuntos), chame perguntar_usuario ANTES de consultar ou gerar, com uma pergunta curta e de 2 a 4 opções. Uma pergunta por vez. NÃO pergunte o que dá para deduzir ou tem padrão razoável (período mais recente, aba geral, os 10 maiores...): nesses casos prossiga e diga a premissa adotada ("Considerei..."). Se o usuário já respondeu, não repita a pergunta.
 3) EXECUTAR com a ferramenta certa: "mesmo assunto e mesmo advogado" -> combinacoes; rankings -> agrupar_processos; localizar processos -> buscar_processos; números do mês a mês -> consultar_metricas; temas -> veja BUSCA POR TEMA.
 3b) Para perguntas sobre retenção, pressão, sobrecarga, assuntos envelhecendo, perfil de chegada ou "evolução de um assunto", use consultar_tendencia (com assunto para o detalhe e incluir_historico para o histórico real). Ao responder, deixe claro em uma frase que é estimativa dos processos ainda na fila; nunca chame isso de "entradas e saídas" a menos que venha do histórico das importações.
+3c) Para perguntas sobre produção (quanto alguém calculou, quem produziu mais, evolução, melhor mês, comparação entre anos, assuntos mais calculados, tempo até calcular), use consultar_producao. Se o nome informado corresponder a mais de uma pessoa, a ferramenta devolve as opções: pergunte qual. Diga sempre até que mês vão os dados. Ao comparar pessoas, apresente apenas os números e lembre, em uma frase, que a produção depende do tipo e da complexidade dos processos, do tempo na seção e de afastamentos: NÃO faça julgamento de desempenho individual nem recomendações sobre pessoas. Peça ao usuário que confira com a planilha de origem quando o número for usado oficialmente.
 4) RESPONDER. Comece pela resposta direta; depois, em uma linha, a premissa adotada (se houve); ao listar, informe o total encontrado. Se a busca vier vazia ou com resultado inesperado, diga isso e ofereça alternativas (use sugestoes_proximas quando existirem). Termine com a linha SUGESTÕES.
 
 RELATÓRIOS, PDF E PLANILHAS (gerar_relatorio)
@@ -636,10 +816,10 @@ Quando pedirem processos "sobre" um tema (imposto de renda, aposentadoria, grati
 5) Peça ao usuário para CONFERIR os incluídos por inferência e ofereça ajustar. Se faltarem processos para o número pedido, diga quantos existem.
 
 AÇÕES NA TELA
-Use acao_interface somente quando pedirem para abrir um módulo, trocar de aba, buscar, filtrar o período, escolher um assunto na aba Tendência (tendencia_assunto) ou trocar o mapa de calor entre mês de chegada e faixa de idade (tendencia_modo); depois diga em uma frase o que foi feito. Se a ação for de outro módulo, o sistema navega até ele.
+Use acao_interface somente quando pedirem para abrir um módulo, trocar de aba, buscar, filtrar o período, escolher um assunto na aba Tendência (tendencia_assunto), trocar o mapa de calor entre mês de chegada e faixa de idade (tendencia_modo) ou abrir a Produção Individual de uma pessoa ou do setor, com ano (producao_filtrar); depois diga em uma frase o que foi feito. Se a ação for de outro módulo, o sistema navega até ele.
 
 O QUE VOCÊ FAZ (se perguntarem)
-Consulta processos (busca, rankings, combinações, prazos, por tema), consulta as metas (mês a mês, comparações, tendências), analisa a retenção e a pressão por assunto (aba Tendência) e o histórico das importações, gera relatórios em PDF e dados em CSV, abre módulos/abas/filtros/buscas na tela e explica como o sistema funciona. Você não altera dados: incluir, alterar ou excluir é feito no módulo Cadastros, por quem tem a senha.
+Consulta processos (busca, rankings, combinações, prazos, por tema), consulta as metas (mês a mês, comparações, tendências), analisa a retenção e a pressão por assunto (aba Tendência) e o histórico das importações, consulta a Produção Individual (por pessoa e do setor), gera relatórios em PDF e dados em CSV, abre módulos/abas/filtros/buscas na tela e explica como o sistema funciona. Você não altera dados: incluir, alterar ou excluir é feito no módulo Cadastros, por quem tem a senha.
 
 REGRAS
 - Todo número, contagem, nome ou processo citado DEVE vir das ferramentas. Nunca invente nem estime. Se a ferramenta não trouxer o dado, diga que não encontrou.
@@ -695,6 +875,7 @@ function pedidoVago(texto: string, temConversa: boolean): boolean {
   return norm(texto).split(/[^a-z0-9]+/).filter((p) => p.length >= 2 && !PALAVRAS_DO_PEDIDO.has(p)).length === 0;
 }
 function opcoesDeRelatorio(modulo: string): string[] {
+  if (/produ/i.test(modulo)) return ["Gere um relatório da produção do setor", "Gere um relatório do ranking de produção por pessoa", "Gere um relatório da produção do último ano", "Gere um relatório do panorama da base de processos"];
   if (/metas/i.test(modulo)) return ["Gere um relatório das metas do período mais recente (Geral)", "Gere um relatório comparando Varas Comuns e JEF", "Gere um relatório da evolução do acervo", "Gere um relatório do panorama da base de processos"];
   return ["Gere um relatório do panorama da base de processos", "Gere um relatório dos processos atrasados", "Gere um relatório do perfil de chegada por assunto (Tendência)", "Gere um relatório das metas do período mais recente"];
 }
@@ -712,6 +893,20 @@ function distanciaTxt(a: string, b: string): number {
 }
 const TXT_PERFIL = `A data de chegada de cada processo é estimada pelos dias na tarefa (data da importação menos os dias) e considera só os processos que ainda estão na fila. Acervo velho: o assunto tem mais processos velhos do que o normal. Chegada alta: está entrando muito processo novo. Cada assunto é comparado com o conjunto de todos os assuntos; assuntos com menos de 10 processos aparecem como Poucos processos.`;
 const RELATORIOS_PRONTOS: { frase: string; args: any }[] = [
+  { frase: "Gere um relatório da produção do setor", args: {
+    titulo: "Produção do setor", orientacao: "paisagem", interpretacao: "Produção individual de todas as pessoas somada (setor), todo o histórico importado, só meses fechados.",
+    secoes: [
+      { tipo: "kpis", fonte: "producao_resumo", titulo: "Indicadores do setor" },
+      { tipo: "grafico", fonte: "producao_anos", tipo_grafico: "linha", titulo: "Comparação mês a mês entre os anos" },
+      { tipo: "grafico", fonte: "producao_assuntos", top: 10, titulo: "Assuntos mais calculados" },
+      { tipo: "tabela", fonte: "producao_ranking", top: 40, titulo: "Produção por pessoa" },
+    ] } },
+  { frase: "Gere um relatório do ranking de produção por pessoa", args: {
+    titulo: "Produção por pessoa", orientacao: "paisagem", interpretacao: "Total de processos calculados por cada pessoa, em todo o histórico importado, com média mensal e último mês fechado.",
+    secoes: [
+      { tipo: "grafico", fonte: "producao_ranking", top: 20, titulo: "Processos por pessoa (20 maiores)" },
+      { tipo: "tabela", fonte: "producao_ranking", top: 40, titulo: "Produção por pessoa" },
+    ] } },
   { frase: "Gere um relatório do perfil de chegada por assunto (Tendência)", args: {
     titulo: "Perfil de chegada e envelhecimento por assunto", orientacao: "paisagem",
     interpretacao: "Todos os assuntos e todas as varas, com os assuntos que mais pedem atenção (acervo velho e chegada alta) primeiro. Estimativa pelos processos ainda na fila.",
@@ -781,14 +976,14 @@ function rotuloStatus(nome: string): string {
     resumo_base: "Consultando o resumo da base...", buscar_processos: "Buscando processos...", agrupar_processos: "Agrupando os processos...",
     combinacoes: "Cruzando assuntos e advogados...", listar_assuntos: "Lendo o catálogo de assuntos...", consultar_metricas: "Consultando as metas...", consultar_tendencia: "Calculando a tendência dos assuntos...",
     listar_periodos: "Consultando os períodos...", gerar_relatorio: "Montando o relatório...", acao_interface: "Preparando a ação na tela...",
-    perguntar_usuario: "Preparando uma pergunta...",
+    perguntar_usuario: "Preparando uma pergunta...", consultar_producao: "Consultando a produção...",
   };
   return m[nome] ?? "Consultando os dados...";
 }
 
 type Resultado = { texto: string; relatorio: any | null; acoes: any[]; consultas: string[] };
-async function executarModelo(db: any, chaveApi: string, nome: string, modulo: string, contexto: string, hist: any[], onStatus?: (m: string) => void): Promise<Resultado> {
-  const ctx: Ctx = { relatorio: null, acoes: [], modulo, consultas: [], pergunta: null, onStatus };
+async function executarModelo(db: any, chaveApi: string, nome: string, modulo: string, contexto: string, hist: any[], onStatus?: (m: string) => void, matricula = ""): Promise<Resultado> {
+  const ctx: Ctx = { relatorio: null, acoes: [], modulo, matricula, consultas: [], pergunta: null, onStatus };
   const ultimaPergunta = String(hist[hist.length - 1]?.content ?? "");
   const pedidoRelatorio = PEDIDO_VERBO.test(ultimaPergunta) && PEDIDO_OBJETO.test(ultimaPergunta);
   let lembretes = 0;
@@ -860,6 +1055,9 @@ function descreverTela(c: any): string {
   if (c.periodo) partes.push(`período de metas exibido: ${t(c.periodo, 80)}`);
   if (c.assunto_selecionado) partes.push(`assunto selecionado na Tendência: "${t(c.assunto_selecionado, 160)}"`);
   if (c.visao) partes.push(`mapa de calor da Tendência por: ${t(c.visao, 30)}`);
+  if (c.visao_producao) partes.push(`visão da Produção Individual: ${t(c.visao_producao, 30)}`);
+  if (c.pessoa) partes.push(`pessoa selecionada na Produção Individual: ${t(c.pessoa, 80)}`);
+  if (c.ano) partes.push(`ano filtrado: ${t(c.ano, 10)}`);
   if (c.recorte) partes.push(`recorte da Tendência: ${t(c.recorte, 40)}`);
   return partes.join("; ");
 }
@@ -965,11 +1163,11 @@ Deno.serve(async (req) => {
       }
       hist.push({ role: "user", content: texto });
 
-      const modulo = b.modulo === "metricas" ? "Metas Processuais" : b.modulo === "inicio" ? "Início (tela inicial)" : "Análise de Processos";
+      const modulo = b.modulo === "metricas" ? "Metas Processuais" : b.modulo === "producao" ? "Produção Individual" : b.modulo === "inicio" ? "Início (tela inicial)" : "Análise de Processos";
       const contexto = descreverTela(b.contexto);
       // Processa o pedido e grava a conversa. Devolve o resultado final (usado tanto na resposta em fluxo quanto na comum).
       const processar = async (andamento?: (msg: string) => void) => {
-        const r = await executarModelo(db, chaveApi, sessao.n, modulo, contexto, hist, andamento);
+        const r = await executarModelo(db, chaveApi, sessao.n, modulo, contexto, hist, andamento, m);
 
         // só grava depois de ter a resposta: pergunta sem resposta não fica no histórico
         let titulo: string | undefined;

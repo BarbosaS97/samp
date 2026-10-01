@@ -338,7 +338,7 @@
             if (!v || v.length < 2) return '';
             const mn = Math.min(...v), mx = Math.max(...v), W = 100, H = 30, p = 2;
             const pts = v.map((x, k) => `${(p + (k / (v.length - 1)) * (W - 2 * p)).toFixed(1)},${(mx === mn ? H / 2 : H - p - ((x - mn) / (mx - mn)) * (H - 2 * p)).toFixed(1)}`);
-            return `<svg class="mt-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.join(' ')}"/><circle cx="${pts[pts.length - 1].split(',')[0]}" cy="${pts[pts.length - 1].split(',')[1]}" r="2.4"/></svg>`;
+            return `<svg class="mt-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.join(' ')}"/><polyline class="dot" points="${pts[pts.length - 1]} ${(parseFloat(pts[pts.length - 1].split(',')[0]) + 0.01).toFixed(2)},${pts[pts.length - 1].split(',')[1]}"/></svg>`;
         };
         const cartao = (rotulo, serie, media, casas) => {
             const u = serie && serie.length ? serie[serie.length - 1] : null;

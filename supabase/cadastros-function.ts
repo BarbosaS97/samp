@@ -22,7 +22,7 @@ function igual(a: string, b: string) {
 }
 
 const CAMPOS = ["recebidos", "calculados", "acervo", "tempo"];
-const TABELAS = ["processos", "configuracoes", "config_periodos", "dados_processos", "processos_fotos", "processos_fotos_assuntos"];
+const TABELAS = ["processos", "configuracoes", "config_periodos", "dados_processos", "processos_fotos", "processos_fotos_assuntos", "producao_resumo"];
 const SESSAO_MS = 8 * 60 * 60 * 1000; // 8 horas
 const nums = (v: unknown, n: number) =>
   Array.isArray(v) && v.length === n && v.every((x) => typeof x === "number" && isFinite(x));
@@ -276,6 +276,131 @@ async function gravarFoto(db: any, ts: string, novos: any[], antigos: Map<string
   }
   return { entradas: temAnterior ? ent : null, saidas: temAnterior ? sai : null };
 }
+
+/* ---------- Produção Individual: agrupamento de assuntos e resumo por pessoa ----------
+   O objeto de cada processo vem digitado à mão nas planilhas (centenas de grafias). As regras abaixo
+   (aplicadas ao texto sem acento, em maiúsculas e sem pontuação; a primeira que casar vale) levam tudo para um
+   assunto agrupado. O texto original continua guardado; para mudar uma regra, edite a lista e use
+   "Recalcular" em Cadastros (não precisa importar as planilhas de novo). */
+const GRUPOS_REGRAS: [string, string][] = [
+  ["Imposto de renda", "^(IR|IRFP|IRPF|RRA)( |$)|IMPO?RTO DE RENDA"],
+  ["PSS (contribuição previdenciária)", "(^| )(PSS|CPSS)( |$)|CONT ACIMA DO TETO"],
+  ["28,86%", "28 86|(^| )2886"],
+  ["13,23%", "13 23|(^| )0 1323|(^| )1323"],
+  ["3,17%", "(^| )3 17( |$)|0 0317|(^| )0317"],
+  ["11,98%", "11 98|(^| )0 1198"],
+  ["Fundef / FPM", "FUNDEF|(^| )FPM( |$)|FUNDO DE PARTICIPACAO"],
+  ["ECEE", "(^| )ECEE"],
+  ["Honorários", "HONORARIO"],
+  ["FGTS", "FGTS"],
+  ["Diferenças salariais", "^DIF(ERENCA|S)?( |$)|^DIFERENCA"],
+  ["Previdenciário", "PREVIDENC|^INSS|^JEF INSS|^PREVI( |$)|BENEFICIO|AUXILIO (INCAPACIDADE|DOENCA|ACIDENTE|RECLUSAO)|APOSENTADORIA|^BPC|^PENSAO( POR MORTE)?$|SALARIO MATERNIDADE|VIDA TODA|CNIS|(^| )TETO|^LOAS"],
+  ["Precatório / RPV", "PRECATORIO|^RPV|PRINCIPAL JUROS"],
+  ["Horas extras", "HORAS? EXTRAS?|^H E$"],
+  ["SUS", "(^| )SUS( |$)|TUNEP"],
+  ["Gratificações e adicionais", "GRATIFICA|^GD[A-Z]+|^GIFA|^GOE|^GAT( |$)|ABONO|ADICIONAL|PERICULOSIDADE|INSALUBRIDADE|^VPE|^PAE"],
+  ["Servidores (carreira)", "PROG FUNCIONAL|PROGRESSAO|ENQUADRAMENTO|QUINTOS|LICENCA PREMIO|FERIAS|REINTEGRACAO|ANISTIA|RESIDENCIA MEDICA|PROMOCAO|AUXILIO (MORADIA|CRECHE)|PRE ESCOLAR|DIARIAS|PENSAO MILITAR|^REFORMA|INCORPORACAO|^RAV|^IVC|SALARIO EDUCACAO|REAJUSTE|PERICIA|^ABATE"],
+  ["Tributário e execução fiscal", "TRIBUT|ICMS|(^| )PIS( |$)|COFINS|^IPI|SISCOMEX|^TAXAS?( |$)|EXECUCAO FISCAL|EXEC FISCAL|^EF( |$)|ROYALTIES|^IRPJ|CONT SOCIAL|CONTRIBUICOES SOCIAIS|CREDITO IPI"],
+  ["Contratos, monitória e financeiro", "CONTRATO|^SFH|SIST REMUNERATORIO|^FIES|^TDA|MONITORIA|^IPC|COR MON|CORRECAO MONETARIA|JUROS PROGRESSIVOS"],
+  ["Dano moral e indenizações", "DANO|INDENIZ"],
+  ["Criminal, multas e custas", "CRIMINAL|PENAL|MULTA|CUSTAS"],
+  ["Atualização e adequação", "ATUALIZA|ADEQUACAO|RATEIO|DEVOLUCAO|VALOR INCONTROVERSO|RESOLUCAO"],
+  ["PRF e DNIT", "^(PRF|DNIT)( |$)"],
+  ["Pedido da vara", "PEDIDO DA VARA"],
+  ["Recesso", "RECESSO"]
+];
+const GRUPOS_RX: [string, RegExp][] = GRUPOS_REGRAS.map(([n, r]): [string, RegExp] => [n, new RegExp(r)]);
+const chaveObjeto = (x: unknown) =>
+  String(x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+function grupoDoObjeto(x: unknown): string {
+  const k = chaveObjeto(x);
+  if (!k) return "Sem objeto";
+  for (const [nome, rx] of GRUPOS_RX) if (rx.test(k)) return nome;
+  return "Outros";
+}
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+function primeiroDiaMesAtual(): string {   // meses em andamento não entram (a planilha é enviada após a virada do mês)
+  const sp = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+  return sp.slice(0, 8) + "01";
+}
+const diasEntre = (a: string, b: string) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+function prioridadeCodigo(x: unknown): number {   // 0 sem prioridade, 1 sim, 2 acima de 60 dias, 3 prioridade legal
+  const k = chaveObjeto(x);
+  if (!k) return 0;
+  if (/60/.test(k)) return 2;
+  if (/LEGAL/.test(k)) return 3;
+  if (/^SIM/.test(k)) return 1;
+  return 0;
+}
+const horaExtra = (x: unknown) => (/HORAS? EXTRAS?/.test(chaveObjeto(x)) ? 1 : 0);
+
+function montarResumo(itens: any[]) {
+  const nomes: string[] = [];
+  const idx = new Map<string, number>();
+  const m = new Map<string, number[]>();
+  const g = new Map<string, number[]>();
+  const d = new Map<string, number>();
+  const procs = new Map<string, number>();
+  let primeira = "", ultima = "";
+  for (const it of itens) {
+    const data = String(it.data);
+    const ano = +data.slice(0, 4), mes = +data.slice(5, 7);
+    const tipo = it.tipo === "META" ? 0 : it.tipo === "ACERVO" ? 1 : 2;
+    const prio = prioridadeCodigo(it.prioridade), he = horaExtra(it.observacao);
+    let dias = -1;
+    if (it.recebido_em && ISO.test(String(it.recebido_em))) { const x = diasEntre(String(it.recebido_em), data); if (x >= 0 && x <= 1500) dias = x; }
+    const k = `${ano}|${mes}|${tipo}|${prio}|${he}`;
+    const a = m.get(k) ?? [ano, mes, tipo, prio, he, 0, 0, 0];
+    a[5]++; if (dias >= 0) { a[6] += dias; a[7]++; }
+    m.set(k, a);
+    const gn = grupoDoObjeto(it.objeto);
+    let gi = idx.get(gn);
+    if (gi === undefined) { gi = nomes.length; nomes.push(gn); idx.set(gn, gi); }
+    const kg = `${ano}|${gi}`;
+    const b = g.get(kg) ?? [ano, gi, 0];
+    b[2]++; g.set(kg, b);
+    d.set(data, (d.get(data) ?? 0) + 1);
+    const pk = String(it.processo).trim();
+    procs.set(pk, (procs.get(pk) ?? 0) + 1);
+    if (!primeira || data < primeira) primeira = data;
+    if (!ultima || data > ultima) ultima = data;
+  }
+  let refeitos = 0, repetidos = 0;
+  for (const v of procs.values()) if (v > 1) { repetidos++; refeitos += v - 1; }
+  return {
+    primeira, ultima, total: itens.length,
+    dados: {
+      m: [...m.values()], gn: nomes, g: [...g.values()], d: [...d].sort((x, y) => (x[0] < y[0] ? -1 : 1)),
+      r: { distintos: procs.size, repetidos, refeitos },
+    },
+  };
+}
+
+async function recalcularPessoa(db: any, pessoa: string, arquivo?: string | null, ts?: string) {
+  // sempre usa só a importação mais recente da pessoa (sobras de importações antigas nunca entram na conta)
+  let alvo = ts;
+  if (!alvo) {
+    const { data: u, error: eU } = await db.from("producao_itens").select("importado_em").eq("pessoa", pessoa).order("importado_em", { ascending: false }).limit(1);
+    if (eU) throw new Error(eU.message);
+    alvo = u?.[0]?.importado_em;
+  }
+  const itens: any[] = [];
+  if (alvo) for (let off = 0; ; off += 1000) {
+    const { data, error } = await db.from("producao_itens").select("data,processo,objeto,prioridade,observacao,recebido_em,tipo")
+      .eq("pessoa", pessoa).eq("importado_em", alvo).order("id").range(off, off + 999);
+    if (error) throw new Error(error.message);
+    itens.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  if (!itens.length) { await db.from("producao_resumo").delete().eq("pessoa", pessoa); return 0; }
+  const r = montarResumo(itens);
+  const linha: any = { pessoa, dados: r.dados, total: r.total, primeira_data: r.primeira, ultima_data: r.ultima, atualizado_em: new Date().toISOString() };
+  if (arquivo !== undefined) linha.arquivo = arquivo;
+  const { error } = await db.from("producao_resumo").upsert(linha, { onConflict: "pessoa" });
+  if (error) throw new Error(error.message);
+  return r.total;
+}
+const nomePessoa = (x: unknown) => String(x ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -576,6 +701,69 @@ Deno.serve(async (req) => {
         const { error: e1 } = await db.from("dados_processos").delete().eq("periodo_id", id);
         if (e1) return falha(e1);
         const { error: e2 } = await db.from("config_periodos").delete().eq("id", id);
+        if (e2) return falha(e2);
+        return json({ ok: true });
+      }
+
+      /* ---- Produção Individual ---- */
+      case "producao_lote": {   // recebe um pedaço das linhas de uma pessoa (a importação é feita em lotes)
+        const pessoa = nomePessoa(b.pessoa);
+        const ts = String(b.ts ?? "");
+        if (!pessoa || !/^\d{4}-\d{2}-\d{2}T/.test(ts) || Number.isNaN(Date.parse(ts))) return json({ error: "Pessoa ou carimbo da importação inválidos" }, 400);
+        const rows = b.rows;
+        if (!Array.isArray(rows) || !rows.length || rows.length > 3000) return json({ error: "Lote inválido" }, 400);
+        const corte = primeiroDiaMesAtual();
+        const lim = (x: unknown, n: number) => { const t = String(x ?? "").trim().slice(0, n); return t || null; };
+        const dia = (x: unknown) => {   // só datas que existem no calendário (rejeita mês 15, 30/02 etc. sem derrubar o lote)
+          if (typeof x !== "string" || !ISO.test(x)) return null;
+          const t = Date.parse(x + "T00:00:00Z");
+          return Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) !== x ? null : x;
+        };
+        const ok: any[] = []; let ignoradas = 0;
+        for (const r of rows) {
+          const data = dia(r.data), processo = lim(r.processo, 80);
+          if (!data || !processo || data >= corte || data < "2000-01-01") { ignoradas++; continue; }
+          ok.push({ pessoa, data, processo, objeto: lim(r.objeto, 200), prioridade: lim(r.prioridade, 60), observacao: lim(r.observacao, 300), recebido_em: dia(r.recebido_em), tipo: lim(r.tipo, 20)?.toUpperCase() ?? null, importado_em: ts });
+        }
+        if (ok.length) { const { error } = await db.from("producao_itens").insert(ok); if (error) return falha(error); }
+        return json({ ok: true, gravadas: ok.length, ignoradas });
+      }
+
+      case "producao_finalizar": {   // troca os dados antigos da pessoa pelos novos e recalcula o resumo
+        const pessoa = nomePessoa(b.pessoa), ts = String(b.ts ?? "");
+        if (!pessoa || Number.isNaN(Date.parse(ts))) return json({ error: "Pessoa ou carimbo da importação inválidos" }, 400);
+        const { count, error: eC } = await db.from("producao_itens").select("id", { count: "exact", head: true }).eq("pessoa", pessoa).eq("importado_em", ts);
+        if (eC) return falha(eC);
+        if (!count) return json({ error: "Nenhuma linha válida recebida para esta pessoa; os dados antigos foram mantidos" }, 400);
+        // 1) calcula o resumo só com a importação nova; 2) só então apaga a antiga (se algo falhar, nada se perde)
+        const total = await recalcularPessoa(db, pessoa, String(b.arquivo ?? "").slice(0, 200) || null, ts);
+        const { error: eD } = await db.from("producao_itens").delete().eq("pessoa", pessoa).neq("importado_em", ts);
+        if (eD) return falha(eD);
+        return json({ ok: true, total });
+      }
+
+      case "producao_cancelar": {   // importação que falhou no meio: descarta só o que chegou nela
+        const pessoa = nomePessoa(b.pessoa), ts = String(b.ts ?? "");
+        if (!pessoa || Number.isNaN(Date.parse(ts))) return json({ error: "Pedido inválido" }, 400);
+        const { error } = await db.from("producao_itens").delete().eq("pessoa", pessoa).eq("importado_em", ts);
+        if (error) return falha(error);
+        return json({ ok: true });
+      }
+
+      case "producao_recalcular": {   // refaz os resumos de todos (depois de mudar as regras de assunto)
+        const { data, error } = await db.from("producao_resumo").select("pessoa");
+        if (error) return falha(error);
+        let n = 0;
+        for (const r of data ?? []) { await recalcularPessoa(db, r.pessoa); n++; }
+        return json({ ok: true, pessoas: n });
+      }
+
+      case "producao_excluir_pessoa": {
+        const pessoa = nomePessoa(b.pessoa);
+        if (!pessoa) return json({ error: "Pessoa inválida" }, 400);
+        const { error: e1 } = await db.from("producao_itens").delete().eq("pessoa", pessoa);
+        if (e1) return falha(e1);
+        const { error: e2 } = await db.from("producao_resumo").delete().eq("pessoa", pessoa);
         if (e2) return falha(e2);
         return json({ ok: true });
       }

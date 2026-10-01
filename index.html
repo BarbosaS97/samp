@@ -20,7 +20,7 @@
   .sk { display: inline-block; height: 1.1em; width: 70%; border-radius: 3px; background: #e7ebf0; animation: th-brilho .9s ease-in-out infinite alternate; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
   a.card { animation: th-sobe .6s both; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; text-decoration: none; color: var(--ink); transition: border-color .15s, box-shadow .15s; }
-  a.card:nth-child(1) { animation-delay: .30s; } a.card:nth-child(2) { animation-delay: .38s; } a.card:nth-child(3) { animation-delay: .46s; }
+  a.card:nth-child(1) { animation-delay: .30s; } a.card:nth-child(2) { animation-delay: .38s; } a.card:nth-child(3) { animation-delay: .46s; } a.card:nth-child(4) { animation-delay: .54s; }
   a.card:hover { border-color: var(--navy); box-shadow: 0 8px 22px rgba(18,53,91,.14); transform: translateY(-4px); }
   a.card:hover .ico { background: var(--navy); color: #fff; }
   .card .ico { transition: background .25s, color .25s; }
@@ -43,7 +43,7 @@
   <section class="hero">
     <div class="eyebrow" id="saudacao">SAMP</div>
     <h1>Sistema de Acompanhamento e Métricas Processuais</h1>
-    <p>Consulte os painéis de análise e de metas ou acesse o módulo de cadastros para atualizar as informações do sistema.</p>
+    <p>Consulte os painéis de análise, de metas e de produção ou acesse o módulo de cadastros para atualizar as informações do sistema.</p>
   </section>
 
   <div class="kpis resumo" id="resumo">
@@ -67,6 +67,14 @@
       <h2>Metas Processuais</h2>
       <p>Estatísticas de processos recebidos, calculados, acervo e tempo médio nas Varas Comuns e no JEF.</p>
       <ul><li>Varas, JEF e consolidado</li><li>Filtro por período</li><li>Exportação em PDF</li></ul>
+      <span class="go">Acessar &rarr;</span>
+    </a>
+    <a class="card" href="producao.html">
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg></div>
+      <div class="tag">Consulta</div>
+      <h2>Produção Individual</h2>
+      <p>Processos calculados por pessoa e pelo setor, mês a mês, com assuntos, prioridades e tempo de resposta.</p>
+      <ul><li>Visão do setor e por pessoa</li><li>Comparação entre anos</li><li>Atualização mensal</li></ul>
       <span class="go">Acessar &rarr;</span>
     </a>
     <a class="card restrito" href="cadastros.html">

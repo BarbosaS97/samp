@@ -114,6 +114,7 @@
     <button class="tab active" data-pane="pProc">Processos (Análise)</button>
     <button class="tab" data-pane="pPrazos">Prazos (Análise)</button>
     <button class="tab" data-pane="pMetas">Metas Processuais</button>
+    <button class="tab" data-pane="pProd">Produção Individual</button>
     <button class="tab" data-pane="pUsers">Usuários (matrículas)</button>
   </div>
 
@@ -191,6 +192,33 @@
     <div class="savebar">
       <button class="btn btn-primary" id="salvarPeriodo">Salvar como novo período</button>
       <span class="dirty" id="dirtyChip">Alterações não salvas</span>
+    </div>
+  </div>
+  <!-- PRODUÇÃO INDIVIDUAL -->
+  <div class="pane hidden" id="pProd">
+    <h2>Produção Individual</h2>
+    <p class="desc">Envie as planilhas "PRODUÇÃO SECAJ - Nome" (.xlsm, .xlsx ou .xlsb) logo após a virada do mês. Pode selecionar várias de uma vez. O sistema lê só a aba Produção: a lista de processos (data, número, objeto, prioridade, observação, recebido em e tipo). O mês em andamento é ignorado e cada envio substitui por completo os dados da pessoa, então reenviar nunca duplica.</p>
+    <div class="info" id="prodInfo">Carregando...</div>
+    <div class="row">
+      <label class="drop" id="dropProd" for="arqProd">
+        <input type="file" id="arqProd" accept=".xlsx,.xlsm,.xlsb,.xls" multiple hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        <b>Arraste as planilhas aqui</b><span>ou clique para selecionar (várias)</span>
+      </label>
+      <button class="btn btn-primary" id="prodImportar" disabled>Importar planilhas selecionadas</button>
+    </div>
+    <div class="msg" id="prodMsg"></div>
+    <div id="prodFila"></div>
+    <h2 style="margin-top:22px">Pessoas já importadas</h2>
+    <div class="grid-wrap" style="margin-top:6px">
+      <table class="usr">
+        <thead><tr><th>Pessoa</th><th>Processos</th><th>Período</th><th>Última importação</th><th></th></tr></thead>
+        <tbody id="prodLista"></tbody>
+      </table>
+    </div>
+    <div class="danger-zone" style="border-top:none;padding-top:0">
+      <p class="desc" style="margin-bottom:8px">Os assuntos são agrupados por regras do sistema (por exemplo, "INSS", "inss" e "Benefício previdenciário" viram Previdenciário). Se as regras forem ajustadas, use o botão abaixo para refazer os números de todos sem enviar as planilhas de novo.</p>
+      <button class="btn" id="prodRecalcular">Recalcular resumos</button>
     </div>
   </div>
   <!-- USUÁRIOS -->
@@ -607,9 +635,194 @@
     } catch (e) { msg('userMsg', e.message, 'err'); }
   };
 
+  /* ---------- PRODUÇÃO INDIVIDUAL ---------- */
+  const MESES_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const dataBR = (iso) => iso ? `${MESES_PT[+iso.slice(5, 7) - 1]}/${iso.slice(0, 4)}` : '-';
+  const semAcentoUp = (x) => String(x == null ? '' : x).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+  let filaProd = [], jaImportados = [];
+
+  function nomeDoArquivo(nome) {
+    let n = nome.replace(/\.[a-z0-9]+$/i, '');
+    n = n.replace(/^.*PRODU[ÇC][ÃA]O\s+SE[CR]CAJ\s*-\s*/i, '').replace(/^.*\s-\s/, '').trim();
+    n = n.replace(/\s+\d+$/, '').replace(/\s+\(\d+\)$/, '').trim();
+    if (n === n.toUpperCase()) n = n.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+    return n;
+  }
+  // só aceita datas que existem no calendário (rejeita 30/02, mês 15, 29/02 de ano não bissexto etc.)
+  function dataReal(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    if (!m) return null;
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3] ? iso : null;
+  }
+  function serialParaISO(v) { return dataReal(serialParaISOBruto(v)); }
+  function serialParaISOBruto(v) {
+    if (v instanceof Date) return isNaN(v) ? null : new Date(v.getTime() + 12 * 3600 * 1000).toISOString().slice(0, 10);
+    if (typeof v === 'number' && isFinite(v)) {
+      if (v < 36526 || v > 73415) return null;   // fora de 2000-2100
+      return new Date(Math.floor(v) * 86400000 + Date.UTC(1899, 11, 30)).toISOString().slice(0, 10);
+    }
+    if (typeof v === 'string') {
+      const m = v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+      if (/^\d{4}-\d{2}-\d{2}/.test(v.trim())) return v.trim().slice(0, 10);
+    }
+    return null;
+  }
+  const primeiroDiaMes = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
+
+  function lerProducao(buf) {
+    const nomes = XLSX.read(buf, { type: 'array', bookSheets: true }).SheetNames;
+    const aba = nomes.find((n) => semAcentoUp(n).startsWith('PRODUCAO'));
+    if (!aba) throw new Error('Aba "Produção" não encontrada');
+    const wb = XLSX.read(buf, { type: 'array', sheets: aba });
+    const ws = wb.Sheets[aba];
+    if (!ws || !ws['!ref']) throw new Error('Aba "Produção" vazia');
+    const rng = XLSX.utils.decode_range(ws['!ref']);
+    const val = (r, c) => { const x = ws[XLSX.utils.encode_cell({ r, c })]; return x && x.t !== 'e' ? x.v : undefined; };   // células com erro de fórmula (#REF!) contam como vazias
+    let cab = -1;
+    for (let r = 0; r <= Math.min(150, rng.e.r); r++) if (semAcentoUp(val(r, 2)) === 'PROCESSO') { cab = r; break; }
+    if (cab < 0) throw new Error('Cabeçalho da lista (coluna PROCESSO) não encontrado');
+    const corte = primeiroDiaMes();
+    const rows = [], exemplos = []; let mesAtual = 0, invalidas = 0;
+    for (let r = cab + 1; r <= rng.e.r; r++) {
+      const procV = val(r, 2);
+      // linhas de modelo (fórmulas) trazem números curtos soltos (a data em série) no lugar do processo; número de processo real tem 7 ou mais dígitos
+      if (procV == null || typeof procV === 'boolean') continue;
+      const processo = (typeof procV === 'number' ? String(Math.round(procV)) : String(procV)).trim();
+      if (processo.length < 7) continue;
+      const dv = val(r, 1);
+      if (dv == null || dv === '' || (typeof dv === 'string' && !/\d/.test(dv))) continue;   // sem data ou rodapé de texto (ex.: "Data todo o período"): não é lançamento
+      const data = serialParaISO(dv);
+      if (!data) { invalidas++; if (exemplos.length < 5) exemplos.push(`linha ${r + 1}: ${String(dv).slice(0, 30)}`); continue; }
+      if (data >= corte) { mesAtual++; continue; }
+      const txt = (c) => { const v = val(r, c); return v == null ? '' : String(v).trim(); };
+      rows.push({ data, processo, objeto: txt(3), prioridade: txt(4), observacao: txt(5), recebido_em: serialParaISO(val(r, 6)), tipo: txt(7) });
+    }
+    return { rows, mesAtual, invalidas, exemplos };
+  }
+
+  const esperar = () => new Promise((ok) => setTimeout(ok, 30));
+  async function lerArquivos(files) {
+    $('prodImportar').disabled = true; msg('prodMsg', '');
+    for (const file of files) {
+      const item = { arquivo: file.name, pessoa: nomeDoArquivo(file.name), rows: [], estado: 'lendo', usar: true };
+      filaProd = filaProd.filter((x) => x.arquivo !== file.name);
+      filaProd.push(item); desenharFila(); await esperar();
+      try {
+        const buf = new Uint8Array(await file.arrayBuffer());
+        const r = lerProducao(buf);
+        Object.assign(item, r, { estado: r.rows.length ? 'pronto' : 'vazio' });
+        if (!r.rows.length) item.usar = false;
+        item.primeira = r.rows.reduce((a, x) => (!a || x.data < a ? x.data : a), '');
+        item.ultima = r.rows.reduce((a, x) => (!a || x.data > a ? x.data : a), '');
+      } catch (e) { item.estado = 'erro'; item.erro = e.message; item.usar = false; }
+      desenharFila(); await esperar();
+    }
+    $('prodImportar').disabled = !filaProd.some((x) => x.usar && x.estado === 'pronto');
+  }
+
+  function desenharFila() {
+    const box = $('prodFila');
+    if (!filaProd.length) { box.innerHTML = ''; return; }
+    const atual = (p) => jaImportados.find((x) => x.pessoa.toLowerCase() === p.trim().toLowerCase());
+    box.innerHTML = '<div class="grid-wrap"><table class="usr"><thead><tr><th></th><th>Planilha</th><th>Pessoa (nome que aparecerá)</th><th>Processos</th><th>Período</th><th>Situação</th></tr></thead><tbody>' +
+      filaProd.map((x, i) => {
+        const ja = x.estado === 'pronto' ? atual(x.pessoa) : null;
+        const sit = x.estado === 'lendo' ? 'Lendo a planilha...'
+          : x.estado === 'erro' ? `<span style="color:var(--bad)">${escH(x.erro)}</span>`
+          : x.estado === 'vazio' ? '<span style="color:var(--muted)">Sem processos lançados (modelo em branco)</span>'
+          : x.estado === 'enviando' ? `Enviando... ${x.progresso || 0}%`
+          : x.estado === 'ok' ? '<span style="color:var(--ok)">Importada</span>'
+          : (ja ? `Substitui os ${ja.total.toLocaleString('pt-BR')} atuais` : 'Nova pessoa') +
+            (x.mesAtual ? ` · ${x.mesAtual} do mês em andamento ignorados` : '') + (x.invalidas ? ` · <span title="${escH(x.exemplos.join(' | '))}" style="border-bottom:1px dotted">${x.invalidas} sem data válida ignorada(s): ${escH(x.exemplos.slice(0, 2).join('; '))}</span>` : '');
+        return `<tr><td><input type="checkbox" data-i="${i}" class="pf-uso"${x.usar ? ' checked' : ''}${x.estado === 'pronto' ? '' : ' disabled'}></td>` +
+          `<td>${escH(x.arquivo)}</td>` +
+          `<td><input type="text" data-i="${i}" class="pf-nome" value="${escH(x.pessoa)}" maxlength="80" style="min-width:170px"${x.estado === 'pronto' ? '' : ' disabled'}></td>` +
+          `<td>${x.estado === 'pronto' ? x.rows.length.toLocaleString('pt-BR') : x.estado === 'ok' ? (x.qtd || 0).toLocaleString('pt-BR') : '-'}</td>` +
+          `<td>${x.primeira ? dataBR(x.primeira) + ' a ' + dataBR(x.ultima) : '-'}</td><td>${sit}</td></tr>`;
+      }).join('') + '</tbody></table></div>';
+  }
+  $('prodFila').addEventListener('input', (ev) => { const e = ev.target; if (e.classList.contains('pf-nome')) filaProd[+e.dataset.i].pessoa = e.value; });
+  $('prodFila').addEventListener('change', (ev) => {
+    const e = ev.target;
+    if (e.classList.contains('pf-uso')) filaProd[+e.dataset.i].usar = e.checked;
+    if (e.classList.contains('pf-nome')) desenharFila();
+    $('prodImportar').disabled = !filaProd.some((x) => x.usar && x.estado === 'pronto');
+  });
+
+  const dropP = $('dropProd');
+  ['dragenter', 'dragover'].forEach((t) => dropP.addEventListener(t, (e) => { e.preventDefault(); dropP.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((t) => dropP.addEventListener(t, (e) => { e.preventDefault(); dropP.classList.remove('over'); }));
+  dropP.addEventListener('drop', (e) => { const fs = [...(e.dataTransfer?.files || [])].filter((f) => /\.(xlsx|xlsm|xlsb|xls)$/i.test(f.name)); if (fs.length) lerArquivos(fs); });
+  $('arqProd').onchange = (ev) => { const fs = [...ev.target.files]; ev.target.value = ''; if (fs.length) lerArquivos(fs); };
+
+  $('prodImportar').onclick = async () => {
+    const lista = filaProd.filter((x) => x.usar && x.estado === 'pronto');
+    if (!lista.length) return;
+    const nomes = lista.map((x) => x.pessoa.trim().toLowerCase());
+    if (nomes.some((n) => !n)) return msg('prodMsg', 'Há planilha sem o nome da pessoa.', 'err');
+    if (new Set(nomes).size !== nomes.length) return msg('prodMsg', 'Duas planilhas estão com o mesmo nome de pessoa. Ajuste os nomes.', 'err');
+    if (!confirm(`Importar ${lista.length} planilha(s)? Os dados atuais dessas pessoas serão substituídos pelos da planilha.`)) return;
+    $('prodImportar').disabled = true; msg('prodMsg', '');
+    let feitas = 0;
+    for (const x of lista) {
+      // se a pessoa já existe (mesmo nome, só muda maiúscula/minúscula), mantém a grafia cadastrada para não duplicar
+      const digitado = x.pessoa.trim().replace(/\s+/g, ' '), existente = jaImportados.find((j) => j.pessoa.toLowerCase() === digitado.toLowerCase());
+      const ts = new Date().toISOString(), pessoa = existente ? existente.pessoa : digitado;
+      x.estado = 'enviando'; x.progresso = 0; desenharFila();
+      try {
+        const LOTE = 2000;
+        for (let i = 0; i < x.rows.length; i += LOTE) {
+          await api('producao_lote', { pessoa, ts, rows: x.rows.slice(i, i + LOTE) });
+          x.progresso = Math.min(99, Math.round(((i + LOTE) / x.rows.length) * 100)); desenharFila();
+        }
+        await api('producao_finalizar', { pessoa, ts, arquivo: x.arquivo });
+        x.qtd = x.rows.length; x.rows = []; x.estado = 'ok'; feitas++;   // libera a memória das linhas já enviadas
+      } catch (e) {
+        try { await api('producao_cancelar', { pessoa, ts }); } catch (e2) { /* nada a desfazer */ }
+        x.estado = 'erro'; x.erro = e.message + ' (os dados antigos desta pessoa foram mantidos)';
+      }
+      x.usar = false; desenharFila();
+    }
+    msg('prodMsg', `${feitas} de ${lista.length} planilha(s) importada(s).`, feitas === lista.length ? 'ok' : 'err');
+    if (feitas) toast('Produção importada.', 'ok');
+    carregarProducao();
+  };
+
+  async function carregarProducao() {
+    const r = await sb.from('producao_resumo').select('pessoa,total,primeira_data,ultima_data,atualizado_em,arquivo').order('pessoa');
+    if (r.error) {
+      $('prodInfo').textContent = 'Não foi possível ler a produção (' + r.error.message + '). Verifique se o SQL 11 foi executado e a função publicada.';
+      return;
+    }
+    jaImportados = r.data || [];
+    const total = jaImportados.reduce((a, x) => a + x.total, 0);
+    $('prodInfo').textContent = jaImportados.length
+      ? `${jaImportados.length} pessoa(s) com produção importada, ${total.toLocaleString('pt-BR')} processos no total.`
+      : 'Nenhuma produção importada ainda.';
+    $('prodLista').innerHTML = jaImportados.length ? jaImportados.map((x) => `<tr><td>${escH(x.pessoa)}</td><td>${x.total.toLocaleString('pt-BR')}</td>` +
+      `<td>${dataBR(x.primeira_data)} a ${dataBR(x.ultima_data)}</td><td>${new Date(x.atualizado_em).toLocaleString('pt-BR')}</td>` +
+      `<td><button class="lnk rm" data-p="${escH(x.pessoa)}">Excluir</button></td></tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center!important;color:var(--muted)">Nenhuma pessoa importada.</td></tr>';
+    desenharFila();
+  }
+  $('prodLista').onclick = async (ev) => {
+    const b = ev.target.closest('button[data-p]'); if (!b) return;
+    if (!confirm(`Excluir toda a produção de ${b.dataset.p}? Para recuperar, será preciso importar a planilha de novo.`)) return;
+    try { await api('producao_excluir_pessoa', { pessoa: b.dataset.p }); toast('Produção excluída.', 'ok'); carregarProducao(); }
+    catch (e) { msg('prodMsg', e.message, 'err'); }
+  };
+  $('prodRecalcular').onclick = async () => {
+    $('prodRecalcular').disabled = true;
+    try { const r = await api('producao_recalcular'); msg('prodMsg', `Resumos refeitos para ${r.pessoas} pessoa(s).`, 'ok'); carregarProducao(); }
+    catch (e) { msg('prodMsg', e.message, 'err'); }
+    $('prodRecalcular').disabled = false;
+  };
+
   async function iniciar() {
     try { const a = sessionStorage.getItem('cad_aba'); if (a && $(a)) document.querySelector(`.tab[data-pane="${a}"]`).click(); } catch (e) {}
-    infoProcessos(); carregarPrazos(); carregarUsuarios(); carregarEquivalencias();
+    infoProcessos(); carregarPrazos(); carregarUsuarios(); carregarEquivalencias(); carregarProducao();
     const lista = await listarPeriodos();
     if (lista.length) carregar(lista[0].id); else $('novoPeriodo').click();
   }

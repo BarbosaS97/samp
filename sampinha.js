@@ -21,6 +21,13 @@
       'Resuma o desempenho do período mais recente',
       'Quais processos estão atrasados?'
     ],
+    producao: [
+      'Qual foi a produção do setor no último mês?',
+      'Quem mais produziu em 2025?',
+      'Compare a produção de 2024 e 2025',
+      'Quais os assuntos mais calculados pelo setor?',
+      'O que você consegue fazer?'
+    ],
     metricas: [
       'Resuma o desempenho do período mais recente',
       'Compare Varas Comuns e JEF',
@@ -77,6 +84,12 @@
             const rec = document.getElementById('tnEscopo'); if (rec && rec.selectedOptions[0]) c.recorte = rec.selectedOptions[0].textContent.trim();
           }
         }
+      } else if (pagina === 'producao') {
+        const modo = document.querySelector('.pr-modo button.on');
+        if (modo) c.visao_producao = modo.textContent.trim();
+        const sp = document.getElementById('selPessoa'), sa = document.getElementById('selAno');
+        if (modo && modo.dataset.m === 'pessoa' && sp) c.pessoa = sp.value;
+        if (sa && sa.value) c.ano = sa.value;
       } else if (pagina === 'metricas') {
         const i = document.getElementById('dataInicialSelect'), f = document.getElementById('dataFinalSelect');
         if (i && f && i.value !== '' && f.value !== '') c.filtro = i.selectedOptions[0].textContent + ' a ' + f.selectedOptions[0].textContent;
@@ -340,6 +353,64 @@
     catch (err) { alert(msgErro(err)); }
   };
 
+  /* ---------- animação de espera: o usuário vê que ela está trabalhando ---------- */
+  const FRASES_GERAIS = [
+    'Lendo os dados do sistema...', 'Conferindo os números para não errar...', 'Cruzando as informações...',
+    'Organizando a resposta...', 'Separando o que é relevante do que é ruído...', 'Revisando os totais mais uma vez...',
+    'Checando se os números fecham...', 'Colocando tudo em ordem...', 'Procurando o melhor jeito de explicar isso...',
+    'Verificando as fontes de dados...', 'Quase lá, só mais um instante...'
+  ];
+  const FRASES_TEMA = [
+    { rx: /relat[oó]rio|pdf|planilha|csv|exporta/i, f: [
+      'Montando as seções do relatório...', 'Preenchendo tabelas e gráficos com os dados reais...', 'Revisando o que vai no arquivo...',
+      'Escolhendo a melhor forma de apresentar os números...', 'Ajustando títulos, escalas e legendas...', 'Preparando o PDF e a planilha para download...'] },
+    { rx: /produ[cç][aã]o|produziu|calculou|ranking|pessoa/i, f: [
+      'Somando a produção mês a mês...', 'Agrupando os assuntos calculados...', 'Comparando com os períodos anteriores...',
+      'Separando meta, acervo e o que está sem classificação...', 'Procurando o melhor mês e a média do período...', 'Conferindo as prioridades e o tempo até calcular...'] },
+    { rx: /tend[eê]ncia|chegada|envelhec|reten[cç][aã]o|acervo velho/i, f: [
+      'Calculando a idade dos processos por assunto...', 'Comparando cada assunto com o conjunto...', 'Procurando onde o acervo está envelhecendo...',
+      'Medindo a chegada de processos nos últimos 30 dias...', 'Estimando a data de entrada de cada processo...', 'Identificando os assuntos que pedem atenção...'] },
+    { rx: /meta|recebid|calculad|acervo|jef|varas?/i, f: [
+      'Consultando as metas processuais...', 'Calculando médias e variações...', 'Comparando Varas Comuns e JEF...',
+      'Acompanhando a evolução do acervo mês a mês...', 'Conferindo recebidos, calculados e tempo de permanência...'] },
+    { rx: /processo|atrasad|assunto|advogado|prazo/i, f: [
+      'Varrendo a base de processos...', 'Aplicando os prazos configurados...', 'Agrupando os resultados...',
+      'Classificando os processos por situação de prazo...', 'Procurando o que combina com o seu pedido...', 'Ordenando do mais antigo para o mais novo...'] }
+  ];
+  const DICAS = [
+    'Dica: peça "gere um relatório" para receber a resposta em PDF ou CSV.',
+    'Dica: você pode minimizar a conversa; aviso aqui quando terminar.',
+    'Dica: cite o período ou a pessoa para uma resposta mais precisa.',
+    'Dica: use o histórico (relógio no topo) para retomar conversas anteriores.',
+    'Lembrete: confira sempre os números importantes na fonte original.',
+    'Dica: perguntas específicas costumam ser respondidas mais rápido.'
+  ];
+  function iniciarEspera(bolhaEl, pergunta) {
+    const tema = FRASES_TEMA.filter((t) => t.rx.test(pergunta)).flatMap((t) => t.f);
+    const mistura = (v) => v.map((x) => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map((p) => p[1]);
+    const fila = [...mistura(tema), ...mistura(FRASES_GERAIS)], t0 = Date.now(); let i = 0;
+    bolhaEl.classList.add('sp-wait');
+    bolhaEl.innerHTML =
+      '<div class="sp-wt">' +
+      '<div class="sp-wb"><div class="sp-line"><span class="sp-dots"><i></i><i></i><i></i></span><span class="sp-st">Entendendo o seu pedido...</span></div>' +
+      '<div class="sp-frase" aria-hidden="true"></div><div class="sp-bar" aria-hidden="true"><i></i></div></div></div>';
+    const fr = bolhaEl.querySelector('.sp-frase');
+    const trocar = () => {
+      const seg = (Date.now() - t0) / 1000;
+      let txt;
+      if (seg > 75) txt = 'Está demorando mais que o normal. Pode continuar usando o SAMP: eu aviso aqui quando terminar.';
+      else if (seg > 35) txt = 'Consultas com muitos dados levam um pouco mais. Continuo trabalhando nisso...';
+      else if (seg > 14 && i % 4 === 3) txt = DICAS[Math.floor(i / 4) % DICAS.length];
+      else txt = fila[i % fila.length];
+      i++;
+      fr.classList.remove('on'); void fr.offsetWidth;   // reinicia a animação de entrada
+      fr.textContent = txt; fr.classList.add('on');
+    };
+    const primeira = setTimeout(trocar, 1800);
+    const ciclo = setInterval(trocar, 3600);
+    return () => { clearTimeout(primeira); clearInterval(ciclo); };
+  }
+
   /* ---------- envio ---------- */
   function bloquear(v) { ocupado = v; botao.classList.toggle('sp-ocupado', v && painel.hidden); $send.disabled = v; $txt.disabled = v; $bHist.disabled = v; $bNova.disabled = v; }
   async function enviar(texto) {
@@ -349,7 +420,7 @@
     if (!mensagens.length) $msgs.innerHTML = '';   // sai a tela de boas-vindas ao começar a conversa
     bolha('user', texto);
     const espera = bolha('bot', '');
-    espera.classList.add('sp-wait'); espera.innerHTML = '<span class="sp-dots"><i></i><i></i><i></i></span><span class="sp-st">Entendendo o seu pedido...</span>';
+    const pararEspera = iniciarEspera(espera, texto);
     $txt.value = ''; ajustarAltura();
     try {
       const j = await chatStream({ action: 'chat', conversa_id: atualId, mensagem: texto }, (m) => { const st = espera.querySelector('.sp-st'); if (st) st.textContent = m; });
@@ -357,18 +428,18 @@
       atualId = j.conversa_id; guardarAtiva();
       mensagens.push({ role: 'user', content: texto }, { role: 'assistant', content: j.resposta, anexo: j.relatorio ? { relatorio: j.relatorio } : undefined });
       const s = separarSugestoes(j.resposta);
-      espera.classList.remove('sp-wait'); espera.innerHTML = formatar(s.corpo);
+      pararEspera(); espera.classList.remove('sp-wait'); espera.innerHTML = formatar(s.corpo);
       if (j.relatorio) anexarRelatorio(espera, j.relatorio);
       adicionarAcoes(espera, s.corpo);
       mostrarChips(s.sugestoes);
       if (espera.offsetHeight > $msgs.clientHeight * 0.6) { ancorar = true; $msgs.scrollTop = Math.max(0, espera.getBoundingClientRect().top - $msgs.getBoundingClientRect().top + $msgs.scrollTop - 10); }   // resposta longa: mostra o começo
       if (j.acoes && j.acoes.length) executarAcoes(j.acoes);
     } catch (e) {
-      espera.classList.remove('sp-wait'); espera.classList.add('sp-erro');
+      pararEspera(); espera.classList.remove('sp-wait'); espera.classList.add('sp-erro');
       espera.innerHTML = `<p>${esc(msgErro(e))}</p>` + (e.detalhe ? `<p class="sp-det">Detalhe técnico: ${esc(e.detalhe)}</p>` : '');
       mostrarChips([texto]);   // a pergunta não foi salva: permite repeti-la com um clique
     } finally {
-      bloquear(false); if (painel.hidden) botao.classList.add('sp-novo'); else $txt.focus();
+      pararEspera(); bloquear(false); if (painel.hidden) botao.classList.add('sp-novo'); else $txt.focus();
       if (!ancorar) $msgs.scrollTop = $msgs.scrollHeight;
     }
   }
@@ -409,7 +480,7 @@
   });
 
   /* ---------- ações de interface pedidas pela Sampinha (nunca alteram dados) ---------- */
-  const PAGINAS = { inicio: 'index.html', analise: 'analise.html', metricas: 'metricas.html' };
+  const PAGINAS = { inicio: 'index.html', analise: 'analise.html', metricas: 'metricas.html', producao: 'producao.html' };
   const NOMES_MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const rotMes = (ym) => NOMES_MES[parseInt(ym.slice(5), 10) - 1] + '/' + ym.slice(0, 4);
   const INPUT_BUSCA = { assuntos: 'searchInput', poloPassivo: 'poloSearchInput', advogadoAtivo: 'advogadoSearchInput' };
@@ -423,7 +494,7 @@
   function nota(texto) {
     const n = el('div', 'sp-nota', esc(texto)); $msgs.appendChild(n); $msgs.scrollTop = $msgs.scrollHeight;
   }
-  const moduloDa = (a) => (a.acao === 'abrir_modulo' ? a.modulo : (a.acao.startsWith('analise') || a.acao.startsWith('tendencia')) ? 'analise' : a.acao.startsWith('metricas') ? 'metricas' : null);
+  const moduloDa = (a) => (a.acao === 'abrir_modulo' ? a.modulo : (a.acao.startsWith('analise') || a.acao.startsWith('tendencia')) ? 'analise' : a.acao.startsWith('metricas') ? 'metricas' : a.acao.startsWith('producao') ? 'producao' : null);
 
   async function executarAcao(a) {
     switch (a.acao) {
@@ -470,6 +541,24 @@
         ini.value = oi.value; fim.value = of.value; document.getElementById('aplicarFiltroBtn').click();
         return `Filtrei o período de ${rotMes(a.mes_inicial)} a ${rotMes(a.mes_final)}.`;
       }
+      case 'producao_filtrar': {
+        const sel = await esperar(() => { const s = document.getElementById('selPessoa'); return s && s.options.length ? s : null; });
+        if (!sel) return 'A produção ainda não carregou; tente novamente.';
+        const norm = (x) => String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        const alvo = norm(a.pessoa || ''), setor = !alvo || /^(setor|todos|todas|geral|equipe)$/.test(alvo);
+        const botoes = [...document.querySelectorAll('.pr-modo button')];
+        let msgPessoa = 'Visão do setor';
+        if (setor) botoes.find((b) => b.dataset.m === 'setor').click();
+        else {
+          const op = [...sel.options].find((o) => norm(o.textContent) === alvo) || [...sel.options].find((o) => norm(o.textContent).includes(alvo));
+          if (!op) return `Não encontrei "${a.pessoa}" na Produção Individual.`;
+          sel.value = op.value; sel.dispatchEvent(new Event('change', { bubbles: true }));
+          botoes.find((b) => b.dataset.m === 'pessoa').click(); msgPessoa = 'Produção de ' + op.textContent;
+        }
+        const sa = document.getElementById('selAno');
+        if (sa) { sa.value = a.ano ? String(a.ano) : ''; sa.dispatchEvent(new Event('change', { bubbles: true })); }
+        return msgPessoa + (a.ano ? ', ano ' + a.ano : ', todos os anos') + '.';
+      }
       case 'metricas_limpar_filtro': {
         const b = await esperar(() => document.getElementById('limparFiltroBtn'));
         if (!b) return 'Não encontrei o botão de limpar filtro.';
@@ -486,7 +575,7 @@
         // navega e deixa as ações restantes (a atual, se não for só "abrir") para depois do carregamento
         const resto = (a.acao === 'abrir_modulo' ? [] : [a]).concat(lista.slice(i + 1));
         try { sessionStorage.setItem('sampinha_pendentes', JSON.stringify(resto)); sessionStorage.setItem('sampinha_aberta', '1'); } catch (e) {}
-        nota('Abrindo ' + ({ analise: 'Análise de Processos', metricas: 'Metas Processuais', inicio: 'a tela inicial' })[destino] + '...');
+        nota('Abrindo ' + ({ analise: 'Análise de Processos', metricas: 'Metas Processuais', producao: 'Produção Individual', inicio: 'a tela inicial' })[destino] + '...');
         await pausa(500); location.href = PAGINAS[destino]; return;
       }
       try { const r = await executarAcao(a); if (r) nota(r); } catch (e) { nota('Não consegui executar uma das ações.'); }
