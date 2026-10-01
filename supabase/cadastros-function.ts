@@ -119,6 +119,104 @@ function normalizarVara(original: unknown): InfoVara {
   return { nome, num: n, tipo, adjunto, aviso };
 }
 
+/* ---------- unificação de assuntos ----------
+   Camadas, da mais segura para a menos segura:
+   1) regras confirmadas pelo usuário (tabela assuntos_equivalencias);
+   2) nomes iguais exceto por maiúsculas, acentos, pontuação e espaços são unidos automaticamente (fica o mais frequente);
+   3) nomes PARECIDOS (palavra diferente, como "Lei" x "LL") só viram SUGESTÃO para o usuário confirmar.
+   Nunca se sugere unir nomes cujos NÚMEROS são diferentes (ex.: "Índice de 13,23%" x "Índice de 3,17%"). */
+const chaveAssunto = (t: unknown) => semAcento(String(t ?? "")).replace(/[^a-z0-9]+/g, " ").trim();
+
+async function carregarEquivalencias(db: any): Promise<Map<string, string>> {
+  const m = new Map<string, string>();
+  const { data } = await db.from("assuntos_equivalencias").select("chave,canonico");
+  for (const r of data ?? []) m.set(r.chave, r.canonico);
+  return m;
+}
+
+type MapaAssunto = { final: string; motivo: "regra" | "igual" | null };
+function mapearAssuntos(contagens: Map<string, number>, eq: Map<string, string>): Map<string, MapaAssunto> {
+  const porChave = new Map<string, { texto: string; qtd: number }[]>();
+  for (const [texto, qtd] of contagens) {
+    const k = chaveAssunto(texto);
+    if (!porChave.has(k)) porChave.set(k, []);
+    porChave.get(k)!.push({ texto, qtd });
+  }
+  const resolver = (k: string): string | undefined => {   // segue a regra até o nome final (no máximo 5 saltos)
+    let atual = eq.get(k);
+    for (let i = 0; atual && i < 5; i++) {
+      const prox = eq.get(chaveAssunto(atual));
+      if (!prox || prox === atual) break;
+      atual = prox;
+    }
+    return atual;
+  };
+  const resultado = new Map<string, MapaAssunto>();
+  for (const [k, lista] of porChave) {
+    lista.sort((a, b) => (b.qtd - a.qtd) || a.texto.localeCompare(b.texto, "pt-BR"));
+    const regra = resolver(k);
+    for (const v of lista) {
+      if (regra) resultado.set(v.texto, { final: regra, motivo: v.texto === regra ? null : "regra" });
+      else resultado.set(v.texto, { final: lista[0].texto, motivo: v.texto === lista[0].texto ? null : "igual" });
+    }
+  }
+  return resultado;
+}
+
+function distancia(a: string, b: string): number {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+
+// sugere grupos de nomes parecidos (já com as regras aplicadas); só compara nomes com os MESMOS números
+function sugerirGrupos(finais: Map<string, number>) {
+  const itens = [...finais.entries()].map(([texto, qtd]) => {
+    const toks = chaveAssunto(texto).split(" ").filter(Boolean);
+    return { texto, qtd, num: toks.filter((x) => /^\d+$/.test(x)).join(" "), txt: toks.filter((x) => !/^\d+$/.test(x)).join(" ") };
+  });
+  const porNum = new Map<string, typeof itens>();
+  for (const it of itens) { if (!porNum.has(it.num)) porNum.set(it.num, []); porNum.get(it.num)!.push(it); }
+
+  const pai = new Map<string, string>();
+  const raiz = (x: string): string => { let r = x; while (pai.get(r) !== r) r = pai.get(r)!; return r; };
+  const pares: { a: string; sim: number }[] = [];   // pares parecidos (para informar a similaridade do grupo)
+  for (const [num, lista] of porNum) {
+    for (const it of lista) pai.set(it.texto, it.texto);
+    const limiar = num ? 0.82 : 0.85;          // sem números no nome, exige-se um pouco mais de semelhança
+    for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) {
+      const a = lista[i], b = lista[j];
+      const tam = Math.max(a.txt.length, b.txt.length);
+      if (!tam || Math.abs(a.txt.length - b.txt.length) / tam > 0.3) continue;
+      const sim = 1 - distancia(a.txt, b.txt) / tam;
+      if (sim >= limiar) {
+        const ra = raiz(a.texto), rb = raiz(b.texto);
+        if (ra !== rb) pai.set(ra, rb);
+        pares.push({ a: a.texto, sim });
+      }
+    }
+  }
+  const grupos = new Map<string, { texto: string; qtd: number }[]>();
+  for (const it of itens) {
+    const r = raiz(it.texto);
+    if (!grupos.has(r)) grupos.set(r, []);
+    grupos.get(r)!.push({ texto: it.texto, qtd: it.qtd });
+  }
+  return [...grupos.entries()].filter(([, v]) => v.length > 1).map(([r, v]) => {
+    v.sort((a, b) => b.qtd - a.qtd);
+    const sims = pares.filter((p) => raiz(p.a) === r).map((p) => p.sim);
+    return { similaridade: Math.round(Math.max(0, ...sims) * 100) / 100, variantes: v, sugerido: v[0].texto, total: v.reduce((acc, x) => acc + x.qtd, 0) };
+  }).sort((x, y) => y.total - x.total).slice(0, 80);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
@@ -200,6 +298,9 @@ Deno.serve(async (req) => {
         const rows = b.rows;
         if (!Array.isArray(rows) || !rows.length || rows.length > 50000) return json({ error: "Lista de processos inválida" }, 400);
         const ts = new Date().toISOString();
+        const contAssunto = new Map<string, number>();
+        for (const r of rows) { const t = String(r.assunto_principal ?? ""); contAssunto.set(t, (contAssunto.get(t) ?? 0) + 1); }
+        const mapaAssunto = mapearAssuntos(contAssunto, await carregarEquivalencias(db));
         const novos = rows.map((r: any) => ({
           numero_processo: String(r.numero_processo ?? ""),
           ...(() => {
@@ -207,7 +308,8 @@ Deno.serve(async (req) => {
             return { orgao_julgador: v.nome, orgao_original: String(r.orgao_julgador ?? ""), vara_num: v.num, vara_tipo: v.tipo, adjunto: v.adjunto };
           })(),
           dias_chegada: Number.isFinite(r.dias_chegada) ? r.dias_chegada : 0,
-          assunto_principal: String(r.assunto_principal ?? ""),
+          assunto_principal: mapaAssunto.get(String(r.assunto_principal ?? ""))?.final ?? String(r.assunto_principal ?? ""),
+          assunto_original: String(r.assunto_principal ?? ""),
           polo_passivo: String(r.polo_passivo ?? ""),
           advogado_polo_ativo: String(r.advogado_polo_ativo ?? ""),
           data_importacao: ts,
@@ -238,6 +340,57 @@ Deno.serve(async (req) => {
         return json({ ok: true, total: novos.length });
       }
 
+      /* ---- assuntos: prévia da unificação (não grava nada) ---- */
+      case "assuntos_previa": {
+        const lista = Array.isArray(b.assuntos) ? b.assuntos.slice(0, 3000) : [];
+        const cont = new Map<string, number>();
+        for (const x of lista) { const t = String(x?.texto ?? ""); cont.set(t, (cont.get(t) ?? 0) + (Number(x?.qtd) || 0)); }
+        const mapa = mapearAssuntos(cont, await carregarEquivalencias(db));
+        const finais = new Map<string, number>();
+        const automaticos: { de: string; para: string; motivo: string; qtd: number }[] = [];
+        for (const [texto, qtd] of cont) {
+          const m = mapa.get(texto)!;
+          finais.set(m.final, (finais.get(m.final) ?? 0) + qtd);
+          if (m.motivo) automaticos.push({ de: texto, para: m.final, motivo: m.motivo, qtd });
+        }
+        automaticos.sort((x, y) => y.qtd - x.qtd);
+        return json({ ok: true, total_textos: cont.size, total_finais: finais.size, automaticos, grupos: sugerirGrupos(finais) });
+      }
+
+      /* ---- assuntos: salva regras confirmadas pelo usuário ---- */
+      case "assuntos_equivalencias_salvar": {
+        const grupos = Array.isArray(b.grupos) ? b.grupos.slice(0, 200) : [];
+        const linhas = new Map<string, { chave: string; canonico: string; exemplo: string }>();
+        for (const g of grupos) {
+          const canonico = String(g?.canonico ?? "").trim().slice(0, 300);
+          if (!canonico || !Array.isArray(g?.variantes)) continue;
+          linhas.set(chaveAssunto(canonico), { chave: chaveAssunto(canonico), canonico, exemplo: canonico });   // âncora: o próprio nome final
+          for (const v of g.variantes.slice(0, 100)) {
+            const texto = String(v ?? "").trim().slice(0, 300);
+            const k = chaveAssunto(texto);
+            if (texto && k && k !== chaveAssunto(canonico)) linhas.set(k, { chave: k, canonico, exemplo: texto });
+          }
+        }
+        if (!linhas.size) return json({ error: "Nenhuma unificação válida informada" }, 400);
+        const { error } = await db.from("assuntos_equivalencias").upsert([...linhas.values()], { onConflict: "chave" });
+        if (error) return falha(error);
+        return json({ ok: true, regras: linhas.size });
+      }
+
+      case "assuntos_equivalencias_listar": {
+        const { data, error } = await db.from("assuntos_equivalencias").select("chave,canonico,exemplo,criado_em").order("canonico");
+        if (error) return falha(error);
+        return json({ ok: true, data: (data ?? []).filter((r: any) => chaveAssunto(r.canonico) !== r.chave) });   // esconde as âncoras
+      }
+
+      case "assuntos_equivalencias_excluir": {
+        const chave = String(b.chave ?? "");
+        if (!chave) return json({ error: "Regra inválida" }, 400);
+        const { error } = await db.from("assuntos_equivalencias").delete().eq("chave", chave);
+        if (error) return falha(error);
+        return json({ ok: true });
+      }
+
       /* ---- prévia da unificação (não grava nada) ---- */
       case "processos_previa": {
         const un = Array.isArray(b.unidades) ? b.unidades.slice(0, 1000) : [];
@@ -259,11 +412,19 @@ Deno.serve(async (req) => {
       /* ---- reaplica a unificação nos processos já cadastrados ---- */
       case "processos_renormalizar": {
         const origens = new Set<string>();
+        const paresAssunto = new Map<string, { src: string; atual: string; tinhaOriginal: boolean }>();
+        const contAssuntoBase = new Map<string, number>();
         let total = 0;
         for (let off = 0; ; off += 1000) {
-          const { data, error } = await db.from("processos").select("orgao_julgador,orgao_original").order("id").range(off, off + 999);
+          const { data, error } = await db.from("processos").select("orgao_julgador,orgao_original,assunto_principal,assunto_original").order("id").range(off, off + 999);
           if (error) return falha(error);
-          for (const r of data ?? []) { origens.add(r.orgao_original ?? r.orgao_julgador ?? ""); total++; }
+          for (const r of data ?? []) {
+            origens.add(r.orgao_original ?? r.orgao_julgador ?? ""); total++;
+            const srcA = r.assunto_original ?? r.assunto_principal ?? "";
+            const chaveA = `${srcA}\u0001${r.assunto_principal ?? ""}`;
+            if (!paresAssunto.has(chaveA)) paresAssunto.set(chaveA, { src: srcA, atual: r.assunto_principal ?? "", tinhaOriginal: r.assunto_original != null });
+            contAssuntoBase.set(srcA, (contAssuntoBase.get(srcA) ?? 0) + 1);
+          }
           if (!data || data.length < 1000) break;
         }
         for (const src of origens) {
@@ -274,7 +435,21 @@ Deno.serve(async (req) => {
           const { error: e2 } = await db.from("processos").update(campos).is("orgao_original", null).eq("orgao_julgador", src);
           if (e2) return falha(e2);
         }
-        return json({ ok: true, processos: total, textos_distintos: origens.size });
+        // assuntos: aplica as regras e a unificação automática; só atualiza o que realmente muda
+        const mapaBase = mapearAssuntos(contAssuntoBase, await carregarEquivalencias(db));
+        let assuntosAlterados = 0;
+        for (const { src, atual, tinhaOriginal } of paresAssunto.values()) {
+          const novoFinal = mapaBase.get(src)?.final ?? src;
+          if (novoFinal === atual) continue;
+          const campos = { assunto_principal: novoFinal, assunto_original: src };
+          const q1 = tinhaOriginal
+            ? db.from("processos").update(campos).eq("assunto_original", src).eq("assunto_principal", atual)
+            : db.from("processos").update(campos).is("assunto_original", null).eq("assunto_principal", atual);
+          const { error: eA } = await q1;
+          if (eA) return falha(eA);
+          assuntosAlterados++;
+        }
+        return json({ ok: true, processos: total, textos_distintos: origens.size, assuntos_unificados: assuntosAlterados });
       }
 
       case "processos_excluir_todos": {
@@ -291,11 +466,17 @@ Deno.serve(async (req) => {
         const v = Object.values(mapa);
         if (!v.every((x) => Number.isInteger(x) && x > 0 && x <= 365) || !(v[0] < v[1] && v[1] < v[2]))
           return json({ error: "Valores inválidos: use inteiros crescentes (Normal < Atenção < Atrasado)" }, 400);
-        for (const [chave, valor] of Object.entries(mapa)) {
+        // limite da linha "Acima de X dias" no topo de cada assunto (opcional; independe da classificação normal/atenção/atrasado)
+        const destaque = p.destaque_assunto;
+        if (destaque !== undefined && (!Number.isInteger(destaque) || destaque < 1 || destaque > 3650))
+          return json({ error: "Valor inválido para a lista de assuntos: use um número inteiro de 1 a 3650 dias" }, 400);
+        const gravar: [string, number, string | null][] = Object.entries(mapa).map(([k, v]) => [k, v, null]);
+        if (destaque !== undefined) gravar.push(["prazo_destaque_assunto", destaque, "Dias a partir dos quais o processo entra na linha 'Acima de X dias' de cada assunto (Análise)"]);
+        for (const [chave, valor, descricao] of gravar) {
           const { data, error } = await db.from("configuracoes").update({ valor: String(valor), atualizado_em: new Date().toISOString() }).eq("chave", chave).select("id");
           if (error) return falha(error);
           if (!data?.length) {
-            const { error: e2 } = await db.from("configuracoes").insert({ chave, valor: String(valor) });
+            const { error: e2 } = await db.from("configuracoes").insert(descricao ? { chave, valor: String(valor), descricao } : { chave, valor: String(valor) });
             if (e2) return falha(e2);
           }
         }

@@ -56,6 +56,17 @@
   .drop b { color: var(--navy); font-size: .92rem; } .drop span { color: var(--muted); font-size: .78rem; }
   .drop em { font-style: normal; font-size: .8rem; color: var(--ok); font-weight: 600; min-height: 1em; }
   .toastx { animation: th-entra .3s ease both; }
+  .grp { border-top: 1px solid var(--line-soft); padding: 10px 12px; }
+  .grp:first-of-type { border-top: none; }
+  .grp-top { display: flex; align-items: center; gap: 8px; font-size: .78rem; color: var(--muted); margin-bottom: 6px; }
+  .grp-top input { width: 16px; height: 16px; accent-color: var(--navy); }
+  .grp label.var { display: flex; align-items: baseline; gap: 8px; font-size: .84rem; padding: 3px 0; cursor: pointer; }
+  .grp label.var input { accent-color: var(--navy); }
+  .grp label.var small { color: var(--muted); white-space: nowrap; }
+  .grp-acoes { padding: 10px 12px; display: flex; gap: 10px; align-items: center; border-top: 1px solid var(--line); background: #f7f8fa; }
+  details.eq-box { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+  details.eq-box summary { cursor: pointer; padding: 9px 12px; font-size: .85rem; color: var(--navy); font-weight: 600; }
+  details.vara-box summary { cursor: pointer; padding: 10px 12px; font-size: .85rem; color: var(--navy); font-weight: 600; }
   .vara-box { border: 1px solid var(--line); border-radius: var(--radius); margin: 4px 0 14px; background: #fff; }
   .vara-box h3 { font-size: .85rem; color: var(--navy); font-weight: 600; padding: 10px 12px 0; }
   .vara-box .sub { font-size: .78rem; color: var(--muted); padding: 2px 12px 8px; }
@@ -121,11 +132,15 @@
     </div>
     <div class="msg" id="procMsg"></div>
     <div id="previaVaras"></div>
+    <div id="previaAssuntos"></div>
     <div id="preview"></div>
     <div class="danger-zone" style="border-top:none;margin-top:8px;padding-top:0">
-      <h2 style="font-size:.95rem;margin:4px 0">Unificação das varas</h2>
-      <p class="desc" style="margin-bottom:10px">As varas são unificadas pela numeração (1 a 22 = Varas Comuns; 23 a 27 = JEF; adjuntos somam na vara correspondente). Use o botão abaixo para aplicar a regra aos processos que já estão cadastrados, sem precisar importar a planilha de novo.</p>
+      <h2 style="font-size:.95rem;margin:4px 0">Unificação de varas e assuntos</h2>
+      <p class="desc" style="margin-bottom:10px">As varas são unificadas pela numeração (1 a 22 = Varas Comuns; 23 a 27 = JEF; adjuntos somam na vara correspondente). Assuntos escritos de formas diferentes também são unificados (grafia igual: automático; nomes parecidos: você confirma na prévia do upload, e a escolha vira regra). Use o botão abaixo para aplicar as regras aos processos que já estão cadastrados, sem precisar importar a planilha de novo.</p>
       <button class="btn" id="renormalizar">Reaplicar unificação na base atual</button>
+      <details class="eq-box" id="eqBox"><summary>Regras de assuntos cadastradas <span class="chip" id="eqTotal"></span></summary>
+        <div class="vara-scroll"><table class="vr"><thead><tr><th>Nome na planilha</th><th>Passa a ser</th><th></th></tr></thead><tbody id="eqLista"></tbody></table></div>
+      </details>
     </div>
     <div class="danger-zone">
       <button class="btn btn-danger" id="excluirProc">Excluir todos os processos</button>
@@ -265,6 +280,66 @@
       ? `${count} processos cadastrados. Última importação: ${new Date(data[0].data_importacao).toLocaleString('pt-BR')}.`
       : 'Nenhum processo cadastrado.';
   }
+  /* ---------- prévia da unificação dos assuntos ---------- */
+  let gruposAssunto = [];
+  async function previaAssuntos(lista) {
+    const box = $('previaAssuntos'); box.innerHTML = '<p class="desc">Analisando os assuntos da planilha...</p>';
+    const cont = new Map();
+    lista.forEach((p) => cont.set(p.assunto_principal, (cont.get(p.assunto_principal) || 0) + 1));
+    try {
+      const r = await api('assuntos_previa', { assuntos: [...cont].map(([texto, qtd]) => ({ texto, qtd })) });
+      gruposAssunto = r.grupos;
+      const esc = esc2;
+      const auto = r.automaticos.length
+        ? `<details class="vara-box" style="border-left:0;border-right:0;border-radius:0;margin:0"><summary>${r.automaticos.length} nome(s) unificado(s) automaticamente (mesma grafia ou regra já salva)</summary>` +
+          `<div class="vara-scroll"><table class="vr"><thead><tr><th>Na planilha</th><th>Passa a ser</th><th>Motivo</th><th class="n">Processos</th></tr></thead><tbody>` +
+          r.automaticos.map((a) => `<tr><td>${esc(a.de)}</td><td class="mudou">${esc(a.para)}</td><td>${a.motivo === 'regra' ? 'Regra salva' : 'Só muda a grafia'}</td><td class="n">${a.qtd}</td></tr>`).join('') +
+          '</tbody></table></div></details>'
+        : '';
+      const grupos = r.grupos.length
+        ? r.grupos.map((g, gi) => `<div class="grp" data-g="${gi}">
+            <div class="grp-top"><input type="checkbox" class="g-ok" id="gok${gi}" checked><label for="gok${gi}">Unificar este grupo (parecido: ${Math.round(g.similaridade * 100)}%) - escolha o nome final:</label></div>
+            ${g.variantes.map((v, vi) => `<label class="var"><input type="radio" name="gn${gi}" value="${vi}"${vi === 0 ? ' checked' : ''}><span>${esc(v.texto)}</span><small>${v.qtd} processo(s)</small></label>`).join('')}
+          </div>`).join('') +
+          `<div class="grp-acoes"><button class="btn btn-primary" id="salvarGrupos">Unificar os grupos marcados e salvar a regra</button><span class="desc" style="margin:0">A regra vale para as próximas planilhas também.</span></div>`
+        : '<div class="sub" style="padding:10px 12px;font-size:.82rem;color:var(--muted)">Nenhum assunto parecido para revisar.</div>';
+      box.innerHTML = `<div class="vara-box"><h3>Unificação de assuntos</h3>` +
+        `<div class="sub">${r.total_textos} nome(s) de assunto na planilha, ${r.total_finais} depois da unificação. ` +
+        `${r.grupos.length ? '<b style="color:var(--warn)">' + r.grupos.length + ' grupo(s) de nomes parecidos para você revisar:</b>' : 'Nada a revisar.'}</div>` + grupos + auto + '</div>';
+      const btn = $('salvarGrupos');
+      if (btn) btn.onclick = async () => {
+        const escolhidos = [...box.querySelectorAll('.grp')].filter((el) => el.querySelector('.g-ok').checked).map((el) => {
+          const g = gruposAssunto[+el.dataset.g], sel = +el.querySelector('input[type=radio]:checked').value;
+          return { canonico: g.variantes[sel].texto, variantes: g.variantes.map((v) => v.texto) };
+        });
+        if (!escolhidos.length) return toast('Nenhum grupo marcado.', 'err');
+        btn.disabled = true;
+        try {
+          const rs = await api('assuntos_equivalencias_salvar', { grupos: escolhidos });
+          toast(`${rs.regras} regra(s) salva(s). Os assuntos serão unificados na importação.`, 'ok');
+          previaAssuntos(lista); carregarEquivalencias();
+        } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
+      };
+    } catch (e) {
+      box.innerHTML = `<p class="desc">Não foi possível analisar os assuntos (${esc2(e.message)}). A unificação automática será aplicada na importação, se a função estiver atualizada.</p>`;
+    }
+  }
+  async function carregarEquivalencias() {
+    try {
+      const r = await api('assuntos_equivalencias_listar');
+      $('eqTotal').textContent = r.data.length ? r.data.length + ' regra(s)' : 'nenhuma';
+      $('eqLista').innerHTML = r.data.length
+        ? r.data.map((x) => `<tr><td>${esc2(x.exemplo || x.chave)}</td><td class="mudou">${esc2(x.canonico)}</td><td><button class="lnk rm" data-chave="${esc2(x.chave)}">Remover</button></td></tr>`).join('')
+        : '<tr><td colspan="3" style="color:var(--muted)">Nenhuma regra cadastrada.</td></tr>';
+    } catch (e) { $('eqTotal').textContent = ''; }
+  }
+  $('eqLista').onclick = async (ev) => {
+    const b = ev.target.closest('button[data-chave]'); if (!b) return;
+    if (!confirm('Remover esta regra? Os próximos uploads voltam a tratar esse nome como assunto separado.')) return;
+    try { await api('assuntos_equivalencias_excluir', { chave: b.dataset.chave }); toast('Regra removida.', 'ok'); carregarEquivalencias(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+
   /* ---------- prévia da unificação das varas ---------- */
   async function previaVaras(lista) {
     const box = $('previaVaras'); box.innerHTML = '<p class="desc">Analisando as varas da planilha...</p>';
@@ -290,7 +365,7 @@
   $('renormalizar').onclick = async () => {
     if (!confirm('Aplicar a unificação das varas a todos os processos já cadastrados?')) return;
     $('renormalizar').disabled = true;
-    try { const r = await api('processos_renormalizar'); msg('procMsg', `Unificação aplicada: ${r.processos} processos, ${r.textos_distintos} texto(s) de vara.`, 'ok'); toast('Varas unificadas na base atual.', 'ok'); infoProcessos(); }
+    try { const r = await api('processos_renormalizar'); msg('procMsg', `Unificação aplicada: ${r.processos} processos, ${r.textos_distintos} texto(s) de vara, ${r.assuntos_unificados || 0} assunto(s) unificado(s).`, 'ok'); toast('Varas unificadas na base atual.', 'ok'); infoProcessos(); }
     catch (e) { msg('procMsg', e.message, 'err'); }
     $('renormalizar').disabled = false;
   };
@@ -308,7 +383,7 @@
   });
   $('arquivo').addEventListener('change', () => { const f = $('arquivo').files[0]; $('dropNome').textContent = f ? f.name : ''; });
   $('arquivo').onchange = (ev) => {
-    preparados = null; $('importar').disabled = true; msg('procMsg', ''); $('preview').innerHTML = ''; $('previaVaras').innerHTML = '';
+    preparados = null; $('importar').disabled = true; msg('procMsg', ''); $('preview').innerHTML = ''; $('previaVaras').innerHTML = ''; $('previaAssuntos').innerHTML = '';
     const file = ev.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -334,7 +409,7 @@
           });
         }
         if (!lista.length) return msg('procMsg', 'Nenhum processo válido encontrado na planilha.', 'err');
-        preparados = lista; $('importar').disabled = false; previaVaras(lista);
+        preparados = lista; $('importar').disabled = false; previaVaras(lista); previaAssuntos(lista);
         const esc = (x) => String(x).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
         $('preview').innerHTML = '<table class="prev"><thead><tr><th>Processo</th><th>Unidade</th><th>Assunto</th><th>Dias</th></tr></thead><tbody>' +
           lista.slice(0, 5).map((p) => `<tr><td>${esc(p.numero_processo)}</td><td>${esc(p.orgao_julgador)}</td><td>${esc(p.assunto_principal)}</td><td>${p.dias_chegada}</td></tr>`).join('') +
@@ -349,7 +424,7 @@
     $('importar').disabled = true; msg('procMsg', 'Enviando...');
     try {
       const r = await api('processos_substituir', { rows: preparados });
-      msg('procMsg', `${r.total} processos importados.`, 'ok'); toast(`${r.total} processos importados.`, 'ok'); $('preview').innerHTML = ''; $('previaVaras').innerHTML = ''; preparados = null; $('arquivo').value = ''; $('dropNome').textContent = ''; infoProcessos();
+      msg('procMsg', `${r.total} processos importados.`, 'ok'); toast(`${r.total} processos importados.`, 'ok'); $('preview').innerHTML = ''; $('previaVaras').innerHTML = ''; $('previaAssuntos').innerHTML = ''; preparados = null; $('arquivo').value = ''; $('dropNome').textContent = ''; infoProcessos();
     } catch (e) { msg('procMsg', e.message, 'err'); $('importar').disabled = false; }
   };
   $('excluirProc').onclick = async () => {
@@ -513,7 +588,7 @@
 
   async function iniciar() {
     try { const a = sessionStorage.getItem('cad_aba'); if (a && $(a)) document.querySelector(`.tab[data-pane="${a}"]`).click(); } catch (e) {}
-    infoProcessos(); carregarPrazos(); carregarUsuarios();
+    infoProcessos(); carregarPrazos(); carregarUsuarios(); carregarEquivalencias();
     const lista = await listarPeriodos();
     if (lista.length) carregar(lista[0].id); else $('novoPeriodo').click();
   }
