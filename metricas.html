@@ -176,7 +176,7 @@
     </div>
     
     <div class="action-buttons">
-        <button class="btn btn-outline" id="refreshFromDBBtn">Recarregar do Banco</button>
+        <button class="btn btn-outline" id="refreshFromDBBtn">Recarregar dados</button>
         <button class="btn btn-warning" id="exportCompletePDFBtn">Exportar PDF Completo</button>
     </div>
     
@@ -335,6 +335,7 @@
             (periodoAtualNome ? `<span class="chip">Registro: ${periodoAtualNome.replace(/^Período\s+/, '')}</span>` : '');
     }
 
+    const fmt1 = (x) => x.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     function atualizarStats() {
         atualizarMeta();
         const medVaras = calcularMedias(varasData, true);
@@ -343,23 +344,23 @@
         
         const statsVaras = document.getElementById('statsVaras');
         if (statsVaras) statsVaras.innerHTML = `
-            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${medVaras.rec.toFixed(1)}</div></div>
-            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${medVaras.calc.toFixed(1)}</div></div>
-            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${medVaras.ac.toFixed(1)}</div></div>
-            <div class="stat-card"><h3>Média Tempo (dias)</h3><div class="value">${medVaras.tp.toFixed(1)}</div></div>`;
+            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${fmt1(medVaras.rec)}</div></div>
+            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${fmt1(medVaras.calc)}</div></div>
+            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${fmt1(medVaras.ac)}</div></div>
+            <div class="stat-card"><h3>Média Tempo (dias)</h3><div class="value">${fmt1(medVaras.tp)}</div></div>`;
         
         const statsJef = document.getElementById('statsJef');
         if (statsJef) statsJef.innerHTML = `
-            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${medJef.rec.toFixed(1)}</div></div>
-            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${medJef.calc.toFixed(1)}</div></div>
-            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${medJef.ac.toFixed(1)}</div></div>
-            <div class="stat-card"><h3>Média Tempo (dias)</h3><div class="value">${medJef.tp.toFixed(1)}</div></div>`;
+            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${fmt1(medJef.rec)}</div></div>
+            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${fmt1(medJef.calc)}</div></div>
+            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${fmt1(medJef.ac)}</div></div>
+            <div class="stat-card"><h3>Média Tempo (dias)</h3><div class="value">${fmt1(medJef.tp)}</div></div>`;
         
         const statsGeral = document.getElementById('statsGeral');
         if (statsGeral) statsGeral.innerHTML = `
-            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${medGeral.rec.toFixed(1)}</div></div>
-            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${medGeral.calc.toFixed(1)}</div></div>
-            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${medGeral.ac.toFixed(1)}</div></div>`;
+            <div class="stat-card"><h3>Média Recebidos</h3><div class="value">${fmt1(medGeral.rec)}</div></div>
+            <div class="stat-card"><h3>Média Calculados</h3><div class="value">${fmt1(medGeral.calc)}</div></div>
+            <div class="stat-card"><h3>Média Acervo</h3><div class="value">${fmt1(medGeral.ac)}</div></div>`;
     }
     
     function renderizarGraficos(aba, data, hasTempo = true, isGeral = false) {

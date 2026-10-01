@@ -5,15 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SAMP - Sistema de Acompanhamento e Métricas Processuais</title>
 <link rel="icon" href="icone.png">
+<script src="config.js"></script>
 <link rel="stylesheet" href="theme.css">
 <style>
   .hero { padding: 40px 0 28px; }
   .hero .eyebrow { font-size: .72rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 700; }
   .hero h1 { font-size: 1.9rem; color: var(--navy); font-weight: 600; margin: 6px 0 8px; }
   .hero p { color: var(--muted); max-width: 640px; }
+  .hero .eyebrow, .hero h1, .hero p { animation: th-sobe .6s both; }
+  .hero h1 { animation-delay: .08s; } .hero p { animation-delay: .16s; }
+  .resumo { margin-bottom: 26px; }
+  .resumo .kpi .k-s { font-size: .95rem; font-weight: 600; color: var(--navy); }
+  .resumo .kpi .k-n { font-size: .75rem; color: var(--muted); }
+  .sk { display: inline-block; height: 1.1em; width: 70%; border-radius: 3px; background: #e7ebf0; animation: th-brilho .9s ease-in-out infinite alternate; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-  a.card { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; text-decoration: none; color: var(--ink); transition: border-color .15s, box-shadow .15s; }
-  a.card:hover { border-color: var(--navy); box-shadow: 0 2px 10px rgba(18,53,91,.12); }
+  a.card { animation: th-sobe .6s both; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; text-decoration: none; color: var(--ink); transition: border-color .15s, box-shadow .15s; }
+  a.card:nth-child(1) { animation-delay: .30s; } a.card:nth-child(2) { animation-delay: .38s; } a.card:nth-child(3) { animation-delay: .46s; }
+  a.card:hover { border-color: var(--navy); box-shadow: 0 8px 22px rgba(18,53,91,.14); transform: translateY(-4px); }
+  a.card:hover .ico { background: var(--navy); color: #fff; }
+  .card .ico { transition: background .25s, color .25s; }
+  .card .go { transition: letter-spacing .25s; } a.card:hover .go { letter-spacing: .6px; }
   .card .ico { width: 44px; height: 44px; border-radius: var(--radius); background: var(--navy-soft); color: var(--navy); display: grid; place-items: center; margin-bottom: 16px; }
   .card .ico svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .card .tag { font-size: .68rem; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); font-weight: 600; }
@@ -34,6 +45,12 @@
     <h1>Sistema de Acompanhamento e Métricas Processuais</h1>
     <p>Consulte os painéis de análise e de metas ou acesse o módulo de cadastros para atualizar as informações do sistema.</p>
   </section>
+
+  <div class="kpis resumo" id="resumo">
+    <div class="kpi"><span class="k-l">Processos na base</span><span class="k-v" id="rTotal"><i class="sk"></i></span></div>
+    <div class="kpi"><span class="k-l">Última atualização da base</span><span class="k-s" id="rSync"><i class="sk"></i></span></div>
+    <div class="kpi"><span class="k-l">Período das metas</span><span class="k-s" id="rPeriodo"><i class="sk"></i></span><span class="k-n" id="rMeses"></span></div>
+  </div>
 
   <div class="cards">
     <a class="card" href="analise.html">
@@ -63,7 +80,31 @@
   </div>
 </main>
 <script>
-  (function () { const u = window.SAMP_USUARIO; if (u) document.getElementById("saudacao").textContent = "Olá, " + u.nome.split(" ")[0] + " - SAMP"; })();
+(function () {
+  const u = window.SAMP_USUARIO;
+  const h = new Date().getHours();
+  const saud = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+  if (u) document.getElementById('saudacao').textContent = saud + ', ' + u.nome.split(' ')[0];
+
+  // resumo com dados reais (somente leitura, pela função protegida)
+  const $ = (id) => document.getElementById(id);
+  const NOMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const rot = (ym) => NOMES[parseInt(ym.slice(5), 10) - 1] + '/' + ym.slice(0, 4);
+  if (!window.criarClienteLeitura || !u) return;
+  const c = window.criarClienteLeitura();
+  Promise.all([
+    c.from('processos').select('id', { count: 'exact', head: true }),
+    c.from('processos').select('data_importacao').order('data_importacao', { ascending: false }).limit(1),
+    c.from('config_periodos').select('nome_periodo,meses').order('id', { ascending: false }).limit(1)
+  ]).then(([tot, ult, per]) => {
+    $('rTotal').textContent = tot.count != null ? tot.count.toLocaleString('pt-BR') : '-';
+    const d = ult.data && ult.data[0] && ult.data[0].data_importacao;
+    $('rSync').textContent = d ? new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+    const p = per.data && per.data[0];
+    if (p && p.meses && p.meses.length) { $('rPeriodo').textContent = rot(p.meses[0]) + ' a ' + rot(p.meses[p.meses.length - 1]); $('rMeses').textContent = p.meses.length + ' meses'; }
+    else $('rPeriodo').textContent = '-';
+  }).catch(() => { ['rTotal', 'rSync', 'rPeriodo'].forEach((i) => { $(i).textContent = '-'; }); });
+})();
 </script>
 </body>
 </html>
