@@ -318,7 +318,7 @@ td:first-child { font-weight: 600; color: var(--navy); }
 .sp-del { background: none; border: none; color: var(--muted); font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 3px; }
 .sp-del:hover { color: var(--bad); background: #fbeeed; }
 .sp-vazio { text-align: center; color: var(--muted); font-size: .85rem; padding: 40px 12px; }
-@media (max-width: 520px) { .sp-panel { height: calc(100vh - 70px); } }
+@media (max-width: 520px) { .sp-panel { height: calc(100vh - 70px); height: calc(100dvh - 70px); } }
 
 /* Sampinha: cartão de relatório e notas de ação */
 .sp-anexo { margin-top: 10px; padding: 10px 12px; background: var(--navy-soft); border: 1px solid #d5deea; border-left: 3px solid var(--navy); border-radius: var(--radius); }
@@ -338,7 +338,9 @@ td:first-child { font-weight: 600; color: var(--navy); }
 @keyframes th-entra { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
 @keyframes th-brilho { 0% { opacity: .55; } 100% { opacity: 1; } }
 
-body { animation: th-sobe .45s ease both; }
+/* só opacidade no body: transform/filter em ancestrais fariam o position:fixed (Sampinha, voltar ao topo) rolar junto com a página */
+@keyframes th-fade { from { opacity: 0; } to { opacity: 1; } }
+body { animation: th-fade .4s ease both; }
 body.saindo { opacity: 0; transition: opacity .19s ease; }
 ::selection { background: rgba(18,53,91,.18); }
 html { scrollbar-color: #b9c2cc transparent; scrollbar-width: thin; }

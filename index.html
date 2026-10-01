@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SAMP - Sistema de Acompanhamento e Métricas Processuais</title>
 <link rel="icon" href="icone.png">
-<script src="config.js"></script>
-<link rel="stylesheet" href="theme.css">
+<script src="config.js?v=20261001a"></script>
+<link rel="stylesheet" href="theme.css?v=20261001a">
 <style>
   .hero { padding: 40px 0 28px; }
   .hero .eyebrow { font-size: .72rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 700; }
@@ -38,7 +38,7 @@
 </style>
 </head>
 <body data-page="inicio">
-<script src="layout.js"></script>
+<script src="layout.js?v=20261001a"></script>
 <main class="page">
   <section class="hero">
     <div class="eyebrow" id="saudacao">SAMP</div>
@@ -106,5 +106,6 @@
   }).catch(() => { ['rTotal', 'rSync', 'rPeriodo'].forEach((i) => { $(i).textContent = '-'; }); });
 })();
 </script>
+<script src="sampinha.js?v=20261001a"></script>
 </body>
 </html>

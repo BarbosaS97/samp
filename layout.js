@@ -53,5 +53,5 @@
   window.SAMP_USUARIO = sessao;   // { nome, matricula, token, exp } ou null
 
   // acabamento visual compartilhado (animações, abas, números); não é usado na tela de acesso
-  if (atual !== 'entrar') { const u = document.createElement('script'); u.src = 'ui.js'; document.body.appendChild(u); }
+  if (atual !== 'entrar') { const u = document.createElement('script'); u.src = 'ui.js?v=20261001a'; document.body.appendChild(u); }
 })();

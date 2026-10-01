@@ -14,6 +14,12 @@
       'Quais processos estão atrasados?',
       'Quais advogados têm mais processos?'
     ],
+    inicio: [
+      'O que eu consigo fazer no SAMP?',
+      'Dê um resumo geral da base de processos',
+      'Resuma o desempenho do período mais recente',
+      'Quais processos estão atrasados?'
+    ],
     metricas: [
       'Resuma o desempenho do período mais recente',
       'Compare Varas Comuns e JEF',
@@ -73,7 +79,23 @@
     '<button type="submit" class="sp-send" aria-label="Enviar">Enviar</button></form>' +
     '<div class="sp-aviso">A Sampinha usa IA e pode errar: confira os dados importantes. As perguntas e os dados consultados são processados por um serviço externo de IA. O histórico fica salvo no sistema e só você o vê.</div>';
 
-  document.body.append(botao, painel);
+  // Estilo crítico injetado pelo próprio script: mesmo que o theme.css esteja em cache antigo, o botão fica
+  // fixo no canto da tela (e nunca solto no fim da página).
+  if (!document.getElementById('sp-critico')) {
+    const st = document.createElement('style');
+    st.id = 'sp-critico';
+    st.textContent =
+      '.sp-fab,.sp-panel{position:fixed!important;margin:0!important;transform:none!important;}' +
+      '.sp-fab{right:max(20px,env(safe-area-inset-right))!important;bottom:max(20px,env(safe-area-inset-bottom))!important;z-index:2147483000!important;}' +
+      '.sp-panel{right:max(20px,env(safe-area-inset-right))!important;bottom:max(20px,env(safe-area-inset-bottom))!important;z-index:2147483001!important;}' +
+      '.sp-fab[hidden],.sp-panel[hidden]{display:none!important;}' +
+      '@media (max-width:520px){.sp-panel{right:6px!important;bottom:6px!important;left:6px!important;width:auto!important;}}' +
+      '@media print{.sp-fab,.sp-panel{display:none!important;}}';
+    document.head.appendChild(st);
+  }
+  // montados na raiz do documento (e não no body), fora do alcance de qualquer estilo do corpo da página
+  const raiz = document.documentElement;
+  raiz.append(botao, painel);
   const q = (s) => painel.querySelector(s);
   const $msgs = q('.sp-msgs'), $chips = q('.sp-chips'), $form = q('.sp-form'), $txt = q('textarea'), $send = q('.sp-send'),
         $hist = q('.sp-hist'), $lista = q('.sp-hist-lista'), $busca = q('.sp-busca'), $aviso = q('.sp-aviso'),
@@ -239,7 +261,7 @@
   function carregarGerador() {
     if (window.SAMP_RELATORIO) return Promise.resolve();
     if (!promessaRelatorio) promessaRelatorio = new Promise((ok, falha) => {
-      const sc = document.createElement('script'); sc.src = 'relatorio-pdf.js'; sc.onload = ok;
+      const sc = document.createElement('script'); sc.src = 'relatorio-pdf.js?v=20261001a'; sc.onload = ok;
       sc.onerror = () => { promessaRelatorio = null; falha(new Error('Não foi possível carregar o gerador de relatórios.')); }; document.head.appendChild(sc);
     });
     return promessaRelatorio;
@@ -341,6 +363,14 @@
     navigator.clipboard.writeText(p.dataset.n).then(() => { const o = p.textContent; p.textContent = 'Copiado'; setTimeout(() => (p.textContent = o), 1200); });
   });
 
+  function ajustarJanela() {
+    const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+    painel.style.maxHeight = Math.max(320, h - 24) + 'px';
+  }
+  ajustarJanela();
+  window.addEventListener('resize', ajustarJanela);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', ajustarJanela);
+
   function abrir(v) {
     painel.hidden = !v; botao.hidden = v;
     try { sessionStorage.setItem('sampinha_aberta', v ? '1' : ''); } catch (e) {}
@@ -352,6 +382,15 @@
   botao.onclick = () => abrir(true);
   q('.sp-x').onclick = () => abrir(false);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !painel.hidden) abrir(false); });
+
+  document.addEventListener('keydown', (e) => { if (e.altKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); abrir(painel.hidden); } });   // Alt+S abre/fecha
+
+  // vigilância: garante que a Sampinha continue no canto da tela, disponível para abrir ou fechar
+  setInterval(() => {
+    if (!botao.isConnected || !painel.isConnected) raiz.append(botao, painel);
+    if (painel.hidden && botao.hidden) botao.hidden = false;   // nunca ficam os dois ocultos
+    if (!painel.hidden && !botao.hidden) botao.hidden = true;
+  }, 1500);
 
   let aberta = false; try { aberta = !!sessionStorage.getItem('sampinha_aberta'); } catch (e) {}
   if (aberta) abrir(true);
