@@ -1,11 +1,12 @@
 // Estrutura comum do SAMP: controle de acesso por matrícula, barra de navegação e rodapé.
-// Cada página informa a sua posição com <body data-page="inicio|analise|metricas|producao|cadastros|entrar">.
+// Cada página informa a sua posição com <body data-page="inicio|analise|metricas|producao|ajuda|cadastros|entrar">.
 (function () {
   const ITENS = [
     { id: 'inicio',    href: 'index.html',     texto: 'Início' },
     { id: 'analise',   href: 'analise.html',   texto: 'Análise de Processos' },
     { id: 'metricas',  href: 'metricas.html',  texto: 'Metas Processuais' },
     { id: 'producao',  href: 'producao.html',  texto: 'Produção Individual' },
+    { id: 'ajuda',     href: 'ajuda.html',     texto: 'O que tem no SAMP?' },
     { id: 'cadastros', href: 'cadastros.html', texto: 'Cadastros', restrito: true }
   ];
   const atual = document.body.dataset.page;
@@ -113,7 +114,7 @@
   window.SAMP_USUARIO = sessao;   // { nome, matricula, token, exp } ou null
 
   // acabamento visual compartilhado (animações, abas, números); não é usado na tela de acesso
-  if (atual !== 'entrar') { const u = document.createElement('script'); u.src = 'ui.js?v=20261001a'; document.body.appendChild(u); }
+  if (atual !== 'entrar') { const u = document.createElement('script'); u.src = 'ui.js?v=20261002a'; document.body.appendChild(u); }
 
   // PWA: registra o service worker (só quando servido por http/https)
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0c2540">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="icon.svg" type="image/svg+xml" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="application-name" content="SAMP">
+<meta name="apple-mobile-web-app-title" content="SAMP">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>SAMP - O que tem no SAMP?</title>
+<script src="config.js?v=20261002a"></script>
+<link rel="stylesheet" href="theme.css?v=20261002a">
+<style>
+  .hero { padding: 36px 0 18px; }
+  .hero .eyebrow { font-size: .72rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+  .hero h1 { font-size: 1.9rem; color: var(--navy); font-weight: 600; margin: 6px 0 8px; }
+  .hero p { color: var(--muted); max-width: 720px; }
+  .hero .eyebrow, .hero h1, .hero p { animation: th-sobe .6s both; }
+  .hero h1 { animation-delay: .08s; } .hero p { animation-delay: .16s; }
+
+  /* barra de ferramentas: busca, atalhos e expandir/recolher */
+  .gd-barra { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0 12px; margin-bottom: 8px; border-bottom: 1px solid var(--line-soft); }
+  .gd-linha { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .gd-busca { position: relative; flex: 1 1 260px; max-width: 420px; }
+  .gd-busca input { width: 100%; height: 40px; padding: 0 12px 0 38px; border: 1px solid #b9c2cc; border-radius: var(--radius); background: #fff; font-size: .92rem; }
+  .gd-busca input:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(18,53,91,.14); }
+  .gd-busca svg { position: absolute; left: 11px; top: 11px; width: 18px; height: 18px; stroke: var(--muted); fill: none; stroke-width: 1.8; stroke-linecap: round; pointer-events: none; }
+  .gd-btn { height: 40px; padding: 0 14px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); color: var(--navy); font-size: .85rem; font-weight: 600; cursor: pointer; }
+  .gd-btn:hover { border-color: var(--navy); }
+  .gd-atalhos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .gd-atalhos a { font-size: .78rem; padding: 4px 11px; border-radius: 999px; background: #fff; border: 1px solid var(--line); color: var(--navy); text-decoration: none; transition: background .2s, color .2s, border-color .2s; }
+  .gd-atalhos a:hover { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+  /* comece por aqui */
+  .gd-comece { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin: 16px 0 22px; counter-reset: passo; }
+  .gd-passo { position: relative; background: #fff; border: 1px solid var(--line); border-top: 3px solid var(--gold); border-radius: var(--radius); padding: 16px 16px 14px 54px; animation: th-sobe .55s both; }
+  .gd-passo::before { counter-increment: passo; content: counter(passo); position: absolute; left: 14px; top: 14px; width: 28px; height: 28px; border-radius: 50%; background: var(--navy); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: .9rem; }
+  .gd-passo b { display: block; color: var(--navy); margin-bottom: 2px; }
+  .gd-passo span { font-size: .85rem; color: var(--muted); }
+  .gd-passo:nth-child(2) { animation-delay: .08s; } .gd-passo:nth-child(3) { animation-delay: .16s; }
+
+  /* seções */
+  .gd-sec { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 12px; scroll-margin-top: 130px; animation: th-sobe .5s both; transition: border-color .2s, box-shadow .2s; }
+  .gd-sec[open] { border-color: #b9c6d6; box-shadow: 0 6px 20px rgba(18,53,91,.07); }
+  .gd-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+  .gd-sec > summary::-webkit-details-marker { display: none; }
+  .gd-sec > summary:focus-visible { outline: 3px solid rgba(18,53,91,.25); outline-offset: -3px; }
+  .gd-ico { flex: none; width: 40px; height: 40px; border-radius: var(--radius); background: var(--navy-soft); color: var(--navy); display: grid; place-items: center; transition: background .25s, color .25s; }
+  .gd-sec[open] .gd-ico, .gd-sec > summary:hover .gd-ico { background: var(--navy); color: #fff; }
+  .gd-ico svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .gd-tit { flex: 1; min-width: 0; }
+  .gd-tit b { display: block; color: var(--navy); font-size: 1.06rem; font-weight: 600; }
+  .gd-tit small { color: var(--muted); font-size: .84rem; }
+  .gd-seta { flex: none; width: 18px; height: 18px; stroke: var(--muted); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s; }
+  .gd-sec[open] .gd-seta { transform: rotate(180deg); }
+  .gd-corpo { padding: 2px 20px 20px 72px; color: var(--ink); font-size: .93rem; line-height: 1.6; }
+  .gd-corpo h4 { color: var(--navy); font-size: .74rem; letter-spacing: .9px; text-transform: uppercase; margin: 18px 0 6px; }
+  .gd-corpo h4:first-child { margin-top: 4px; }
+  .gd-corpo p { margin: 0 0 8px; }
+  .gd-corpo ul, .gd-corpo ol { margin: 4px 0 8px; padding-left: 20px; display: grid; gap: 4px; }
+  .gd-corpo li::marker { color: var(--gold); font-weight: 700; }
+  .gd-corpo em { font-style: normal; font-weight: 600; color: var(--navy); }
+  .gd-dica { margin: 12px 0 0; padding: 9px 13px; border-left: 3px solid var(--gold); background: #fbf6ea; border-radius: 0 3px 3px 0; font-size: .87rem; color: #5b4a1f; }
+  .gd-dica b { color: #5b4a1f; }
+  .gd-aviso { margin: 12px 0 0; padding: 9px 13px; border-left: 3px solid var(--navy); background: var(--navy-soft); border-radius: 0 3px 3px 0; font-size: .87rem; color: var(--navy); }
+  .gd-tag { display: inline-block; font-size: .68rem; letter-spacing: .6px; text-transform: uppercase; font-weight: 700; padding: 2px 8px; border-radius: 3px; background: #fbf3e0; color: #7a5a14; border: 1px solid #ecd9a8; vertical-align: middle; margin-left: 8px; }
+  .gd-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 6px 0 8px; }
+  .gd-item { border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 10px 12px; background: #fbfcfd; }
+  .gd-item b { display: block; color: var(--navy); font-size: .9rem; margin-bottom: 2px; }
+  .gd-item span { font-size: .85rem; color: var(--muted); }
+  .gd-sem { display: none; text-align: center; color: var(--muted); padding: 30px 10px; }
+  .gd-sem.on { display: block; }
+  .gd-sec.some { display: none; }
+  mark { background: #fbe9b0; color: inherit; border-radius: 2px; padding: 0 1px; }
+  .gd-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: var(--navy); font-weight: 600; font-size: .88rem; text-decoration: none; }
+  .gd-link:hover { text-decoration: underline; }
+  @media (max-width: 720px) {
+    .gd-corpo { padding: 2px 16px 18px 16px; }
+    .gd-sec > summary { padding: 14px; gap: 12px; }
+    .gd-barra { position: static; }
+  }
+  @media print { .gd-barra, .gd-link { display: none !important; } .gd-sec { break-inside: avoid; } .gd-sec:not([open]) .gd-corpo { display: block; } }
+</style>
+</head>
+<body data-page="ajuda">
+<script src="layout.js?v=20261002a"></script>
+<main class="page">
+  <section class="hero">
+    <div class="eyebrow">Guia do sistema</div>
+    <h1>O que tem no SAMP?</h1>
+    <p>Aqui você encontra tudo o que o sistema oferece e aprende, passo a passo, a usar cada parte. Clique em um título para abrir, ou use a busca para achar um assunto rapidamente.</p>
+  </section>
+
+  <div class="gd-comece" aria-label="Comece por aqui">
+    <div class="gd-passo"><b>Entre com a sua matrícula</b><span>Digite a matrícula, depois a sua senha. No primeiro acesso você cria a senha.</span></div>
+    <div class="gd-passo"><b>Escolha um módulo</b><span>Use o menu no topo da tela ou os cartões da tela inicial.</span></div>
+    <div class="gd-passo"><b>Pergunte à Sampinha</b><span>Em qualquer tela, o botão da Sampinha no canto responde dúvidas sobre os dados.</span></div>
+  </div>
+
+  <div class="gd-barra">
+    <div class="gd-linha">
+      <label class="gd-busca"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><input type="search" id="busca" placeholder="Buscar no guia (ex.: PDF, senha, prazo, férias)" aria-label="Buscar no guia" autocomplete="off"></label>
+      <button type="button" class="gd-btn" id="abrirTodas">Abrir todas</button>
+      <button type="button" class="gd-btn" id="fecharTodas">Recolher todas</button>
+    </div>
+    <nav class="gd-atalhos" aria-label="Ir para" id="atalhos"></nav>
+  </div>
+
+  <div id="secoes">
+
+    <!-- 1 -->
+    <details class="gd-sec" id="entrar" open>
+      <summary>
+        <span class="gd-ico"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+        <span class="gd-tit"><b>Entrar e sair do sistema</b><small>Matrícula, senha e primeiro acesso</small></span>
+        <svg class="gd-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="gd-corpo">
+        <h4>Como entrar</h4>
+        <ol>
+          <li>Na tela de acesso, digite a sua <em>matrícula</em> e clique em <em>Continuar</em>. Só entra quem tem a matrícula cadastrada pelo responsável pelo sistema.</li>
+          <li>Se você já tem senha, digite-a e clique em <em>Entrar</em>.</li>
+          <li>Se for o <em>primeiro acesso</em>, o sistema avisa e pede para você <em>escolher uma senha</em> e repeti-la no segundo campo. A senha precisa ter pelo menos 8 caracteres e ser diferente da matrícula.</li>
+          <li>O <em>ícone de olho</em> no campo de senha mostra ou esconde o que você digitou, para conferir se não errou.</li>
+        </ol>
+        <h4>Boas práticas</h4>
+        <ul>
+          <li>Use <em>Lembrar neste computador</em> apenas em um computador seu: ele guarda só a matrícula, nunca a senha.</li>
+          <li>A sessão dura algumas horas. Se ela expirar, o sistema leva você de volta à tela de acesso e depois retorna à página em que você estava.</li>
+          <li>Em computador compartilhado, clique em <em>Sair</em> (canto superior direito) ao terminar.</li>
+          <li>Após várias tentativas erradas, o acesso é bloqueado por alguns minutos por segurança. Aguarde e tente de novo.</li>
+        </ul>
+        <div class="gd-dica"><b>Esqueceu a senha?</b> Peça ao responsável pelo sistema para redefinir. No próximo acesso você escolhe uma nova senha.</div>
+      </div>
+    </details>
+
+    <!-- 2 -->
+    <details class="gd-sec" id="inicio">
+      <summary>
+        <span class="gd-ico"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/></svg></span>
+        <span class="gd-tit"><b>Início</b><small>Resumo do sistema e atalhos</small></span>
+        <svg class="gd-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="gd-corpo">
+        <h4>O que você vê</h4>
+        <ul>
+          <li>Uma saudação com o seu nome e três números de destaque: quantos <em>processos</em> há na base, quando ela foi <em>atualizada pela última vez</em> e o <em>período das metas</em> que está cadastrado.</li>
+          <li>Cartões que levam a cada módulo: Análise de Processos, Metas Processuais, Produção Individual e Cadastros.</li>
+        </ul>
+        <h4>Como usar</h4>
+        <p>Clique no cartão do módulo que deseja. Para voltar, use <em>Início</em> no menu superior (ou clique em SAMP, no canto esquerdo).</p>
+      </div>
+    </details>
+
+    <!-- 3 -->
+    <details class="gd-sec" id="analise">
+      <summary>
+        <span class="gd-ico"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/><circle cx="19" cy="19" r="2"/></svg></span>
+        <span class="gd-tit"><b>Análise de Processos</b><small>Base de processos por prazo, assunto, polo passivo e advogado</small></span>
+        <svg class="gd-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="gd-corpo">
+        <p>Mostra os processos que estão na base atual, organizados de várias formas. Os dados vêm da planilha importada no módulo Cadastros.</p>
+        <h4>Indicadores no topo</h4>
+        <div class="gd-grade">
+          <div class="gd-item"><b>Base atual</b><span>Quantos processos e quantos assuntos diferentes existem.</span></div>
+          <div class="gd-item"><b>Situação por prazo</b><span>Divide os processos em <em>No prazo</em>, <em>Atenção</em> e <em>Atrasados</em>, pelos dias na tarefa. Os limites em dias são definidos no Cadastros.</span></div>
+          <div class="gd-item"><b>Atualização</b><span>Data e hora da última importação da base.</span></div>
+        </div>
+        <h4>As abas</h4>
+        <div class="gd-grade">
+          <div class="gd-item"><b>Assuntos</b><span>Lista os assuntos com a quantidade de processos de cada um, separados por vara.</span></div>
+          <div class="gd-item"><b>Polo Passivo</b><span>Mesma lógica, agrupando pelo polo passivo (a parte contra a qual o processo corre).</span></div>
+          <div class="gd-item"><b>Advogado Polo Ativo</b><span>Agrupa pelos advogados do polo ativo. Útil para ver quem concentra mais processos.</span></div>
+          <div class="gd-item"><b>Análises</b><span>Gráficos e rankings (por exemplo, a distribuição por assunto) e o botão <em>Imprimir Relatório</em>.</span></div>
+          <div class="gd-item"><b>Tendência</b><span>Mostra, por assunto, se o acervo está envelhecendo ou se está chegando muita coisa nova. Veja a explicação abaixo.</span></div>
+        </div>
+        <h4>Como usar, passo a passo</h4>
+        <ol>
+          <li>Olhe os indicadores do topo para ter a visão geral dos prazos.</li>
+          <li>Escolha a aba que responde à sua dúvida (por assunto, polo passivo ou advogado).</li>
+          <li>Cada linha da lista é um grupo com a quantidade de processos. Clique nela (o <em>+</em> vira <em>−</em>) para abrir: dentro aparecem as varas e, ao abrir uma vara, a tabela com os processos. Em cada assunto, a linha <em>"Acima de X dias"</em> reúne os processos mais antigos de todas as varas.</li>
+          <li>Use o campo de busca no topo da aba para filtrar por número do processo, vara, assunto, polo ou advogado, conforme a aba.</li>
+          <li>Para levar o resultado no papel ou em PDF, use <em>Imprimir Relatório</em> na aba Análises e escolha "Salvar como PDF" na janela de impressão.</li>
+        </ol>
+        <h4>Entendendo a aba Tendência</h4>
+        <ul>
+          <li><em>Acervo velho</em>: o assunto tem mais processos antigos do que o normal.</li>
+          <li><em>Chegada alta</em>: está chegando muito processo novo naquele assunto.</li>
+          <li><em>Chegada em volume</em>: o assunto recebe bem mais processos novos do que o tamanho do seu acervo sugere.</li>
+          <li><em>Poucos processos</em>: o assunto tem poucos processos (menos de 10), então não é classificado.</li>
+          <li>Clique em um assunto para ver o detalhe: faixas de idade, chegada mês a mês e, a partir da segunda importação, o histórico real de acervo, entradas e saídas.</li>
+        </ul>
+        <div class="gd-aviso"><b>Importante:</b> a data de chegada na Tendência é uma <em>estimativa</em> (data da importação menos os dias na tarefa) e considera só os processos que ainda estão na fila. Quem já saiu da fila não aparece.</div>
+        <a class="gd-link" href="analise.html">Abrir Análise de Processos &rarr;</a>
+      </div>
+    </details>
+
+    <!-- 4 -->
+    <details class="gd-sec" id="metas">
+      <summary>
+        <span class="gd-ico"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+        <span class="gd-tit"><b>Metas Processuais</b><small>Recebidos, calculados, acervo e tempo médio, mês a mês</small></span>
+        <svg class="gd-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="gd-corpo">
+        <p>Acompanha, mês a mês, o movimento das Varas Comuns e do JEF. Sempre mostra o período mais recente cadastrado.</p>
+        <h4>O que significa cada número</h4>
+        <div class="gd-grade">
+          <div class="gd-item"><b>Recebidos</b><span>Processos que chegaram no mês.</span></div>
+          <div class="gd-item"><b>Calculados</b><span>Processos que foram calculados no mês.</span></div>
+          <div class="gd-item"><b>Acervo</b><span>Quantos processos ficaram pendentes (a evolução do estoque).</span></div>
+          <div class="gd-item"><b>Tempo de permanência</b><span>Tempo médio dos processos, em dias.</span></div>
+        </div>
+        <h4>As três seções</h4>
+        <ul>
+          <li><em>Varas Comuns</em>, <em>JEF</em> e <em>Geral consolidado</em> (soma das duas). Use os atalhos abaixo do filtro para pular entre elas. No consolidado, o tempo de permanência não é somado.</li>
+        </ul>
+        <h4>Como usar, passo a passo</h4>
+        <ol>
+          <li>Para ver só alguns meses, escolha o mês em <em>De</em> e em <em>Até</em> e clique em <em>Aplicar</em>. Para voltar a tudo, clique em <em>Limpar</em>.</li>
+          <li>Role a página para ver os gráficos e tabelas de cada seção.</li>
+          <li>Para exportar, use <em>PDF Varas Comuns</em>, <em>PDF JEF</em> ou <em>PDF Geral Consolidado</em> em cada seção, ou <em>Exportar PDF completo</em> no topo.</li>
+          <li>Se os dados foram atualizados no Cadastros e você não vê a mudança, clique em <em>Recarregar dados</em>.</li>
+        </ol>
+        <a class="gd-link" href="metricas.html">Abrir Metas Processuais &rarr;</a>
+      </div>
+    </details>
+
+    <!-- 5 -->
+    <details class="gd-sec" id="producao">
+      <summary>
+        <span class="gd-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg></span>
+        <span class="gd-tit"><b>Produção Individual</b><small>Processos calculados por pessoa e pelo setor</small></span>
+        <svg class="gd-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="gd-corpo">
+        <p>Mostra quantos processos cada pessoa calculou, mês a mês, a partir das planilhas de produção enviadas ao sistema. Só entram <em>meses fechados</em>: o mês em andamento aparece depois da virada.</p>
+        <h4>As duas visões</h4>
+        <div class="gd-grade">
+          <div class="gd-item"><b>Setor</b><span>Soma de todas as pessoas: produção por mês e por ano, assuntos mais calculados, quadro mensal, ranking por pessoa e ausências do setor. Todos podem ver.</span></div>
+          <div class="gd-item"><b>Individual</b><span>O detalhe de uma pessoa: evolução, assuntos, prioridades, tempo até calcular e ausências. <em>Você só vê as pessoas que o administrador liberou para a sua matrícula.</em></span></div>
+        </div>
+        <h4>Como usar, passo a passo</h4>
+        <ol>
+          <li>Escolha <em>Setor</em> ou <em>Individual</em> em <em>Visão</em>. No Individual, selecione a pessoa em <em>Pessoa</em>.</li>
+          <li>Use <em>Ano</em> para olhar um ano específico ou "Todos os anos".</li>
+          <li>No quadro mensal, passe o mouse (ou toque) nos pontos para ver as ausências do mês: férias, licença, treinamento, falta e recesso.</li>
+          <li>Na tabela "Produção por pessoa", clique nos cabeçalhos para ordenar. Clique no nome para abrir o detalhe (se você tiver acesso àquela pessoa).</li>
+          <li>Clique em <em>Como ler estes números</em> para ver a explicação de cada indicador.</li>
+        </ol>
+        <h4>Para interpretar com cuidado</h4>
+        <ul>
+          <li><em>Meta</em> e <em>acervo</em> vêm da coluna TIPO que cada pessoa preenche. O que está em branco aparece como "sem classificação".</li>
+          <li><em>Dias disponíveis</em> são os dias úteis menos as ausências do calendário; <em>produção por dia disponível</em> ajuda a comparar meses com muitas férias. Treinamento só é descontado se você marcar a opção.</li>
+          <li>Licença médica aparece apenas como "licença".</li>
+        </ul>
+        <div class="gd-aviso"><b>Atenção:</b> a produção depende do tipo e da complexidade dos processos, do tempo de cada pessoa na seção e de afastamentos. Compare com cautela e confira com a planilha de origem quando o número for usado oficialmente. Esta produção é diferente das Metas Processuais, por isso os totais podem não coincidir.</div>
+        <a class="gd-link" href="producao.html">Abrir Produção Individual &rarr;</a>
+      </div>
+    </details>
+
+    <!-- 6 -->
+    <details class="gd-sec" id="sampinha">
+      <summary>
+        <span class="gd-ico"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg></span>
+        <span class="gd-tit"><b>Sampinha, a assistente de IA</b><small>Pergunte em linguagem natural e gere relatórios</small></span>
+        <svg class="gd-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="gd-corpo">
+        <p>A Sampinha responde perguntas sobre os dados do sistema. Ela consulta as informações reais e <em>nunca altera nada</em>: apenas lê, calcula e apresenta.</p>
+        <h4>Como abrir e conversar</h4>
+        <ol>
+          <li>Clique no botão <em>Sampinha</em> no canto inferior direito de qualquer tela.</li>
+          <li>Escreva a pergunta como falaria normalmente e envie. Acompanhe o andamento ("Buscando processos...") até a resposta chegar.</li>
+          <li>Clique nas <em>sugestões</em> no fim da resposta para continuar a conversa com um toque.</li>
+        </ol>
+        <h4>O que ela sabe fazer</h4>
+        <ul>
+          <li>Buscar processos e contar por assunto, vara, advogado ou polo passivo; listar os atrasados; achar processos "sobre" um tema.</li>
+          <li>Consultar as metas processuais, a aba Tendência e o histórico das importações.</li>
+          <li>Consultar a Produção Individual (setor, ranking e as pessoas que o administrador liberou para você).</li>
+          <li>Gerar <em>relatórios em PDF</em> e tabelas em <em>CSV</em>: peça, por exemplo, "Gere um relatório dos processos atrasados". O botão de download aparece abaixo da resposta.</li>
+          <li>Abrir módulos, abas e filtros na tela quando você pedir ("abra as metas do JEF").</li>
+        </ul>
+        <h4>Exemplos para começar</h4>
+        <ul>
+          <li>"Quantos processos estão atrasados?"</li>
+          <li>"Quais assuntos têm mais processos no JEF?"</li>
+          <li>"Como foram os recebidos e calculados nos últimos 6 meses?"</li>
+          <li>"Gere um relatório do panorama da base de processos."</li>
+        </ul>
+        <h4>Recursos da janela</h4>
+        <ul>
+          <li><em>Histórico</em>: reabre conversas antigas e permite buscar nelas.</li>
+          <li><em>+ Nova</em>: começa uma conversa do zero.</li>
+          <li><em>Ampliar</em>: aumenta a janela para ler tabelas maiores.</li>
+        </ul>
+        <div class="gd-dica"><b>Dicas:</b> seja específico (vara, período, assunto). Se o pedido for ambíguo, a Sampinha faz uma pergunta antes de responder. Há um limite de perguntas por alguns minutos; se aparecer o aviso, aguarde um pouco.</div>
+        <div class="gd-aviso"><b>Confira sempre:</b> a Sampinha é uma ferramenta de apoio. Ela só consegue falar do que está no sistema, e números usados oficialmente devem ser conferidos nas telas ou nas planilhas de origem.</div>
+      </div>
+    </details>
+
+    <!-- 7 -->
+    <details class="gd-sec" id="cadastros">
+      <summary>
+        <span class="gd-ico"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+        <span class="gd-tit"><b>Cadastros</b><small>Alimenta e administra o sistema <span class="gd-tag">Acesso restrito</span></small></span>
+        <svg class="gd-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="gd-corpo">
+        <p>É onde os dados entram no sistema e onde se controla quem acessa. Exige uma <em>senha de cadastro</em>, diferente da senha pessoal, que fica com o responsável pelo sistema. Se você não tem essa senha, não precisa deste módulo.</p>
+        <h4>As abas</h4>
+        <div class="gd-grade">
+          <div class="gd-item"><b>Base de processos</b><span>Importe a planilha (.xlsx) para substituir toda a base da Análise de Processos. O sistema mostra uma prévia da unificação de varas e assuntos.</span></div>
+          <div class="gd-item"><b>Prazos</b><span>Define os limites em dias que separam "No prazo", "Atenção" e "Atrasado".</span></div>
+          <div class="gd-item"><b>Metas</b><span>Grava um novo período de metas (recebidos, calculados, acervo e tempo). O módulo Metas mostra sempre o mais recente.</span></div>
+          <div class="gd-item"><b>Produção Individual</b><span>Envia as planilhas "PRODUÇÃO SECAJ - Nome" e o "CALENDÁRIO SECAJ", sempre após a virada do mês. Reenviar substitui os dados da pessoa, nunca duplica.</span></div>
+          <div class="gd-item"><b>Matrículas</b><span>Cadastra quem pode entrar, bloqueia ou autoriza, redefine senha e escolhe quais produções individuais cada pessoa pode ver.</span></div>
+        </div>
+        <h4>Cadastrar uma pessoa, passo a passo</h4>
+        <ol>
+          <li>Entre em <em>Cadastros</em> e informe a senha de cadastro.</li>
+          <li>Abra a aba <em>Matrículas</em>, digite a matrícula e o nome completo.</li>
+          <li>Em "Produção individual", marque <em>Todas</em> ou escolha as pessoas que essa matrícula poderá ver em detalhe.</li>
+          <li>Clique em <em>Cadastrar</em>. Para mudar depois, use <em>Editar</em> na linha da pessoa.</li>
+        </ol>
+        <div class="gd-dica"><b>Redefinir senha:</b> na lista de matrículas, clique em <em>Redefinir senha</em>. A pessoa escolherá uma nova no próximo acesso e as sessões abertas dela são encerradas.</div>
+        <a class="gd-link" href="cadastros.html">Abrir Cadastros &rarr;</a>
+      </div>
+    </details>
+
+    <!-- 8 -->
+    <details class="gd-sec" id="dicas">
+      <summary>
+        <span class="gd-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8M12 16.8v.01"/></svg></span>
+        <span class="gd-tit"><b>Dúvidas frequentes</b><small>Respostas rápidas e dicas de uso</small></span>
+        <svg class="gd-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="gd-corpo">
+        <h4>Não consigo entrar</h4>
+        <ul>
+          <li>"Matrícula não autorizada": confira o número digitado (sem espaços) e, se persistir, peça o cadastro ao responsável.</li>
+          <li>"Senha incorreta": confira o Caps Lock (a tela avisa) e use o olho para ver o que digitou.</li>
+          <li>"Muitas tentativas": aguarde o tempo informado e tente novamente.</li>
+        </ul>
+        <h4>Os dados parecem desatualizados</h4>
+        <ul>
+          <li>Veja a data de <em>Atualização</em> na Análise de Processos e o período em Metas. Eles mudam quando o responsável importa novas planilhas.</li>
+          <li>Em Metas, o botão <em>Recarregar dados</em> busca novamente o que está salvo. Se ainda assim não mudou, o Cadastros não foi atualizado.</li>
+        </ul>
+        <h4>Por que os números de Metas e de Produção são diferentes?</h4>
+        <p>São fontes distintas: Metas vêm dos números mensais cadastrados por período; Produção vem das planilhas individuais de cada pessoa. Não são feitas para coincidir.</p>
+        <h4>Instalar como aplicativo</h4>
+        <p>O SAMP pode ser instalado como aplicativo. No navegador, abra o menu e procure <em>Instalar aplicativo</em> (ou <em>Adicionar à tela inicial</em>, no celular). Ele abre em janela própria, com o ícone do SAMP.</p>
+        <h4>Atalhos úteis</h4>
+        <ul>
+          <li>Clique em <em>SAMP</em>, no canto esquerdo do topo, para voltar ao Início.</li>
+          <li>Em telas pequenas, o menu superior rola de lado.</li>
+          <li>Para imprimir qualquer tela, use Ctrl+P e escolha "Salvar como PDF".</li>
+        </ul>
+        <div class="gd-dica"><b>Sugestão:</b> ao ficar em dúvida sobre o significado de um número, pergunte à Sampinha: "O que significa acervo velho?".</div>
+      </div>
+    </details>
+
+  </div>
+  <div class="gd-sem" id="semResultado">Nenhum assunto encontrado para a sua busca. Tente outra palavra, como "senha", "PDF" ou "prazo".</div>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const secoes = [...document.querySelectorAll('.gd-sec')];
+
+  // atalhos para cada seção
+  $('atalhos').innerHTML = secoes.map((s) => `<a href="#${s.id}" data-id="${s.id}">${s.querySelector('.gd-tit b').textContent}</a>`).join('');
+  $('atalhos').addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-id]'); if (!a) return;
+    e.preventDefault();
+    const s = $(a.dataset.id); s.open = true; s.classList.remove('some');
+    s.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    history.replaceState(null, '', '#' + s.id);
+  });
+  if (location.hash && $(location.hash.slice(1))) { const s = $(location.hash.slice(1)); if (s.classList.contains('gd-sec')) s.open = true; }
+
+  $('abrirTodas').onclick = () => secoes.forEach((s) => { s.open = true; });
+  $('fecharTodas').onclick = () => secoes.forEach((s) => { s.open = false; });
+
+  // busca: mostra só as seções com o termo, abre-as e destaca onde aparece
+  const norm = (t) => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const originais = new Map(secoes.map((s) => [s, s.querySelector('.gd-corpo').innerHTML]));
+  function destacar(corpo, termo) {
+    const w = document.createTreeWalker(corpo, NodeFilter.SHOW_TEXT);
+    const nos = []; while (w.nextNode()) nos.push(w.currentNode);
+    for (const n of nos) {
+      const txt = n.nodeValue, i = norm(txt).indexOf(termo);
+      if (i < 0) continue;
+      const m = document.createElement('mark'); m.textContent = txt.slice(i, i + termo.length);
+      const dep = document.createTextNode(txt.slice(i + termo.length));
+      n.nodeValue = txt.slice(0, i); n.after(m, dep);
+    }
+  }
+  let t = null;
+  $('busca').addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      const termo = norm($('busca').value.trim());
+      let achou = 0;
+      for (const s of secoes) {
+        const corpo = s.querySelector('.gd-corpo');
+        corpo.innerHTML = originais.get(s);   // limpa destaques anteriores
+        if (!termo) { s.classList.remove('some'); continue; }
+        const bate = norm(s.textContent).includes(termo);
+        s.classList.toggle('some', !bate);
+        if (bate) { achou++; s.open = true; if (norm(corpo.textContent).includes(termo)) destacar(corpo, termo); }
+      }
+      $('semResultado').classList.toggle('on', !!termo && !achou);
+    }, 120);
+  });
+})();
+</script>
+<script src="sampinha.js?v=20261002a"></script>
+</body>
+</html>
