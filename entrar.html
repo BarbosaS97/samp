@@ -27,7 +27,14 @@
 
   /* ---------- painel institucional ---------- */
   .marca { position: relative; overflow: hidden; background: var(--navy-dark); color: #fff; padding: 56px 56px 40px; display: flex; flex-direction: column; justify-content: space-between; }
-  .marca::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px); background-size: 44px 44px; mask-image: linear-gradient(to bottom, #000 30%, transparent 95%); -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 95%); }
+  /* grade de quadros ao fundo: deriva lenta e acende em dourado perto do ponteiro do mouse */
+  .marca > .fundo { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; mask-image: linear-gradient(to bottom, #000 30%, rgba(0,0,0,.3) 98%); -webkit-mask-image: linear-gradient(to bottom, #000 30%, rgba(0,0,0,.3) 98%); --mx: 50%; --my: 40%; }
+  .fundo i { position: absolute; inset: 0; background-size: 44px 44px; }
+  .fundo .g1 { background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); animation: deriva 36s linear infinite; }
+  .fundo .g2 { background-image: linear-gradient(rgba(224,201,143,.55) 1px, transparent 1px), linear-gradient(90deg, rgba(224,201,143,.55) 1px, transparent 1px); animation: deriva 36s linear infinite; opacity: 0; transition: opacity .5s ease; -webkit-mask-image: radial-gradient(circle 150px at var(--mx) var(--my), #000 0%, transparent 100%); mask-image: radial-gradient(circle 150px at var(--mx) var(--my), #000 0%, transparent 100%); }
+  .fundo .luz { background: radial-gradient(circle 240px at var(--mx) var(--my), rgba(224,201,143,.11), transparent 100%); opacity: 0; transition: opacity .5s ease; }
+  .fundo.ativo .g2, .fundo.ativo .luz { opacity: 1; }
+  @keyframes deriva { to { background-position: 44px 44px, 44px 44px; } }
   .marca::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--gold); }
   .marca > * { position: relative; z-index: 1; }
   .logo { display: flex; align-items: baseline; gap: 14px; animation: sobe .7s .05s both; }
@@ -90,6 +97,34 @@
   .quem button, .link { background: none; border: 0; padding: 0; color: var(--navy); font-size: .8rem; text-decoration: underline; cursor: pointer; white-space: nowrap; }
   .primeiro { background: #fbf3e0; color: #7a5a14; border: 1px solid #ecd9a8; border-radius: 3px; padding: 9px 12px; font-size: .84rem; line-height: 1.45; margin-bottom: 16px; animation: desce .4s both; }
   .regra { font-size: .78rem; color: var(--muted); margin: -4px 0 14px; }
+
+  /* ---------- transição entre as etapas (matrícula <-> senha) ---------- */
+  .form-wrap.altura { transition: height .32s cubic-bezier(.2,.8,.2,1); overflow: hidden; }
+  .etapa.saindo { animation: saiEtapa .16s ease-in forwards; pointer-events: none; }
+  .etapa.entrando { animation: entraEtapa .4s cubic-bezier(.2,.8,.2,1) both; }
+  /* os itens entram em sequência, sem herdar o atraso da abertura da página */
+  .etapa.entrando > *, .etapa.entrando > .campo, .etapa.entrando > .entrar, .etapa.entrando > .opcoes { animation: sobe .42s cubic-bezier(.2,.8,.2,1) both; }
+  .etapa.entrando > :nth-child(1) { animation-delay: .04s; } .etapa.entrando > :nth-child(2) { animation-delay: .09s; }
+  .etapa.entrando > :nth-child(3) { animation-delay: .14s; } .etapa.entrando > :nth-child(4) { animation-delay: .19s; }
+  .etapa.entrando > :nth-child(5) { animation-delay: .24s; } .etapa.entrando > :nth-child(6) { animation-delay: .29s; }
+  .etapa.entrando > :nth-child(7) { animation-delay: .34s; } .etapa.entrando > :nth-child(8) { animation-delay: .39s; }
+  .etapa.entrando > :nth-child(9) { animation-delay: .44s; }
+  @keyframes saiEtapa { to { opacity: 0; transform: translateX(calc(var(--dir, 1) * -22px)); } }
+  @keyframes entraEtapa { from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 28px)); } to { opacity: 1; transform: none; } }
+
+  /* ---------- ajudas ao digitar a senha ---------- */
+  .forca { display: flex; align-items: center; gap: 5px; margin: -4px 0 12px; font-size: .76rem; color: var(--muted); }
+  .forca i { flex: 1; max-width: 62px; height: 4px; border-radius: 2px; background: var(--line-soft); transition: background .3s, transform .3s; transform-origin: left; }
+  .forca span { margin-left: 6px; min-width: 64px; transition: color .3s; }
+  .forca[data-n="1"] i:nth-child(-n+1) { background: var(--bad); } .forca[data-n="1"] span { color: var(--bad); }
+  .forca[data-n="2"] i:nth-child(-n+2) { background: var(--warn); } .forca[data-n="2"] span { color: var(--warn); }
+  .forca[data-n="3"] i:nth-child(-n+3) { background: #5a8f6e; } .forca[data-n="3"] span { color: var(--ok); }
+  .forca[data-n="4"] i { background: var(--ok); } .forca[data-n="4"] span { color: var(--ok); font-weight: 600; }
+  .conf { font-size: .78rem; margin: -6px 0 12px; display: flex; align-items: center; gap: 6px; animation: desce .3s both; color: var(--muted); }
+  .conf.ok { color: var(--ok); } .conf.nao { color: var(--warn); }
+  .conf svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .caps { font-size: .78rem; color: #7a5a14; background: #fbf3e0; border: 1px solid #ecd9a8; border-radius: 3px; padding: 5px 10px; margin: -4px 0 12px; animation: desce .3s both; }
+  .campo .olho svg { transition: transform .25s; } .campo .olho:active svg { transform: scale(.82); }
 
   .msg { color: var(--bad); font-size: .84rem; min-height: 0; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .3s, opacity .3s, margin .3s; }
   .msg.on { max-height: 70px; opacity: 1; margin: -4px 0 12px; }
@@ -156,6 +191,7 @@
 <div class="login">
 
   <aside class="marca" aria-hidden="false">
+    <div class="fundo" id="fundo" aria-hidden="true"><i class="g1"></i><i class="luz"></i><i class="g2"></i></div>
     <div class="logo"><img src="icon.svg" alt="" width="46" height="46" style="align-self:center;border-radius:11px;box-shadow:0 0 0 1px rgba(255,255,255,.16)"><b>SAMP</b><span>Sistema de Acompanhamento e Métricas Processuais</span></div>
 
     <div class="tese">
@@ -205,7 +241,7 @@
           <div class="destino" id="destino"></div>
           <div class="aviso" id="aviso" role="status"></div>
 
-          <form id="form" autocomplete="off" novalidate>
+          <form id="form" class="etapa" autocomplete="off" novalidate>
             <div class="campo" id="campo">
               <input id="matricula" name="matricula" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="30" placeholder=" " autofocus required aria-describedby="msg">
               <label for="matricula">Matrícula</label>
@@ -223,7 +259,7 @@
             </button>
           </form>
 
-          <form id="formSenha" autocomplete="off" novalidate hidden>
+          <form id="formSenha" class="etapa" autocomplete="off" novalidate hidden>
             <div class="quem">
               <div><b id="quemNome"></b><small id="quemMat"></small></div>
               <button type="button" id="trocar">Trocar</button>
@@ -240,6 +276,7 @@
               </button>
               <span class="barra-foco"></span>
             </div>
+            <div class="forca" id="forca" data-n="0" hidden aria-live="polite"><i></i><i></i><i></i><i></i><span id="forcaTxt"></span></div>
             <div class="regra" id="regra" hidden>Use de 8 a 100 caracteres, diferente da matrícula.</div>
 
             <div class="campo" id="campoConfirma" hidden>
@@ -252,6 +289,8 @@
               </button>
               <span class="barra-foco"></span>
             </div>
+            <div class="conf" id="conf" hidden aria-live="polite"></div>
+            <div class="caps" id="caps" hidden>Caps Lock está ativado.</div>
             <div class="msg" id="msgSenha" role="alert"></div>
 
             <button type="submit" class="entrar" id="entrarSenha">
@@ -291,6 +330,26 @@
   const reduzir = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (window.SAMP_AUTH.get()) { location.replace(destino); return; }
+
+  /* ---------- fundo sensível ao mouse (suaviza o movimento; só com mouse/caneta) ---------- */
+  (function () {
+    const marca = document.querySelector('.marca'), fundo = $('fundo');
+    if (!marca || !fundo) return;
+    let alvoX = 0, alvoY = 0, x = 0, y = 0, rodando = false;
+    const passo = () => {
+      x += (alvoX - x) * 0.16; y += (alvoY - y) * 0.16;
+      fundo.style.setProperty('--mx', x.toFixed(1) + 'px'); fundo.style.setProperty('--my', y.toFixed(1) + 'px');
+      if (Math.abs(alvoX - x) > 0.4 || Math.abs(alvoY - y) > 0.4) requestAnimationFrame(passo); else rodando = false;
+    };
+    marca.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;
+      const r = marca.getBoundingClientRect();
+      alvoX = e.clientX - r.left; alvoY = e.clientY - r.top;
+      if (!fundo.classList.contains('ativo')) { x = alvoX; y = alvoY; fundo.classList.add('ativo'); }
+      if (!rodando) { rodando = true; requestAnimationFrame(passo); }
+    });
+    marca.addEventListener('pointerleave', () => fundo.classList.remove('ativo'));
+  })();
 
   /* ---------- contexto ---------- */
   const aviso = (texto, tipo) => { const a = $('aviso'); a.textContent = texto; a.className = 'aviso on ' + tipo; };
@@ -353,25 +412,84 @@
   });
 
   /* ---------- etapa 2: senha (existente ou primeiro acesso) ---------- */
+  /* troca de etapa com saída/entrada deslizando e altura do cartão animada (sentido 1 = avançar, -1 = voltar) */
+  let trocando = false;
+  function trocarEtapa(de, para, sentido, aoMostrar) {
+    if (trocando) return;
+    const wrap = document.querySelector('.form-wrap');
+    if (reduzir) { de.hidden = true; para.hidden = false; if (aoMostrar) aoMostrar(); return; }
+    trocando = true;
+    const h0 = wrap.offsetHeight;
+    wrap.style.setProperty('--dir', sentido);
+    de.style.setProperty('--dir', sentido); para.style.setProperty('--dir', sentido);
+    wrap.style.height = h0 + 'px'; wrap.classList.add('altura');
+    de.classList.add('saindo');
+    setTimeout(() => {
+      de.hidden = true; de.classList.remove('saindo');
+      para.hidden = false; if (aoMostrar) aoMostrar();
+      wrap.style.height = 'auto'; const h1 = wrap.offsetHeight;   // altura natural da nova etapa
+      wrap.style.height = h0 + 'px'; void wrap.offsetHeight;
+      wrap.style.height = h1 + 'px';
+      para.classList.add('entrando');
+      setTimeout(() => { para.classList.remove('entrando'); wrap.classList.remove('altura'); wrap.style.height = ''; trocando = false; }, 760);
+    }, 170);
+  }
   function irParaSenha(primeiroAcesso) {
     criando = primeiroAcesso;
-    $('quemNome').textContent = nomeAtual; $('quemMat').textContent = 'Matrícula ' + matriculaAtual;
-    $('form').hidden = true; $('formSenha').hidden = false;
-    $('primeiro').hidden = !criando; $('regra').hidden = !criando; $('campoConfirma').hidden = !criando;
-    $('rotSenha').textContent = criando ? 'Escolha uma senha' : 'Senha';
-    $('sub').textContent = criando ? 'Crie a sua senha de acesso ao SAMP.' : 'Digite a sua senha para entrar no SAMP.';
-    $('entrarSenha').querySelector('.txt').textContent = criando ? 'Criar senha e entrar' : 'Entrar';
-    $('senha').value = ''; $('confirma').value = ''; limparErroSenha();
-    $('senha').autocomplete = criando ? 'new-password' : 'current-password';
-    $('senha').focus();
+    const ja = !$('formSenha').hidden;   // já está na etapa da senha (ex.: a senha mudou enquanto a tela estava aberta)
+    const preparar = () => {
+      $('quemNome').textContent = nomeAtual; $('quemMat').textContent = 'Matrícula ' + matriculaAtual;
+      $('primeiro').hidden = !criando; $('regra').hidden = !criando; $('campoConfirma').hidden = !criando;
+      $('forca').hidden = !criando; $('conf').hidden = true; $('caps').hidden = true; atualizarForca();
+      $('rotSenha').textContent = criando ? 'Escolha uma senha' : 'Senha';
+      $('sub').textContent = criando ? 'Crie a sua senha de acesso ao SAMP.' : 'Digite a sua senha para entrar no SAMP.';
+      $('entrarSenha').querySelector('.txt').textContent = criando ? 'Criar senha e entrar' : 'Entrar';
+      $('senha').value = ''; $('confirma').value = ''; limparErroSenha();
+      $('senha').autocomplete = criando ? 'new-password' : 'current-password';
+    };
+    if (ja) { preparar(); $('senha').focus(); return; }
+    trocarEtapa($('form'), $('formSenha'), 1, () => { preparar(); $('senha').focus({ preventScroll: true }); });
   }
   function voltarParaMatricula() {
-    $('formSenha').hidden = true; $('form').hidden = false;
-    $('sub').textContent = 'Informe a sua matrícula para entrar no SAMP.';
     $('senha').value = ''; $('confirma').value = '';
     document.querySelectorAll('.olho.on').forEach((b) => b.click());
-    $('matricula').focus(); $('matricula').select();
+    trocarEtapa($('formSenha'), $('form'), -1, () => {
+      $('sub').textContent = 'Informe a sua matrícula para entrar no SAMP.';
+      $('matricula').focus({ preventScroll: true }); $('matricula').select();
+    });
   }
+
+  /* ---------- ajudas ao digitar: força da senha, confirmação e Caps Lock ---------- */
+  const ROTULOS_FORCA = ['', 'Fraca', 'Razoável', 'Boa', 'Forte'];
+  function nivelForca(s) {
+    if (!s) return 0;
+    let p = 0;
+    if (s.length >= 8) p++;
+    if (s.length >= 12) p++;
+    if (/[a-z]/.test(s) && /[A-Z]/.test(s)) p++;
+    if ((/\d/.test(s) && /[^A-Za-z0-9]/.test(s)) || (/\d/.test(s) && /[A-Za-z]/.test(s) && s.length >= 10)) p++;
+    return Math.max(1, Math.min(4, p));
+  }
+  function atualizarForca() {
+    const n = criando ? nivelForca($('senha').value) : 0;
+    $('forca').dataset.n = n; $('forcaTxt').textContent = ROTULOS_FORCA[n];
+  }
+  const ICO_OK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const ICO_NAO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5M12 16.5v.01"/></svg>';
+  function atualizarConfirmacao() {
+    const c = $('conf'), a = $('senha').value, b = $('confirma').value;
+    if (!criando || !b) { c.hidden = true; return; }
+    const ok = a === b;
+    c.hidden = false; c.className = 'conf ' + (ok ? 'ok' : 'nao');
+    c.innerHTML = (ok ? ICO_OK + 'As senhas conferem' : ICO_NAO + 'As senhas ainda não conferem');
+  }
+  $('senha').addEventListener('input', () => { atualizarForca(); atualizarConfirmacao(); });
+  $('confirma').addEventListener('input', atualizarConfirmacao);
+  const avisoCaps = (e) => { if (e.getModifierState) $('caps').hidden = !e.getModifierState('CapsLock'); };
+  ['senha', 'confirma'].forEach((id) => {
+    $(id).addEventListener('keydown', avisoCaps); $(id).addEventListener('keyup', avisoCaps);
+    $(id).addEventListener('blur', () => { $('caps').hidden = true; });
+  });
   $('voltar').addEventListener('click', voltarParaMatricula);
   $('trocar').addEventListener('click', voltarParaMatricula);
 
