@@ -362,15 +362,28 @@
         .tab:hover { color: #1a4a6e; }
         .tab.active { color: #1a4a6e; border-bottom-color: #1a4a6e; }
 
-        /* abas no mesmo estilo do menu do topo: faixa azul-marinho com linha dourada, abas distribuídas na largura toda e linha de destaque sob a aba ativa */
-        .tabs-container .tabs { background: #0c2540 !important; border: none !important; border-bottom: 3px solid #a68a4e !important; border-radius: 6px 6px 0 0 !important; padding: 0 12px !important; gap: 2px !important; align-items: stretch; margin-bottom: 16px; box-shadow: 0 6px 16px rgba(12,37,64,.18); overflow-x: auto; }
-        .tabs-rot { flex: none; align-self: center; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; color: #e0c98f; padding: 0 14px 0 4px; margin-right: 4px; border-right: 1px solid rgba(255,255,255,.18); white-space: nowrap; }
-        .tabs-container .tabs .tab { flex: 1 1 0; min-width: max-content; padding: 15px 18px !important; font-size: 14px; font-weight: 500; text-align: center; color: #cdd6e1 !important; background: transparent !important; border: none !important; border-bottom: 3px solid transparent !important; margin-bottom: -3px; border-radius: 0 !important; transition: background .2s, color .2s, border-color .2s; }
-        .tabs-container .tabs .tab:hover { color: #fff !important; background: rgba(255,255,255,.08) !important; border-bottom-color: rgba(255,255,255,.35) !important; }
+        /* abas no estilo do menu do topo: faixa azul-marinho com linha dourada, ícones, abas na largura toda e destaque dourado na ativa */
+        .tabs-container .tabs { position: relative; background: linear-gradient(180deg, #123257 0%, #0c2540 100%) !important; border: none !important; border-bottom: 3px solid #a68a4e !important; border-radius: 8px 8px 0 0 !important; padding: 0 12px !important; gap: 2px !important; align-items: stretch; margin-bottom: 16px; box-shadow: 0 8px 20px rgba(12,37,64,.2), inset 0 1px 0 rgba(255,255,255,.12); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; }
+        .tabs-container .tabs::-webkit-scrollbar { display: none; }
+        .tabs-rot { flex: none; align-self: center; font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase; font-weight: 700; color: #e0c98f; padding: 0 16px 0 4px; margin-right: 4px; border-right: 1px solid rgba(255,255,255,.2); white-space: nowrap; }
+        .tabs-container .tabs .tab { position: relative; flex: 1 1 0; min-width: max-content; display: inline-flex; align-items: center; justify-content: center; padding: 16px 20px !important; font-size: 14px; font-weight: 500; letter-spacing: .1px; color: #c4d0de !important; background: transparent !important; border: none !important; border-radius: 0 !important; transition: background .25s, color .25s; }
+        .tabs-container .tabs .tab::before { content: ""; flex: none; width: 17px; height: 17px; margin-right: 9px; background: currentColor; opacity: .85; -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat; transition: transform .3s cubic-bezier(.2,.8,.2,1.4), opacity .2s, color .2s; }
+        .tabs-container .tabs .tab::after { content: ""; position: absolute; left: 14%; right: 14%; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: #e0c98f; transform: scaleX(0); transform-origin: center; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+        .tabs-container .tabs .tab:hover { color: #fff !important; background: rgba(255,255,255,.07) !important; }
+        .tabs-container .tabs .tab:hover::before { transform: scale(1.18) rotate(-6deg); opacity: 1; }
+        .tabs-container .tabs .tab:hover::after { transform: scaleX(.55); }
         .tabs-container .tabs .tab:focus-visible { outline: 2px solid #e0c98f; outline-offset: -3px; }
-        .tabs-container .tabs .tab.active { color: #fff !important; font-weight: 700; background: rgba(255,255,255,.1) !important; border-bottom-color: #fff !important; }
+        .tabs-container .tabs .tab.active { color: #fff !important; font-weight: 700; background: linear-gradient(180deg, rgba(255,255,255,.04) 0%, rgba(224,201,143,.2) 100%) !important; }
+        .tabs-container .tabs .tab.active::before { color: #e0c98f; opacity: 1; }
+        .tabs-container .tabs .tab.active::after { transform: scaleX(1); left: 0; right: 0; background: linear-gradient(90deg, #a68a4e, #f1dfaa, #a68a4e); box-shadow: 0 -2px 10px rgba(224,201,143,.55); }
         .tabs-container .tabs .tab-ind { display: none !important; }
-        @media (max-width: 700px) { .tabs-rot { display: none; } .tabs-container .tabs { padding: 0 6px !important; } .tabs-container .tabs .tab { flex: none; padding: 13px 16px !important; font-size: 13px; } }
+        .tab[data-tab="assuntos"] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h16M4 12h16M4 18h10'/%3E%3C/svg%3E"); }
+        .tab[data-tab="poloPassivo"] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3'/%3E%3Cpath d='M3 20c0-3 2.7-5 6-5s6 2 6 5M16 5a3 3 0 0 1 0 6M18 15c2 .6 3 2.3 3 5'/%3E%3C/svg%3E"); }
+        .tab[data-tab="advogadoAtivo"] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='8' width='18' height='12' rx='2'/%3E%3Cpath d='M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18'/%3E%3C/svg%3E"); }
+        .tab[data-tab="unidade"] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 21V8l8-5 8 5v13M9 21v-6h6v6M8 11h.01M12 11h.01M16 11h.01'/%3E%3C/svg%3E"); }
+        .tab[data-tab="analises"] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V10M10 20V4M16 20v-7M22 20H2'/%3E%3C/svg%3E"); }
+        .tab[data-tab="tendencia"] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 17l6-6 4 4 8-9M15 6h6v6'/%3E%3C/svg%3E"); }
+        @media (max-width: 700px) { .tabs-rot { display: none; } .tabs-container .tabs { padding: 0 6px !important; } .tabs-container .tabs .tab { flex: none; padding: 14px 16px !important; font-size: 13px; } .tabs-container .tabs .tab::before { width: 15px; height: 15px; margin-right: 7px; } }
 
 
         .main-content {
