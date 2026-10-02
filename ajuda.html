@@ -81,6 +81,14 @@
   mark { background: #fbe9b0; color: inherit; border-radius: 2px; padding: 0 1px; }
   .gd-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: var(--navy); font-weight: 600; font-size: .88rem; text-decoration: none; }
   .gd-link:hover { text-decoration: underline; }
+  .gd-voltar { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; height: 38px; padding: 0 16px 0 12px; background: #fff; border: 1px solid var(--line); border-radius: 999px; color: var(--navy); font-size: .88rem; font-weight: 600; text-decoration: none; box-shadow: var(--shadow-sm); animation: th-sobe .5s both; transition: border-color .2s, background .2s, color .2s, transform .15s; }
+  .gd-voltar svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s; }
+  .gd-voltar:hover { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .gd-voltar:hover svg { transform: translateX(-4px); }
+  .gd-voltar:active { transform: scale(.97); }
+  .gd-voltar:focus-visible { outline: 3px solid rgba(18,53,91,.3); outline-offset: 2px; }
+  .gd-voltar + .hero { padding-top: 14px; }
+  @media print { .gd-voltar { display: none !important; } }
   /* modo público (antes de entrar): sem links para os módulos, que exigem login */
   .gd-publico { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 8px; padding: 14px 18px; background: var(--navy-soft); border: 1px solid #d5deea; border-left: 4px solid var(--navy); border-radius: var(--radius); color: var(--navy); font-size: .92rem; animation: th-sobe .5s .1s both; }
   .gd-publico[hidden] { display: none; }
@@ -98,6 +106,7 @@
 <body data-page="ajuda">
 <script src="layout.js?v=20261003a"></script>
 <main class="page">
+  <a class="gd-voltar" id="voltar" href="index.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span id="voltarTxt">Voltar ao início</span></a>
   <section class="hero">
     <div class="eyebrow" id="gEyebrow">Guia do sistema</div>
     <h1 id="gTitulo">O que tem no SAMP?</h1>
@@ -432,6 +441,8 @@
     const s = document.createElement('script'); s.src = 'sampinha.js?v=20261003a'; document.body.appendChild(s);
   } else {
     document.body.classList.add('publico');
+    document.getElementById('voltar').href = 'entrar.html';
+    document.getElementById('voltarTxt').textContent = 'Voltar ao acesso';
     document.getElementById('gEyebrow').textContent = 'Antes de entrar';
     document.getElementById('gTitulo').textContent = 'Conheça o SAMP';
     document.title = 'SAMP - Conheça o SAMP';
