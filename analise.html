@@ -16,7 +16,7 @@
 <meta name="mobile-web-app-capable" content="yes">
     <title>SAMP - Análise de Processos</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
-    <script src="config.js?v=20261003a"></script>
+    <script src="config.js?v=20261004a"></script>
     <style>
         * {
             margin: 0;
@@ -769,10 +769,10 @@
             @page { margin: 16mm 12mm; }
         }
     </style>
-    <link rel="stylesheet" href="theme.css?v=20261003a">
+    <link rel="stylesheet" href="theme.css?v=20261004a">
 </head>
 <body data-page="analise">
-<script src="layout.js?v=20261003a"></script>
+<script src="layout.js?v=20261004a"></script>
     <div class="page">
     <div class="header">
         <div class="header-content">
@@ -830,6 +830,7 @@
             <button class="tab active" data-tab="assuntos">Assuntos</button>
             <button class="tab" data-tab="poloPassivo">Polo Passivo</button>
             <button class="tab" data-tab="advogadoAtivo">Advogado Polo Ativo</button>
+            <button class="tab" data-tab="unidade">Unidade</button>
             <button class="tab" data-tab="analises">Análises</button>
             <button class="tab" data-tab="tendencia">Tendência</button>
         </div>
@@ -839,6 +840,7 @@
         <div id="tab-assuntos" class="tab-content active"><div id="assuntosContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
         <div id="tab-poloPassivo" class="tab-content"><div id="poloPassivoContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
         <div id="tab-advogadoAtivo" class="tab-content"><div id="advogadoAtivoContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
+        <div id="tab-unidade" class="tab-content"><div id="unidadeContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
         <div id="tab-analises" class="tab-content"><div id="analisesContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
         <div id="tab-tendencia" class="tab-content"><div id="tendenciaContent"><div class="loading"><div class="spinner"></div><div>Carregando...</div></div></div></div>
     </div>
@@ -852,8 +854,9 @@
             const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG;
             const supabaseClient = window.criarClienteLeitura();
             
-            let currentData = null, currentPoloData = null, currentAdvogadoData = null;
-            let searchTerm = '', poloSearchTerm = '', advogadoSearchTerm = '';
+            let currentData = null, currentPoloData = null, currentAdvogadoData = null, currentUnidadeData = null;
+            let searchTerm = '', poloSearchTerm = '', advogadoSearchTerm = '', unidadeSearchTerm = '';
+            const expandedUnidades = new Set(), expandedUnidadeVaras = new Set(), expandedUnidadeAssuntos = new Set();
             let expandedSubjects = new Set(), expandedPolos = new Set(), expandedAdvogados = new Set();
             let expandedPoloCourts = new Set(), expandedAdvogadoCourts = new Set();
             let subjectChart = null, courtChart = null;
@@ -959,6 +962,30 @@
                     }
                 }
 
+                // Unidade > Vara > Assunto: Varas Comuns (1 a 22) e JEF (23 a 27); o que não for identificado vai para "Outras unidades"
+                const NOMES_UNIDADE = ['Varas Comuns', 'JEF', 'Outras unidades'];
+                const byUnidade = {};
+                proc.forEach(p => {
+                    const n = extractVaraNumber(p.orgaoJulgador);
+                    const nome = /\bjef\b|juizado/i.test(p.orgaoJulgador) ? NOMES_UNIDADE[1] : n <= 22 ? NOMES_UNIDADE[0] : n <= 27 ? NOMES_UNIDADE[1] : NOMES_UNIDADE[2];
+                    const U = byUnidade[nome] || (byUnidade[nome] = { total: 0, sit: { normal: 0, warning: 0, delayed: 0 }, varas: {} });
+                    U.total++; U.sit[getDaysBadgeClass(p.diasChegada)]++;
+                    const V = U.varas[p.orgaoJulgador] || (U.varas[p.orgaoJulgador] = { total: 0, assuntos: {} });
+                    V.total++;
+                    (V.assuntos[p.assuntoPrincipal] || (V.assuntos[p.assuntoPrincipal] = [])).push(p);
+                });
+                const sortedUnidades = NOMES_UNIDADE.filter(u => byUnidade[u]);
+                for (const u of sortedUnidades) {
+                    const U = byUnidade[u];
+                    U.sortedVaras = Object.keys(U.varas).sort((x, y) => (extractVaraNumber(x) - extractVaraNumber(y)) || x.localeCompare(y, 'pt-BR'));
+                    for (const vara of U.sortedVaras) {
+                        const V = U.varas[vara];
+                        V.sortedAssuntos = Object.keys(V.assuntos).sort((x, y) => (V.assuntos[y].length - V.assuntos[x].length) || x.localeCompare(y, 'pt-BR'));
+                        for (const ass of V.sortedAssuntos) V.assuntos[ass].sort((x, y) => y.diasChegada - x.diasChegada);   // mais antigos primeiro
+                    }
+                }
+                currentUnidadeData = { byUnidade, sortedUnidades, total: proc.length };
+
                 const subjectCounts = {}, courtCounts = {}, poloCounts = {}, advogadoCounts = {};
                 proc.forEach(p => {
                     subjectCounts[p.assuntoPrincipal] = (subjectCounts[p.assuntoPrincipal] || 0) + 1;
@@ -990,6 +1017,7 @@
                 if (activeTab === 'assuntos') renderAssuntosTab();
                 else if (activeTab === 'poloPassivo') renderPoloPassivoTab();
                 else if (activeTab === 'advogadoAtivo') renderAdvogadoAtivoTab();
+                else if (activeTab === 'unidade') renderUnidadeTab();
                 else if (activeTab === 'tendencia') renderTendenciaTab();
                 else renderAnalisesTab();
             }
@@ -1185,6 +1213,68 @@ function renderAdvogadoAtivoTab() {
         });
     }
 }
+            function renderUnidadeTab() {
+                const container = document.getElementById('unidadeContent');
+                if (!currentUnidadeData || !currentUnidadeData.total) { container.innerHTML = `<div class="empty-state"><div class="empty-icon"></div><div>Nenhum processo encontrado</div></div>`; return; }
+                const termo = unidadeSearchTerm.toLowerCase();
+                const bate = (p) => !termo || [p.numeroProcesso, p.orgaoJulgador, p.assuntoPrincipal, p.poloPassivo, p.advogadoAtivo].some(v => String(v || '').toLowerCase().includes(termo));
+                let html = `<div class="search-container"><input type="text" class="search-input" id="unidadeSearchInput" placeholder="Buscar por número, vara, assunto, polo passivo ou advogado..." autocomplete="off"></div>`;
+                const busca = !!termo;   // com busca ativa, os níveis já aparecem abertos
+                let achou = false;
+                // Hierarquia: Unidade > Vara > Assunto > Processos
+                currentUnidadeData.sortedUnidades.forEach((un, ui) => {
+                    const U = currentUnidadeData.byUnidade[un];
+                    const varasVis = [];
+                    let totalUn = 0; const sit = { normal: 0, warning: 0, delayed: 0 };
+                    U.sortedVaras.forEach((vara, vi) => {
+                        const V = U.varas[vara], assVis = [];
+                        let totalVara = 0;
+                        V.sortedAssuntos.forEach((ass, si) => {
+                            const lista = V.assuntos[ass].filter(bate);
+                            if (lista.length) { assVis.push([ass, si, lista]); totalVara += lista.length; lista.forEach(p => sit[getDaysBadgeClass(p.diasChegada)]++); }
+                        });
+                        if (assVis.length) { varasVis.push([vara, vi, assVis, totalVara]); totalUn += totalVara; }
+                    });
+                    if (!varasVis.length) return;
+                    achou = true;
+                    const unId = `un-${ui}`;
+                    const isUnExp = busca || expandedUnidades.has(unId);
+                    const nota = `<span style="font-size:12px;color:#5f6b7a;margin-left:12px;font-weight:400">${varasVis.length} ${varasVis.length === 1 ? 'vara' : 'varas'} &middot; ${sit.normal.toLocaleString('pt-BR')} no prazo &middot; ${sit.warning.toLocaleString('pt-BR')} em atenção &middot; ${sit.delayed.toLocaleString('pt-BR')} atrasados</span>`;
+                    html += `<div class="section-card"><div class="section-header" onclick="toggleUnidade('${unId}','un')"><div class="section-info"><div class="section-badge" style="background:#a68a4e"></div><span class="section-name">${escapeHtml(un)}${nota}</span><span class="section-count">${totalUn}</span></div><div class="toggle-icon" id="${unId}-icon">${isUnExp ? '−' : '+'}</div></div><div class="section-content ${isUnExp ? 'expanded' : ''}" id="${unId}-content">`;
+                    varasVis.forEach(([vara, vi, assVis, totalVara]) => {
+                        const varaId = `${unId}-v${vi}`;
+                        const isVaraExp = busca || expandedUnidadeVaras.has(varaId);
+                        html += `<div class="sub-card"><div class="sub-header" onclick="toggleUnidade('${varaId}','vara')"><div class="sub-info"><div class="sub-icon"></div><span class="sub-name">${escapeHtml(vara)}</span><span class="sub-count">${totalVara}</span></div><div class="sub-toggle" id="${varaId}-icon">${isVaraExp ? '−' : '+'}</div></div><div class="sub-content ${isVaraExp ? 'expanded' : ''}" id="${varaId}-content">`;
+                        assVis.forEach(([ass, si, lista]) => {
+                            const assId = `${varaId}-a${si}`;
+                            const isAssExp = busca || expandedUnidadeAssuntos.has(assId);
+                            html += `<div class="sub-card"><div class="sub-header" style="padding-left:60px" onclick="toggleUnidade('${assId}','ass')"><div class="sub-info"><span style="font-weight:600">${escapeHtml(ass)}</span><span class="sub-count">${lista.length}</span></div><div class="sub-toggle" id="${assId}-icon">${isAssExp ? '−' : '+'}</div></div><div class="sub-content ${isAssExp ? 'expanded' : ''}" id="${assId}-content"><div class="process-table">`;
+                            lista.forEach(p => {
+                                html += `<div class="process-row"><div class="process-number"><span>${escapeHtml(p.numeroProcesso)}</span><button class="copy-btn" onclick="copyToClipboard('${escapeHtml(p.numeroProcesso)}', this)">⎘</button></div><div class="process-days"><span class="days-badge ${getDaysBadgeClass(p.diasChegada)}">${getDaysLabel(p.diasChegada)}</span></div><div class="process-orgao">${escapeHtml(p.poloPassivo)}</div></div>`;
+                            });
+                            html += `</div></div></div>`;
+                        });
+                        html += `</div></div>`;
+                    });
+                    html += `</div></div>`;
+                });
+                if (!achou) html += `<div class="empty-state"><div>Nenhum resultado para a busca.</div></div>`;
+                container.innerHTML = html;
+                const inp = document.getElementById('unidadeSearchInput');
+                if (inp) {
+                    inp.value = unidadeSearchTerm;
+                    inp.addEventListener('input', (e) => {
+                        if (searchTimeout) clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => {
+                            unidadeSearchTerm = e.target.value;
+                            renderUnidadeTab();
+                            const novo = document.getElementById('unidadeSearchInput');
+                            if (novo) { novo.focus(); novo.setSelectionRange(novo.value.length, novo.value.length); }
+                        }, 300);
+                    });
+                }
+            }
+
             function renderAnalisesTab() {
                 const container = document.getElementById('analisesContent');
                 if (!currentData || !currentData.totalProcesses) { container.innerHTML = `<div class="empty-state"><div class="empty-icon"></div><div>Nenhum dado disponível</div></div>`; return; }
@@ -1364,6 +1454,7 @@ function renderAdvogadoAtivoTab() {
                 document.getElementById('assuntosContent').innerHTML = `<div class="loading"><div class="spinner"></div><div>Carregando...</div></div>`;
                 document.getElementById('poloPassivoContent').innerHTML = `<div class="loading"><div class="spinner"></div><div>Carregando...</div></div>`;
                 document.getElementById('advogadoAtivoContent').innerHTML = `<div class="loading"><div class="spinner"></div><div>Carregando...</div></div>`;
+                document.getElementById('unidadeContent').innerHTML = `<div class="loading"><div class="spinner"></div><div>Carregando...</div></div>`;
                 document.getElementById('analisesContent').innerHTML = `<div class="loading"><div class="spinner"></div><div>Carregando...</div></div>`;
             }
 
@@ -1373,8 +1464,15 @@ function renderAdvogadoAtivoTab() {
             window.togglePoloCourt = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; expandedPoloCourts.delete(id); } else { c.classList.add('expanded'); i.textContent = '−'; expandedPoloCourts.add(id); } } };
             window.toggleAdvogado = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; expandedAdvogados.delete(id); } else { c.classList.add('expanded'); i.textContent = '−'; expandedAdvogados.add(id); } } };
             window.toggleAdvogadoCourt = function(id) { const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`); if (c && i) { if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; expandedAdvogadoCourts.delete(id); } else { c.classList.add('expanded'); i.textContent = '−'; expandedAdvogadoCourts.add(id); } } };
+            window.toggleUnidade = function(id, nivel) {
+                const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`);
+                if (!c || !i) return;
+                const set = nivel === 'un' ? expandedUnidades : nivel === 'vara' ? expandedUnidadeVaras : expandedUnidadeAssuntos;
+                if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; set.delete(id); }
+                else { c.classList.add('expanded'); i.textContent = '−'; set.add(id); }
+            };
             window.copyToClipboard = function(t, btn) { navigator.clipboard.writeText(t).then(() => { const orig = btn.textContent; btn.textContent = '✓'; btn.classList.add('copied'); showToast(`Copiado: ${t}`, 'success'); setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500); }); };
-            window.switchTab = function(tab) { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); event.target.classList.add('active'); document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.getElementById(`tab-${tab}`).classList.add('active'); if (tab === 'assuntos' && currentData) renderAssuntosTab(); else if (tab === 'poloPassivo' && currentPoloData) renderPoloPassivoTab(); else if (tab === 'advogadoAtivo' && currentAdvogadoData) renderAdvogadoAtivoTab(); else if (tab === 'analises' && currentData) renderAnalisesTab(); else if (tab === 'tendencia' && currentData) renderTendenciaTab(); };
+            window.switchTab = function(tab) { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); event.target.classList.add('active'); document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.getElementById(`tab-${tab}`).classList.add('active'); if (tab === 'assuntos' && currentData) renderAssuntosTab(); else if (tab === 'poloPassivo' && currentPoloData) renderPoloPassivoTab(); else if (tab === 'advogadoAtivo' && currentAdvogadoData) renderAdvogadoAtivoTab(); else if (tab === 'unidade' && currentUnidadeData) renderUnidadeTab(); else if (tab === 'analises' && currentData) renderAnalisesTab(); else if (tab === 'tendencia' && currentData) renderTendenciaTab(); };
 
             async function loadDataFromSupabase() {
                 try {
@@ -1399,7 +1497,7 @@ function renderAdvogadoAtivoTab() {
             
         })();
     </script>
-<script src="tendencia.js?v=20261003a"></script>
-<script src="sampinha.js?v=20261003a"></script>
+<script src="tendencia.js?v=20261004a"></script>
+<script src="sampinha.js?v=20261004a"></script>
 </body>
 </html>

@@ -74,7 +74,7 @@
         const aba = document.querySelector('.tab.active');
         if (aba) {
           c.aba = aba.textContent.trim();
-          const ids = { assuntos: 'searchInput', poloPassivo: 'poloSearchInput', advogadoAtivo: 'advogadoSearchInput' };
+          const ids = { assuntos: 'searchInput', poloPassivo: 'poloSearchInput', advogadoAtivo: 'advogadoSearchInput', unidade: 'unidadeSearchInput' };
           const inp = ids[aba.dataset.tab] && document.getElementById(ids[aba.dataset.tab]);
           if (inp && inp.value.trim()) c.busca = inp.value.trim();
           if (aba.dataset.tab === 'tendencia') {
@@ -483,8 +483,8 @@
   const PAGINAS = { inicio: 'index.html', analise: 'analise.html', metricas: 'metricas.html', producao: 'producao.html' };
   const NOMES_MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const rotMes = (ym) => NOMES_MES[parseInt(ym.slice(5), 10) - 1] + '/' + ym.slice(0, 4);
-  const INPUT_BUSCA = { assuntos: 'searchInput', poloPassivo: 'poloSearchInput', advogadoAtivo: 'advogadoSearchInput' };
-  const NOME_ABA = { assuntos: 'Assuntos', poloPassivo: 'Polo Passivo', advogadoAtivo: 'Advogado Polo Ativo', analises: 'Análises', tendencia: 'Tendência' };
+  const INPUT_BUSCA = { assuntos: 'searchInput', poloPassivo: 'poloSearchInput', advogadoAtivo: 'advogadoSearchInput', unidade: 'unidadeSearchInput' };
+  const NOME_ABA = { assuntos: 'Assuntos', poloPassivo: 'Polo Passivo', advogadoAtivo: 'Advogado Polo Ativo', unidade: 'Unidade', analises: 'Análises', tendencia: 'Tendência' };
   const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
   async function esperar(fn, ms) {
     const t0 = Date.now();

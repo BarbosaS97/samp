@@ -115,7 +115,7 @@
   window.SAMP_USUARIO = sessao;   // { nome, matricula, token, exp } ou null
 
   // acabamento visual compartilhado (animações, abas, números); não é usado na tela de acesso
-  if (atual !== 'entrar') { const u = document.createElement('script'); u.src = 'ui.js?v=20261003a'; document.body.appendChild(u); }
+  if (atual !== 'entrar') { const u = document.createElement('script'); u.src = 'ui.js?v=20261004a'; document.body.appendChild(u); }
 
   // PWA: registra o service worker (só quando servido por http/https)
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
