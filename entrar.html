@@ -240,7 +240,7 @@
               </button>
               <span class="barra-foco"></span>
             </div>
-            <div class="regra" id="regra" hidden>Use de 6 a 100 caracteres.</div>
+            <div class="regra" id="regra" hidden>Use de 8 a 100 caracteres, diferente da matrícula.</div>
 
             <div class="campo" id="campoConfirma" hidden>
               <input class="senha" id="confirma" name="confirma" type="password" autocomplete="off" maxlength="100" placeholder=" ">
@@ -380,7 +380,8 @@
     const senha = $('senha').value, confirma = $('confirma').value;
     if (!senha) { mostrarErro(criando ? 'Escolha uma senha.' : 'Digite a sua senha.', 'campoSenha', 'msgSenha'); $('senha').focus(); return; }
     if (criando) {
-      if (senha.length < 6) { mostrarErro('A senha deve ter pelo menos 6 caracteres.', 'campoSenha', 'msgSenha'); $('senha').focus(); return; }
+      if (senha.length < 8) { mostrarErro('A senha deve ter pelo menos 8 caracteres.', 'campoSenha', 'msgSenha'); $('senha').focus(); return; }
+      if (senha.toUpperCase() === matriculaAtual) { mostrarErro('A senha não pode ser igual à matrícula.', 'campoSenha', 'msgSenha'); $('senha').focus(); return; }
       if (senha !== confirma) { mostrarErro('As senhas não conferem. Digite a mesma senha nos dois campos.', 'campoConfirma', 'msgSenha'); $('confirma').focus(); return; }
     }
     limparErroSenha(); carregando('entrarSenha', true, criando ? 'Criar senha e entrar' : 'Entrar');

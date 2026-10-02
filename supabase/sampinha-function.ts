@@ -17,7 +17,8 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+  new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+const MAX_CORPO = 1024 * 1024;   // as perguntas são pequenas: recusa pedidos grandes
 
 /* ---------- validação do token de sessão (mesma lógica da cadastros-function) ---------- */
 const enc = new TextEncoder(), dec = new TextDecoder();
@@ -34,7 +35,7 @@ async function chave() {
   const base = await crypto.subtle.digest("SHA-256", enc.encode("samp-token:" + Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")));
   return crypto.subtle.importKey("raw", base, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
 }
-async function lerToken(token: unknown): Promise<{ m: string; n: string } | null> {
+async function lerToken(token: unknown): Promise<{ m: string; n: string; iat: number } | null> {
   if (typeof token !== "string" || token.length > 2000) return null;
   const [corpo, sig] = token.split(".");
   if (!corpo || !sig) return null;
@@ -42,7 +43,7 @@ async function lerToken(token: unknown): Promise<{ m: string; n: string } | null
   if (!igual(sig, esperado)) return null;
   try {
     const d = JSON.parse(dec.decode(deb64u(corpo)));
-    return d.exp > Date.now() ? { m: d.m, n: d.n } : null;
+    return d.exp > Date.now() ? { m: d.m, n: d.n, iat: Number(d.iat) || 0 } : null;
   } catch { return null; }
 }
 
@@ -1131,19 +1132,23 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_CORPO) return json({ error: "Pedido grande demais" }, 413);
   let b: any;
   try { b = await req.json(); } catch { return json({ error: "Requisição inválida" }, 400); }
+  if (!b || typeof b !== "object" || Array.isArray(b)) return json({ error: "Requisição inválida" }, 400);
 
   const sessao = await lerToken(b.token);
   if (!sessao) return json({ error: "Sessão inválida ou expirada" }, 401);
 
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { data: u } = await db.from("usuarios").select("ativo").eq("matricula", sessao.m).maybeSingle();
+  const { data: u } = await db.from("usuarios").select("ativo, senha_definida_em").eq("matricula", sessao.m).maybeSingle();
   if (!u?.ativo) return json({ error: "Matrícula não autorizada" }, 401);
+  // sessão aberta antes da (re)definição da senha deixa de valer
+  if (!u.senha_definida_em || !sessao.iat || Date.parse(u.senha_definida_em) > sessao.iat) return json({ error: "Sessão inválida ou expirada" }, 401);
 
   const m = sessao.m;                       // TODAS as consultas abaixo filtram por esta matrícula
   const acao = typeof b.action === "string" ? b.action : "chat";
-  const falha = (e: any) => json({ error: e?.message ?? String(e) }, 500);
+  const falha = (e: any) => { console.error("sampinha:", e?.message ?? e); return json({ error: "Não foi possível concluir a operação. Tente novamente." }, 500); };
 
   try {
     /* ----- lista de conversas (com busca opcional) ----- */

@@ -11,7 +11,8 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+  new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+const MAX_CORPO = 40 * 1024 * 1024;   // recusa pedidos gigantes (a maior importação, 50 mil processos, fica bem abaixo disso)
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function igual(a: string, b: string) {
@@ -39,11 +40,12 @@ async function chave() {
   return crypto.subtle.importKey("raw", base, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
 }
 async function criarToken(dados: { m: string; n: string }) {
-  const corpo = b64u(enc.encode(JSON.stringify({ ...dados, exp: Date.now() + SESSAO_MS })));
+  const agora = Date.now();
+  const corpo = b64u(enc.encode(JSON.stringify({ ...dados, iat: agora, exp: agora + SESSAO_MS })));
   const sig = b64u(await crypto.subtle.sign("HMAC", await chave(), enc.encode(corpo)));
-  return { token: `${corpo}.${sig}`, exp: Date.now() + SESSAO_MS };
+  return { token: `${corpo}.${sig}`, exp: agora + SESSAO_MS };
 }
-async function lerToken(token: unknown): Promise<{ m: string; n: string } | null> {
+async function lerToken(token: unknown): Promise<{ m: string; n: string; iat: number } | null> {
   if (typeof token !== "string" || token.length > 2000) return null;
   const [corpo, sig] = token.split(".");
   if (!corpo || !sig) return null;
@@ -51,13 +53,36 @@ async function lerToken(token: unknown): Promise<{ m: string; n: string } | null
   if (!igual(sig, esperado)) return null;
   try {
     const d = JSON.parse(dec.decode(deb64u(corpo)));
-    return d.exp > Date.now() ? { m: d.m, n: d.n } : null;
+    return d.exp > Date.now() ? { m: d.m, n: d.n, iat: Number(d.iat) || 0 } : null;
   } catch { return null; }
 }
 
+/* ---------- limite de tentativas (persistente e atômico; ver sql/14_seguranca.sql) ---------- */
+const ipDe = (req: Request) =>
+  (req.headers.get("cf-connecting-ip") || (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "desconhecido").slice(0, 60);
+async function segundosBloqueado(db: any, chave: string): Promise<number> {
+  try {
+    const { data } = await db.from("seguranca_tentativas").select("bloqueado_ate").eq("chave", chave).maybeSingle();
+    const resta = data?.bloqueado_ate ? Date.parse(data.bloqueado_ate) - Date.now() : 0;
+    return resta > 0 ? Math.ceil(resta / 1000) : 0;
+  } catch { return 0; }   // se o controle estiver indisponível, não derruba o login
+}
+async function registrarFalha(db: any, chave: string, max: number, janelaS: number, bloqueioS: number) {
+  try {
+    const { error } = await db.rpc("registrar_falha", { p_chave: chave, p_max: max, p_janela_s: janelaS, p_bloqueio_s: bloqueioS });
+    if (error) console.error("registrar_falha:", error.message);   // normalmente: o SQL 14 ainda não foi executado
+  } catch (e) { console.error("registrar_falha:", (e as Error)?.message); }
+}
+const limparFalhas = async (db: any, chave: string) => { try { await db.from("seguranca_tentativas").delete().eq("chave", chave); } catch { /* sem efeito */ } };
+const tentarDepois = (s: number) => json({ error: `Muitas tentativas. Tente novamente em ${Math.max(1, Math.ceil(s / 60))} minuto(s).`, retry_after: s }, 429);
+// limites: por matrícula 5 falhas / 15 min -> bloqueio de 15 min; por endereço 30 falhas / 15 min -> 15 min; senha de cadastro 8 falhas / 15 min -> 30 min
+const falhaMatricula = (db: any, m: string) => registrarFalha(db, "m:" + m, 5, 900, 900);
+const falhaIp = (db: any, ip: string) => registrarFalha(db, "ip:" + ip, 30, 900, 900);
+const falhaAdmin = (db: any, ip: string) => registrarFalha(db, "adm:" + ip, 8, 900, 1800);
+
 /* ---------- senha (PBKDF2-SHA256 com sal individual) ---------- */
 const ITER_SENHA = 100000;
-const senhaValida = (s: unknown): s is string => typeof s === "string" && s.length >= 6 && s.length <= 100;
+const senhaValida = (s: unknown): s is string => typeof s === "string" && s.length >= 8 && s.length <= 100;
 async function derivar(senha: string, sal: Uint8Array, iter: number) {
   const k = await crypto.subtle.importKey("raw", enc.encode(senha), "PBKDF2", false, ["deriveBits"]);
   return b64u(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: sal, iterations: iter }, k, 256));
@@ -99,7 +124,7 @@ async function ler(db: any, q: any, admin: boolean) {
   }
   if (q.single) qb = qb.single();
   const { data, count, error } = await qb;
-  if (error) return json({ error: error.message }, 500);
+  if (error) { console.error("ler:", error.message); return json({ error: admin ? error.message : "Não foi possível consultar os dados." }, 500); }
   return json({ data, count });
 }
 
@@ -453,20 +478,28 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_CORPO) return json({ error: "Pedido grande demais" }, 413);
   let b: any;
   try { b = await req.json(); } catch { return json({ error: "Requisição inválida" }, 400); }
+  if (!b || typeof b !== "object" || Array.isArray(b)) return json({ error: "Requisição inválida" }, 400);
 
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const falha = (e: any) => json({ error: e?.message ?? String(e) }, 500);
+  const falha = (e: any) => { console.error("erro:", e?.message ?? e); return json({ error: e?.message ?? String(e) }, 500); };
+  const ip = ipDe(req);
 
   try {
     /* ===== 1) Login: matrícula autorizada + senha ===== */
     if (b.action === "login_matricula" || b.action === "login" || b.action === "definir_senha") {
       const m = normMatricula(b.matricula);
+      // bloqueio por excesso de tentativas (checado ANTES de qualquer cálculo de hash, para não gastar CPU com quem ataca)
+      const esperaIp = await segundosBloqueado(db, "ip:" + ip);
+      if (esperaIp) return tentarDepois(esperaIp);
+      if (matriculaValida(m)) { const esperaM = await segundosBloqueado(db, "m:" + m); if (esperaM) return tentarDepois(esperaM); }
+
       const { data: u } = matriculaValida(m)
         ? await db.from("usuarios").select("matricula, nome, ativo, senha_hash").eq("matricula", m).maybeSingle()
         : { data: null };
-      if (!u || !u.ativo) { await espera(900); return json({ error: "Matrícula não autorizada" }, 401); }
+      if (!u || !u.ativo) { await falhaIp(db, ip); await espera(900); return json({ error: "Matrícula não autorizada" }, 401); }
 
       // etapa 1: matrícula autorizada -> informa se já existe senha
       if (b.action === "login_matricula") return json({ ok: true, nome: u.nome, tem_senha: !!u.senha_hash });
@@ -475,17 +508,21 @@ Deno.serve(async (req) => {
       const atualizar: Record<string, unknown> = { ultimo_acesso: new Date().toISOString() };
       if (b.action === "definir_senha") {
         if (u.senha_hash) return json({ error: "Esta matrícula já possui senha." }, 409);
-        if (!senhaValida(b.senha)) return json({ error: "A senha deve ter de 6 a 100 caracteres." }, 400);
+        if (!senhaValida(b.senha)) return json({ error: "A senha deve ter de 8 a 100 caracteres." }, 400);
+        if (normMatricula(b.senha) === m) return json({ error: "A senha não pode ser igual à matrícula." }, 400);
         atualizar.senha_hash = await hashSenha(b.senha);
         atualizar.senha_definida_em = new Date().toISOString();
       } else {
         if (!u.senha_hash) return json({ error: "Esta matrícula ainda não tem senha.", sem_senha: true }, 409);
-        if (typeof b.senha !== "string" || !(await conferirSenha(b.senha, u.senha_hash))) {
+        if (typeof b.senha !== "string" || b.senha.length > 100 || !(await conferirSenha(b.senha, u.senha_hash))) {
+          await Promise.all([falhaMatricula(db, m), falhaIp(db, ip)]);
           await espera(1200); // atrasa tentativas erradas
           return json({ error: "Senha incorreta" }, 401);
         }
       }
-      await db.from("usuarios").update(atualizar).eq("matricula", m);
+      const { error: eUp } = await db.from("usuarios").update(atualizar).eq("matricula", m);
+      if (eUp) return falha(eUp);   // sem gravar a senha/acesso não se abre sessão
+      await limparFalhas(db, "m:" + m);
       const t = await criarToken({ m: u.matricula, n: u.nome });
       return json({ ok: true, nome: u.nome, matricula: u.matricula, token: t.token, exp: t.exp });
     }
@@ -494,16 +531,20 @@ Deno.serve(async (req) => {
     if (b.action === "ler" && b.token !== undefined) {
       const s = await lerToken(b.token);
       if (!s) return json({ error: "Sessão inválida ou expirada" }, 401);
-      // conferência a cada leitura: se a matrícula for desativada/excluída, o acesso cai na hora
-      const { data: u } = await db.from("usuarios").select("ativo").eq("matricula", s.m).maybeSingle();
+      // conferência a cada leitura: se a matrícula for desativada/excluída, ou a senha for redefinida depois do login, o acesso cai na hora
+      const { data: u } = await db.from("usuarios").select("ativo, senha_definida_em").eq("matricula", s.m).maybeSingle();
       if (!u?.ativo) return json({ error: "Matrícula não autorizada" }, 401);
+      if (!u.senha_definida_em || !s.iat || Date.parse(u.senha_definida_em) > s.iat) return json({ error: "Sessão inválida ou expirada" }, 401);
       return await ler(db, b, false);
     }
 
     /* ===== 3) Daqui em diante: exige SENHA_CADASTRO ===== */
+    const esperaAdm = await segundosBloqueado(db, "adm:" + ip);
+    if (esperaAdm) return tentarDepois(esperaAdm);
     const esperada = Deno.env.get("SENHA_CADASTRO");
     if (!esperada) return json({ error: "SENHA_CADASTRO não configurada no servidor" }, 500);
-    if (typeof b.senha !== "string" || !igual(b.senha, esperada)) {
+    if (typeof b.senha !== "string" || b.senha.length > 200 || !igual(b.senha, esperada)) {
+      await falhaAdmin(db, ip);
       await espera(1200); // atrasa tentativas erradas
       return json({ error: "Senha incorreta" }, 401);
     }
