@@ -35,6 +35,13 @@
   .fundo .luz { background: radial-gradient(circle 240px at var(--mx) var(--my), rgba(224,201,143,.11), transparent 100%); opacity: 0; transition: opacity .5s ease; }
   .fundo.ativo .g2, .fundo.ativo .luz { opacity: 1; }
   @keyframes deriva { to { background-position: 44px 44px, 44px 44px; } }
+  /* a mesma grade no lado branco, em tom claro (azul-acinzentado) e brilho dourado suave perto do mouse */
+  .acesso { position: relative; overflow: hidden; }
+  .acesso > .fundo { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; --mx: 50%; --my: 45%; }
+  .acesso > .caixa { z-index: 1; }
+  .fundo.claro .g1 { background-image: linear-gradient(rgba(18,53,91,.075) 1px, transparent 1px), linear-gradient(90deg, rgba(18,53,91,.075) 1px, transparent 1px); }
+  .fundo.claro .g2 { background-image: linear-gradient(rgba(166,138,78,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(166,138,78,.6) 1px, transparent 1px); -webkit-mask-image: radial-gradient(circle 170px at var(--mx) var(--my), #000 0%, transparent 100%); mask-image: radial-gradient(circle 170px at var(--mx) var(--my), #000 0%, transparent 100%); }
+  .fundo.claro .luz { background: radial-gradient(circle 260px at var(--mx) var(--my), rgba(166,138,78,.13), transparent 100%); }
   .marca::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--gold); }
   .marca > * { position: relative; z-index: 1; }
   .logo { display: flex; align-items: baseline; gap: 14px; animation: sobe .7s .05s both; }
@@ -248,6 +255,7 @@
   </aside>
 
   <main class="acesso">
+    <div class="fundo claro" id="fundo2" aria-hidden="true"><i class="g1"></i><i class="luz"></i><i class="g2"></i></div>
     <div class="caixa">
       <section class="cartao" id="cartao">
 
@@ -355,24 +363,25 @@
   if (window.SAMP_AUTH.get()) { location.replace(destino); return; }
 
   /* ---------- fundo sensível ao mouse (suaviza o movimento; só com mouse/caneta) ---------- */
-  (function () {
-    const marca = document.querySelector('.marca'), fundo = $('fundo');
-    if (!marca || !fundo) return;
+  function fundoSensivel(area, fundo) {
+    if (!area || !fundo) return;
     let alvoX = 0, alvoY = 0, x = 0, y = 0, rodando = false;
     const passo = () => {
       x += (alvoX - x) * 0.16; y += (alvoY - y) * 0.16;
       fundo.style.setProperty('--mx', x.toFixed(1) + 'px'); fundo.style.setProperty('--my', y.toFixed(1) + 'px');
       if (Math.abs(alvoX - x) > 0.4 || Math.abs(alvoY - y) > 0.4) requestAnimationFrame(passo); else rodando = false;
     };
-    marca.addEventListener('pointermove', (e) => {
+    area.addEventListener('pointermove', (e) => {
       if (e.pointerType === 'touch') return;
-      const r = marca.getBoundingClientRect();
+      const r = area.getBoundingClientRect();
       alvoX = e.clientX - r.left; alvoY = e.clientY - r.top;
       if (!fundo.classList.contains('ativo')) { x = alvoX; y = alvoY; fundo.classList.add('ativo'); }
       if (!rodando) { rodando = true; requestAnimationFrame(passo); }
     });
-    marca.addEventListener('pointerleave', () => fundo.classList.remove('ativo'));
-  })();
+    area.addEventListener('pointerleave', () => fundo.classList.remove('ativo'));
+  }
+  fundoSensivel(document.querySelector('.marca'), $('fundo'));    // lado azul
+  fundoSensivel(document.querySelector('.acesso'), $('fundo2'));  // lado branco
 
   /* ---------- contexto ---------- */
   const aviso = (texto, tipo) => { const a = $('aviso'); a.textContent = texto; a.className = 'aviso on ' + tipo; };
