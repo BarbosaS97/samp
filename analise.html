@@ -362,16 +362,16 @@
         .tab:hover { color: #1a4a6e; }
         .tab.active { color: #1a4a6e; border-bottom-color: #1a4a6e; }
 
-        /* abas em destaque: cada uma parece um botão clicável, para ficar claro que há outras visões */
-        .tabs-container .tabs { background: #fff !important; border: 1px solid #d3d9e0 !important; border-radius: 10px !important; padding: 10px 14px !important; gap: 8px !important; align-items: center; margin-bottom: 16px; box-shadow: 0 3px 12px rgba(18,53,91,.07); scroll-snap-type: x proximity; }
-        .tabs-rot { flex: none; font-size: 11px; letter-spacing: .9px; text-transform: uppercase; font-weight: 700; color: #a68a4e; padding-right: 8px; margin-right: 2px; border-right: 1px solid #e6eaef; white-space: nowrap; }
-        .tabs-container .tabs .tab { flex: none; scroll-snap-align: start; padding: 10px 20px !important; font-size: 14px; font-weight: 600; color: #12355b !important; background: #eef2f7 !important; border: 1px solid #d3dbe5 !important; border-radius: 999px !important; transition: background .2s, color .2s, border-color .2s, transform .2s, box-shadow .2s; }
-        .tabs-container .tabs .tab:hover { background: #dfe8f2 !important; border-color: #12355b !important; transform: translateY(-2px); box-shadow: 0 5px 12px rgba(18,53,91,.16); }
-        .tabs-container .tabs .tab:active { transform: translateY(0) scale(.98); }
-        .tabs-container .tabs .tab:focus-visible { outline: 3px solid rgba(18,53,91,.3); outline-offset: 2px; }
-        .tabs-container .tabs .tab.active { background: #12355b !important; color: #fff !important; border-color: #12355b !important; box-shadow: 0 6px 14px rgba(18,53,91,.3); transform: none; }
+        /* abas no mesmo estilo do menu do topo: faixa azul-marinho com linha dourada, abas distribuídas na largura toda e linha de destaque sob a aba ativa */
+        .tabs-container .tabs { background: #0c2540 !important; border: none !important; border-bottom: 3px solid #a68a4e !important; border-radius: 6px 6px 0 0 !important; padding: 0 12px !important; gap: 2px !important; align-items: stretch; margin-bottom: 16px; box-shadow: 0 6px 16px rgba(12,37,64,.18); overflow-x: auto; }
+        .tabs-rot { flex: none; align-self: center; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; color: #e0c98f; padding: 0 14px 0 4px; margin-right: 4px; border-right: 1px solid rgba(255,255,255,.18); white-space: nowrap; }
+        .tabs-container .tabs .tab { flex: 1 1 0; min-width: max-content; padding: 15px 18px !important; font-size: 14px; font-weight: 500; text-align: center; color: #cdd6e1 !important; background: transparent !important; border: none !important; border-bottom: 3px solid transparent !important; margin-bottom: -3px; border-radius: 0 !important; transition: background .2s, color .2s, border-color .2s; }
+        .tabs-container .tabs .tab:hover { color: #fff !important; background: rgba(255,255,255,.08) !important; border-bottom-color: rgba(255,255,255,.35) !important; }
+        .tabs-container .tabs .tab:focus-visible { outline: 2px solid #e0c98f; outline-offset: -3px; }
+        .tabs-container .tabs .tab.active { color: #fff !important; font-weight: 700; background: rgba(255,255,255,.1) !important; border-bottom-color: #fff !important; }
         .tabs-container .tabs .tab-ind { display: none !important; }
-        @media (max-width: 700px) { .tabs-rot { display: none; } .tabs-container .tabs { padding: 8px 10px !important; } .tabs-container .tabs .tab { padding: 9px 16px !important; font-size: 13px; } }
+        @media (max-width: 700px) { .tabs-rot { display: none; } .tabs-container .tabs { padding: 0 6px !important; } .tabs-container .tabs .tab { flex: none; padding: 13px 16px !important; font-size: 13px; } }
+
 
         .main-content {
             max-width: 1400px;
