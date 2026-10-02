@@ -380,6 +380,74 @@
     });
     area.addEventListener('pointerleave', () => fundo.classList.remove('ativo'));
   }
+  /* ---------- gráfico vivo: depois da animação de entrada, as barras sobem e descem devagar, a linha e os pontos as acompanham,
+     um feixe de luz percorre o gráfico e as barras reagem ao mouse ---------- */
+  (function () {
+    const svg = document.querySelector('.grafico');
+    if (!svg || reduzir) return;
+    const barras = [...svg.querySelectorAll('.barra')], pontos = [...svg.querySelectorAll('.ponto')], pulso = svg.querySelector('.pulso'), linhaOrig = svg.querySelector('.linha');
+    const BASE = 196, CX = barras.map((b) => +b.getAttribute('x') + +b.getAttribute('width') / 2);
+    const H0 = barras.map((b) => +b.getAttribute('height'));
+    const OFF = [-18, -24, -28, -24, -24, -22, -24];                 // distância da linha acima do topo de cada barra (igual ao desenho original)
+    const IDX_PONTO = pontos.map((p) => CX.findIndex((c) => Math.abs(c - +p.getAttribute('cx')) < 2));
+    const AMP = [9, 12, 8, 13, 10, 12, 11], VEL = [0.9, 0.7, 1.1, 0.6, 0.85, 0.65, 0.75], FASE = [0, 1.7, 3.1, 4.4, 2.2, 5.3, 0.9];
+    const NS = 'http://www.w3.org/2000/svg';
+    const linha = document.createElementNS(NS, 'path');
+    linha.setAttribute('class', 'linha-viva'); linha.style.cssText = 'fill:none;stroke:#e0c98f;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity .7s';
+    linhaOrig.after(linha);
+    let mouseX = null, ramp = 0, t0 = 0, vivo = false;
+    const marca = document.querySelector('.marca');
+    marca.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;
+      const r = svg.getBoundingClientRect();
+      mouseX = r.width ? ((e.clientX - r.left) / r.width) * 480 : null;     // coordenada no desenho (viewBox de 480 de largura)
+    });
+    marca.addEventListener('pointerleave', () => { mouseX = null; });
+    const sua = new Array(barras.length).fill(0);                            // reação suavizada ao mouse
+    function curva(p) {                                                       // curva suave (Catmull-Rom) passando pelos pontos
+      let d = `M${p[0][0].toFixed(1)} ${p[0][1].toFixed(1)}`;
+      for (let i = 0; i < p.length - 1; i++) {
+        const a = p[i - 1] || p[i], b = p[i], c = p[i + 1], e = p[i + 2] || c;
+        d += ` C${(b[0] + (c[0] - a[0]) / 6).toFixed(1)} ${(b[1] + (c[1] - a[1]) / 6).toFixed(1)}, ${(c[0] - (e[0] - b[0]) / 6).toFixed(1)} ${(c[1] - (e[1] - b[1]) / 6).toFixed(1)}, ${c[0].toFixed(1)} ${c[1].toFixed(1)}`;
+      }
+      return d;
+    }
+    function quadro(agora) {
+      requestAnimationFrame(quadro);
+      if (!svg.getClientRects().length) return;                              // gráfico oculto (telas estreitas)
+      if (!t0) t0 = agora;
+      const t = (agora - t0) / 1000;
+      ramp = Math.min(1, t / 2.2);                                           // as ondas entram aos poucos, sem salto
+      const varre = ((t * 70) % 760) - 140;                                  // feixe de luz que atravessa o gráfico da esquerda para a direita
+      const pts = [];
+      barras.forEach((b, i) => {
+        const alvo = mouseX == null ? 0 : 16 * Math.exp(-Math.pow((CX[i] - mouseX) / 62, 2));
+        sua[i] += (alvo - sua[i]) * 0.1;
+        let h = H0[i] + ramp * AMP[i] * Math.sin(t * VEL[i] + FASE[i]) + sua[i];
+        h = Math.max(24, Math.min(178, h));
+        b.setAttribute('y', (BASE - h).toFixed(1)); b.setAttribute('height', h.toFixed(1));
+        const brilho = Math.exp(-Math.pow((CX[i] - varre) / 55, 2));
+        b.style.opacity = Math.min(1, 1 - 0.22 * ramp + 0.22 * brilho * ramp + sua[i] / 80).toFixed(3);
+        pts.push([CX[i], Math.max(8, BASE - h + OFF[i])]);
+      });
+      linha.setAttribute('d', curva(pts));
+      pontos.forEach((p, k) => {
+        const i = IDX_PONTO[k]; if (i < 0) return;
+        const brilho = Math.exp(-Math.pow((CX[i] - varre) / 55, 2));
+        p.setAttribute('cy', pts[i][1].toFixed(1)); p.setAttribute('r', (5 + 1.6 * brilho).toFixed(2));
+        if (i === IDX_PONTO[IDX_PONTO.length - 1] && pulso) pulso.setAttribute('cy', pts[i][1].toFixed(1));
+      });
+    }
+    // entrega do desenho original (animações CSS) para a versão viva, sem salto
+    setTimeout(() => {
+      barras.forEach((b) => { b.style.animation = 'none'; b.style.transform = 'none'; });
+      linhaOrig.style.transition = 'opacity .7s'; linhaOrig.style.opacity = 0;
+      pontos.forEach((p) => { p.style.animation = 'none'; p.style.opacity = 1; p.style.transform = 'none'; });
+      linha.style.opacity = 1; vivo = true;
+      requestAnimationFrame(quadro);
+    }, 3700);
+  })();
+
   fundoSensivel(document.querySelector('.marca'), $('fundo'));    // lado azul
   fundoSensivel(document.querySelector('.acesso'), $('fundo2'));  // lado branco
 
