@@ -362,6 +362,17 @@
         .tab:hover { color: #1a4a6e; }
         .tab.active { color: #1a4a6e; border-bottom-color: #1a4a6e; }
 
+        /* abas em destaque: cada uma parece um botão clicável, para ficar claro que há outras visões */
+        .tabs-container .tabs { background: #fff !important; border: 1px solid #d3d9e0 !important; border-radius: 10px !important; padding: 10px 14px !important; gap: 8px !important; align-items: center; margin-bottom: 16px; box-shadow: 0 3px 12px rgba(18,53,91,.07); scroll-snap-type: x proximity; }
+        .tabs-rot { flex: none; font-size: 11px; letter-spacing: .9px; text-transform: uppercase; font-weight: 700; color: #a68a4e; padding-right: 8px; margin-right: 2px; border-right: 1px solid #e6eaef; white-space: nowrap; }
+        .tabs-container .tabs .tab { flex: none; scroll-snap-align: start; padding: 10px 20px !important; font-size: 14px; font-weight: 600; color: #12355b !important; background: #eef2f7 !important; border: 1px solid #d3dbe5 !important; border-radius: 999px !important; transition: background .2s, color .2s, border-color .2s, transform .2s, box-shadow .2s; }
+        .tabs-container .tabs .tab:hover { background: #dfe8f2 !important; border-color: #12355b !important; transform: translateY(-2px); box-shadow: 0 5px 12px rgba(18,53,91,.16); }
+        .tabs-container .tabs .tab:active { transform: translateY(0) scale(.98); }
+        .tabs-container .tabs .tab:focus-visible { outline: 3px solid rgba(18,53,91,.3); outline-offset: 2px; }
+        .tabs-container .tabs .tab.active { background: #12355b !important; color: #fff !important; border-color: #12355b !important; box-shadow: 0 6px 14px rgba(18,53,91,.3); transform: none; }
+        .tabs-container .tabs .tab-ind { display: none !important; }
+        @media (max-width: 700px) { .tabs-rot { display: none; } .tabs-container .tabs { padding: 8px 10px !important; } .tabs-container .tabs .tab { padding: 9px 16px !important; font-size: 13px; } }
+
         .main-content {
             max-width: 1400px;
             margin: 0 auto;
@@ -827,6 +838,7 @@
 
     <div class="tabs-container">
         <div class="tabs">
+            <span class="tabs-rot" aria-hidden="true">Ver por</span>
             <button class="tab active" data-tab="assuntos">Assuntos</button>
             <button class="tab" data-tab="poloPassivo">Polo Passivo</button>
             <button class="tab" data-tab="advogadoAtivo">Advogado Polo Ativo</button>
