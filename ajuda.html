@@ -15,8 +15,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>SAMP - O que tem no SAMP?</title>
-<script src="config.js?v=20261005a"></script>
-<link rel="stylesheet" href="theme.css?v=20261005a">
+<script src="config.js?v=20261006a"></script>
+<link rel="stylesheet" href="theme.css?v=20261006a">
 <style>
   .hero { padding: 36px 0 18px; }
   .hero .eyebrow { font-size: .72rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 700; }
@@ -104,7 +104,7 @@
 </style>
 </head>
 <body data-page="ajuda">
-<script src="layout.js?v=20261005a"></script>
+<script src="layout.js?v=20261006a"></script>
 <main class="page">
   <a class="gd-voltar" id="voltar" href="index.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span id="voltarTxt">Voltar ao início</span></a>
   <section class="hero">
@@ -421,7 +421,7 @@
 (function () {
   // sem sessão: versão pública ("Conheça o SAMP"); com sessão: guia normal e a Sampinha disponível
   if (window.SAMP_USUARIO) {
-    const s = document.createElement('script'); s.src = 'sampinha.js?v=20261005a'; document.body.appendChild(s);
+    const s = document.createElement('script'); s.src = 'sampinha.js?v=20261006a'; document.body.appendChild(s);
   } else {
     document.body.classList.add('publico');
     document.getElementById('voltar').href = 'entrar.html';

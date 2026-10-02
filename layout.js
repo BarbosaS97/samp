@@ -33,7 +33,7 @@
   const bar = document.createElement('header');
   bar.className = 'app-bar';
   bar.innerHTML =
-    '<a class="brand" href="index.html"><img class="brand-ico" src="icon.svg" alt="" width="28" height="28">SAMP<small>Acompanhamento e Métricas Processuais</small></a>' +
+    '<a class="brand" href="index.html"><img class="brand-ico" src="icon.svg" alt="" width="28" height="28">SAMP<small>Sistema de Acompanhamento e Métricas Processuais</small></a>' +
     (atual === 'entrar' ? '' :
       atual === 'ajuda' && !sessao ? '<nav aria-label="Navegação principal"><a href="ajuda.html" data-id="ajuda" class="active" aria-current="page">Conheça o SAMP</a><a href="entrar.html" data-id="entrar">Entrar</a></nav>' :
       '<nav aria-label="Navegação principal">' +
@@ -115,7 +115,7 @@
   window.SAMP_USUARIO = sessao;   // { nome, matricula, token, exp } ou null
 
   // acabamento visual compartilhado (animações, abas, números); não é usado na tela de acesso
-  if (atual !== 'entrar') { const u = document.createElement('script'); u.src = 'ui.js?v=20261005a'; document.body.appendChild(u); }
+  if (atual !== 'entrar') { const u = document.createElement('script'); u.src = 'ui.js?v=20261006a'; document.body.appendChild(u); }
 
   // PWA: registra o service worker (só quando servido por http/https)
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
