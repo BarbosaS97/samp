@@ -85,6 +85,24 @@
   .campo.erro .ico { stroke: var(--bad); }
   .campo.balanca { animation: balanca .45s; }
 
+  /* ---------- botão "Conheça o SAMP" (fora do cartão) ---------- */
+  .conheca { position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 13px 18px; text-decoration: none; color: #5b4a1f; background: linear-gradient(135deg, #fbf3e0 0%, #f2deaa 100%); border: 1px solid #e0c98f; border-left: 4px solid var(--gold); border-radius: var(--radius); box-shadow: 0 6px 18px rgba(166,138,78,.16); animation: sobe .7s .95s both; transition: transform .2s, box-shadow .25s, border-color .2s, opacity .3s; }
+  .conheca::after { content: ""; position: absolute; top: 0; bottom: 0; left: -80px; width: 50px; background: linear-gradient(100deg, transparent, rgba(255,255,255,.65), transparent); transform: skewX(-18deg); animation: brilhoConheca 5.5s 2.4s ease-in-out infinite; pointer-events: none; }
+  @keyframes brilhoConheca { 0%, 68% { left: -80px; } 100% { left: 115%; } }
+  .conheca:hover { transform: translateY(-3px); border-color: var(--gold); box-shadow: 0 12px 26px rgba(166,138,78,.3); }
+  .conheca:active { transform: translateY(-1px) scale(.99); }
+  .conheca:focus-visible { outline: 3px solid rgba(166,138,78,.45); outline-offset: 2px; }
+  .conheca .c-ico { flex: none; width: 42px; height: 42px; border-radius: 50%; background: var(--gold); color: #fff; display: grid; place-items: center; transition: background .25s, transform .35s cubic-bezier(.2,.8,.2,1.4); }
+  .conheca:hover .c-ico { background: #8a7140; transform: rotate(-12deg) scale(1.08); }
+  .conheca .c-ico svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .conheca .c-txt { flex: 1; min-width: 0; line-height: 1.3; }
+  .conheca .c-txt b { display: block; font-size: 1.02rem; font-weight: 700; letter-spacing: .2px; }
+  .conheca .c-txt small { display: block; font-size: .78rem; color: #7a6a3c; }
+  .conheca .c-seta { flex: none; width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s; }
+  .conheca:hover .c-seta { transform: translateX(5px); }
+  .cartao.concluido ~ .conheca { opacity: 0; pointer-events: none; transform: translateY(6px); }
+  @media (prefers-reduced-motion: reduce) { .conheca::after { display: none; } }
+
   /* ---------- passo da senha ---------- */
   [hidden] { display: none !important; }
   .campo input.senha { text-transform: none; letter-spacing: .3px; padding-right: 48px; }
@@ -304,7 +322,6 @@
           <div class="ajuda">
             Não consegue acessar? Solicite o cadastro da sua matrícula ao responsável pelo sistema.
             <div class="dica" id="dica">Dica: digite somente a matrícula, sem espaços ou outros caracteres.</div>
-            <div style="margin-top:8px"><a href="ajuda.html"><b>Conheça o SAMP</b></a> &middot; veja o que o sistema oferece antes de entrar</div>
             <div style="margin-top:8px"><a href="cadastros.html">Acesso ao Cadastros (administrador)</a></div>
           </div>
         </div>
@@ -316,6 +333,11 @@
           <div class="progresso"><i></i></div>
         </div>
       </section>
+      <a class="conheca" href="ajuda.html">
+        <span class="c-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8M12 16.8v.01"/></svg></span>
+        <span class="c-txt"><b>Conheça o SAMP</b><small>Veja o que o sistema oferece antes de entrar</small></span>
+        <svg class="c-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
       <div class="legal">SAMP &middot; Sistema de Acompanhamento e Métricas Processuais</div>
     </div>
   </main>
