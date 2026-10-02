@@ -159,6 +159,9 @@
 
   let pessoas = [];          // [{ nome, m, g, gn, d, r, total, primeira, ultima }]
   let modo = 'setor', pessoaSel = '', anoSel = '';
+  let acesso = { todas: false, pessoas: [] };   // produções individuais que esta matrícula pode abrir em detalhe
+  const pode = (nome) => acesso.todas || acesso.pessoas.includes(nome);
+  const SEM_ACESSO = 'Você não tem acesso à produção individual desta pessoa. Peça a liberação ao responsável pelo Cadastros.';
   let graficos = [];
   let ordem = { col: 'total', asc: false };
 
@@ -174,7 +177,13 @@
       const cr = await c.from('producao_calendario').select('pessoa,dados,atualizado_em');
       if (!cr.error) for (const x of cr.data || []) { const m = x.dados && x.dados.m; if (m) cal.set(x.pessoa, m); }
     } catch (e) { /* sem calendário */ }
-    pessoaSel = pessoas[0].nome;
+    // o Setor é de todos; o detalhe Individual só das pessoas liberadas a esta matrícula em Cadastros (sem resposta = nenhuma)
+    try {
+      const s = window.SAMP_AUTH.get();
+      const a = await window.chamarSAMP({ action: 'producao_acesso', token: s && s.token });
+      acesso = { todas: !!a.todas, pessoas: Array.isArray(a.pessoas) ? a.pessoas : [] };
+    } catch (e) { if (e.status === 401) window.SAMP_AUTH.sair(); }
+    pessoaSel = (pessoas.find((p) => pode(p.nome)) || {}).nome || '';
     montarEstrutura(); desenhar();
   }
   const erro = (t) => { $('conteudo').innerHTML = '<div class="pr-vazio"><h2>Produção indisponível</h2><p>' + esc(t) + '</p></div>'; };
@@ -328,8 +337,8 @@
     const anos = anosDe(pessoas);
     $('conteudo').innerHTML =
       '<div class="pr-bar">' +
-      '<div class="field"><label>Visão</label><div class="pr-modo"><button type="button" data-m="setor" class="on">Setor</button><button type="button" data-m="pessoa">Individual</button></div></div>' +
-      '<div class="field" id="fPessoa" style="display:none"><label for="selPessoa">Pessoa</label><select id="selPessoa">' + pessoas.map((p) => `<option>${esc(p.nome)}</option>`).join('') + '</select></div>' +
+      '<div class="field"><label>Visão</label><div class="pr-modo"><button type="button" data-m="setor" class="on">Setor</button><button type="button" data-m="pessoa"' + (pessoaSel ? '' : ' disabled title="' + esc(SEM_ACESSO) + '"') + '>Individual</button></div></div>' +
+      '<div class="field" id="fPessoa" style="display:none"><label for="selPessoa">Pessoa</label><select id="selPessoa">' + pessoas.filter((p) => pode(p.nome)).map((p) => `<option>${esc(p.nome)}</option>`).join('') + '</select></div>' +
       '<div class="field"><label for="selAno">Ano</label><select id="selAno"><option value="">Todos os anos</option>' + anos.slice().reverse().map((a) => `<option>${a}</option>`).join('') + '</select></div>' +
       (cal.size ? '<label class="pr-chk" title="Por padrão, treinamento e licença capacitação não são descontados dos dias disponíveis, pois há quem trabalhe nesses dias"><input type="checkbox" id="chkTrein"> Descontar treinamento/licença</label>' : '') +
       '<button type="button" class="pr-info-btn" id="btnInfo" aria-expanded="false"><i>i</i>Como ler estes números</button></div>' +
@@ -350,6 +359,7 @@
   }
 
   function abrirPessoa(nome) {
+    if (!pode(nome)) return;
     modo = 'pessoa'; pessoaSel = nome; $('selPessoa').value = nome; $('fPessoa').style.display = '';
     document.querySelectorAll('.pr-modo button').forEach((x) => x.classList.toggle('on', x.dataset.m === 'pessoa'));
     desenhar(); window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -480,7 +490,7 @@
     const th = (col, txt) => `<th class="ord" data-c="${col}">${txt}${ordem.col === col ? (ordem.asc ? ' ▲' : ' ▼') : ''}</th>`;
     const fim = ls.length ? ls[0].fim : 0;
     return '<div class="pr-tab"><table><thead><tr>' + th('nome', 'Pessoa') + th('total', 'Processos') + th('media', 'Média/mês') + th('ultimo', fim ? 'Último mês (' + rotYM(fim) + ')' : 'Último mês') + th('vs', 'vs. própria média') + th('metaPct', '% meta') + th('prio', 'Prioritários') + th('tempo', 'Tempo médio (dias)') + (cal.size ? th('aus', 'Dias de ausência') + th('pdia', 'Por dia disponível') : '') + '<th>Período</th></tr></thead><tbody>' +
-      ls.map((x) => `<tr class="cl" data-p="${esc(x.nome)}"><td><b>${esc(x.nome)}</b></td><td>${n0(x.total)}</td><td>${n1(x.media)}</td><td${x.ultimo ? '' : ' class="zero"'}>${n0(x.ultimo)}</td>` +
+      ls.map((x) => `<tr${pode(x.nome) ? ` class="cl" data-p="${esc(x.nome)}"` : ' title="Sem acesso ao detalhe individual desta pessoa"'}><td><b>${esc(x.nome)}</b></td><td>${n0(x.total)}</td><td>${n1(x.media)}</td><td${x.ultimo ? '' : ' class="zero"'}>${n0(x.ultimo)}</td>` +
         `<td>${x.vs === null ? '-' : `<span class="pr-var ${x.vs >= 0 ? 'up' : 'down'}">${pct(x.vs)}</span>`}</td><td>${x.metaPct === null ? '-' : Math.round(x.metaPct) + '%'}</td><td>${n0(x.prio)}</td><td>${x.tempo === null ? '-' : n0(x.tempo)}</td>` +
         (cal.size ? `<td${x.aus ? '' : ' class="mut"'}>${x.aus === null ? '-' : n0(x.aus)}</td><td>${x.pdia === null ? '-' : n1(x.pdia)}</td>` : '') +
         `<td>${x.primeira ? MES[+x.primeira.slice(5, 7) - 1] + '/' + x.primeira.slice(0, 4) : '-'} a ${x.ultimaData ? MES[+x.ultimaData.slice(5, 7) - 1] + '/' + x.ultimaData.slice(0, 4) : '-'}</td></tr>`).join('') +

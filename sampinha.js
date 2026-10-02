@@ -542,7 +542,7 @@
         return `Filtrei o período de ${rotMes(a.mes_inicial)} a ${rotMes(a.mes_final)}.`;
       }
       case 'producao_filtrar': {
-        const sel = await esperar(() => { const s = document.getElementById('selPessoa'); return s && s.options.length ? s : null; });
+        const sel = await esperar(() => document.getElementById('selPessoa'));
         if (!sel) return 'A produção ainda não carregou; tente novamente.';
         const norm = (x) => String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
         const alvo = norm(a.pessoa || ''), setor = !alvo || /^(setor|todos|todas|geral|equipe)$/.test(alvo);
@@ -551,7 +551,7 @@
         if (setor) botoes.find((b) => b.dataset.m === 'setor').click();
         else {
           const op = [...sel.options].find((o) => norm(o.textContent) === alvo) || [...sel.options].find((o) => norm(o.textContent).includes(alvo));
-          if (!op) return `Não encontrei "${a.pessoa}" na Produção Individual.`;
+          if (!op) return `Esta matrícula não tem acesso à produção individual de "${a.pessoa}" (ou o nome não existe). O Setor continua disponível.`;
           sel.value = op.value; sel.dispatchEvent(new Event('change', { bubbles: true }));
           botoes.find((b) => b.dataset.m === 'pessoa').click(); msgPessoa = 'Produção de ' + op.textContent;
         }

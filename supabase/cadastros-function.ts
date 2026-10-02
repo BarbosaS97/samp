@@ -57,6 +57,15 @@ async function lerToken(token: unknown): Promise<{ m: string; n: string; iat: nu
   } catch { return null; }
 }
 
+// sessão válida = token assinado + matrícula ainda ativa + senha não redefinida depois do login
+async function sessaoAtiva(db: any, token: unknown) {
+  const s = await lerToken(token);
+  if (!s) return null;
+  const { data: u } = await db.from("usuarios").select("ativo, senha_definida_em").eq("matricula", s.m).maybeSingle();
+  if (!u?.ativo || !u.senha_definida_em || !s.iat || Date.parse(u.senha_definida_em) > s.iat) return null;
+  return s;
+}
+
 /* ---------- limite de tentativas (persistente e atômico; ver sql/14_seguranca.sql) ---------- */
 const ipDe = (req: Request) =>
   (req.headers.get("cf-connecting-ip") || (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "desconhecido").slice(0, 60);
@@ -527,15 +536,18 @@ Deno.serve(async (req) => {
       return json({ ok: true, nome: u.nome, matricula: u.matricula, token: t.token, exp: t.exp });
     }
 
-    /* ===== 2) Leitura com sessão de matrícula ===== */
-    if (b.action === "ler" && b.token !== undefined) {
-      const s = await lerToken(b.token);
+    /* ===== 2) Ações com sessão de matrícula ===== */
+    if ((b.action === "ler" || b.action === "producao_acesso") && b.token !== undefined) {
+      // conferência a cada pedido: se a matrícula for desativada/excluída, ou a senha for redefinida depois do login, o acesso cai na hora
+      const s = await sessaoAtiva(db, b.token);
       if (!s) return json({ error: "Sessão inválida ou expirada" }, 401);
-      // conferência a cada leitura: se a matrícula for desativada/excluída, ou a senha for redefinida depois do login, o acesso cai na hora
-      const { data: u } = await db.from("usuarios").select("ativo, senha_definida_em").eq("matricula", s.m).maybeSingle();
-      if (!u?.ativo) return json({ error: "Matrícula não autorizada" }, 401);
-      if (!u.senha_definida_em || !s.iat || Date.parse(u.senha_definida_em) > s.iat) return json({ error: "Sessão inválida ou expirada" }, 401);
-      return await ler(db, b, false);
+      if (b.action === "ler") return await ler(db, b, false);
+
+      // quais produções individuais esta matrícula pode abrir em detalhe (a visão do Setor é de todos)
+      const { data: u } = await db.from("usuarios").select("producao_todas").eq("matricula", s.m).maybeSingle();
+      if (u?.producao_todas) return json({ ok: true, todas: true, pessoas: [] });
+      const { data } = await db.from("usuarios_producao").select("pessoa").eq("matricula", s.m);
+      return json({ ok: true, todas: false, pessoas: (data ?? []).map((x: any) => x.pessoa) });
     }
 
     /* ===== 3) Daqui em diante: exige SENHA_CADASTRO ===== */
@@ -558,10 +570,19 @@ Deno.serve(async (req) => {
 
       /* ---- usuários (matrículas autorizadas) ---- */
       case "usuarios_listar": {
-        const { data, error } = await db.from("usuarios").select("matricula, nome, ativo, criado_em, ultimo_acesso, senha_hash").order("nome");
+        const { data, error } = await db.from("usuarios").select("matricula, nome, ativo, criado_em, ultimo_acesso, senha_hash, producao_todas").order("nome");
         if (error) return falha(error);
+        const { data: lib, error: eLib } = await db.from("usuarios_producao").select("matricula, pessoa").order("pessoa");
+        if (eLib) return falha(eLib);
+        const porMat = new Map<string, string[]>();
+        for (const x of lib ?? []) porMat.set(x.matricula, [...(porMat.get(x.matricula) ?? []), x.pessoa]);
         // o hash nunca sai do servidor: o painel só recebe se a senha existe
-        return json({ ok: true, data: (data ?? []).map(({ senha_hash, ...u }: any) => ({ ...u, tem_senha: !!senha_hash })) });
+        return json({ ok: true, data: (data ?? []).map(({ senha_hash, ...u }: any) => ({ ...u, tem_senha: !!senha_hash, producao_pessoas: porMat.get(u.matricula) ?? [] })) });
+      }
+      case "producao_pessoas": {   // pessoas que têm produção importada (opções do cadastro de matrículas)
+        const { data, error } = await db.from("producao_resumo").select("pessoa").order("pessoa");
+        if (error) return falha(error);
+        return json({ ok: true, pessoas: (data ?? []).map((x: any) => x.pessoa) });
       }
       case "usuarios_resetar_senha": {   // a pessoa escolherá uma nova senha no próximo acesso
         const m = normMatricula(b.matricula);
@@ -574,8 +595,31 @@ Deno.serve(async (req) => {
         const nome = String(b.nome ?? "").trim().replace(/\s+/g, " ");
         if (!matriculaValida(m)) return json({ error: "Matrícula inválida (use 3 a 30 letras, números, ponto, hífen ou sublinhado)" }, 400);
         if (nome.length < 2 || nome.length > 120) return json({ error: "Informe o nome (2 a 120 caracteres)" }, 400);
-        const { error } = await db.from("usuarios").upsert({ matricula: m, nome }, { onConflict: "matricula" });
+        // produção individual liberada: "todas" ou uma lista de pessoas (só nomes que existem na produção importada)
+        let nomes: string[] | null = null;
+        if (b.producao_pessoas !== undefined) {
+          if (!Array.isArray(b.producao_pessoas) || b.producao_pessoas.length > 200) return json({ error: "Lista de produções inválida" }, 400);
+          const { data: ex, error: eEx } = await db.from("producao_resumo").select("pessoa");
+          if (eEx) return falha(eEx);
+          const validas = new Set((ex ?? []).map((x: any) => x.pessoa));
+          nomes = [...new Set(b.producao_pessoas.map((x: unknown) => nomePessoa(x)).filter((x: string) => validas.has(x)))] as string[];
+        }
+        const todas = b.producao_todas === undefined ? undefined : b.producao_todas === true;
+        const { data: ja, error: eJa } = await db.from("usuarios").select("matricula").eq("matricula", m).maybeSingle();
+        if (eJa) return falha(eJa);
+        // matrícula nova nasce SEM nenhuma produção liberada, a menos que o cadastro diga o contrário
+        const campos: Record<string, unknown> = { matricula: m, nome };
+        if (todas !== undefined) campos.producao_todas = todas; else if (!ja) campos.producao_todas = false;
+        const { error } = await db.from("usuarios").upsert(campos, { onConflict: "matricula" });
         if (error) return falha(error);
+        if (nomes !== null) {
+          const { error: eD } = await db.from("usuarios_producao").delete().eq("matricula", m);
+          if (eD) return falha(eD);
+          if (nomes.length) {
+            const { error: eI } = await db.from("usuarios_producao").insert(nomes.map((pessoa) => ({ matricula: m, pessoa })));
+            if (eI) return falha(eI);
+          }
+        }
         return json({ ok: true });
       }
       case "usuarios_ativar": {
@@ -916,6 +960,7 @@ Deno.serve(async (req) => {
         const { error: e2 } = await db.from("producao_resumo").delete().eq("pessoa", pessoa);
         if (e2) return falha(e2);
         await db.from("producao_calendario").delete().eq("pessoa", pessoa);
+        await db.from("usuarios_producao").delete().eq("pessoa", pessoa);   // some também das liberações de acesso
         return json({ ok: true });
       }
 

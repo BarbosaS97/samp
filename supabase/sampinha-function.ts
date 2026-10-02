@@ -590,17 +590,24 @@ function acaoInterface(a: any, ctx?: Ctx) {
 }
 
 /* ---------- Produção Individual (somente leitura; vem do resumo gravado a cada importação das planilhas) ---------- */
-type PessoaProd = { pessoa: string; total: number; primeira: string; ultima: string; atualizado: string; m: number[][]; gn: string[]; g: number[][]; d: [string, number][]; r: any };
-// REGRA DE PRIVACIDADE: hoje qualquer matrícula autorizada vê a produção de todos. Quando a regra for definida
-// (quem vê quem), é só alterar esta função: ela vale para as consultas e para os relatórios da Sampinha.
-function podeVerProducao(_matricula: string, _pessoa: string): boolean { return true; }
+type PessoaProd = { pessoa: string; total: number; primeira: string; ultima: string; atualizado: string; m: number[][]; gn: string[]; g: number[][]; d: [string, number][]; r: any; liberada: boolean };
+// REGRA DE ACESSO: o Setor (totais, ranking, comparações) é de todas as matrículas; já o detalhe de UMA pessoa só abre
+// para quem recebeu essa produção em Cadastros > Matrículas. "liberada" marca isso em cada pessoa.
+async function pessoasLiberadas(db: any, matricula: string): Promise<(pessoa: string) => boolean> {
+  const { data: u } = await db.from("usuarios").select("producao_todas").eq("matricula", matricula).maybeSingle();
+  if (u?.producao_todas) return () => true;
+  const { data } = await db.from("usuarios_producao").select("pessoa").eq("matricula", matricula);
+  const lib = new Set<string>((data ?? []).map((x: any) => x.pessoa));
+  return (pessoa) => lib.has(pessoa);
+}
 
 async function carregarProducao(db: any, matricula: string): Promise<PessoaProd[]> {
   const { data, error } = await db.from("producao_resumo").select("pessoa,total,primeira_data,ultima_data,atualizado_em,dados").order("pessoa");
   if (error) throw new Error("A produção individual ainda não está disponível (" + error.message + ")");
-  return (data ?? []).filter((x: any) => podeVerProducao(matricula, x.pessoa)).map((x: any) => ({
+  const pode = await pessoasLiberadas(db, matricula);
+  return (data ?? []).map((x: any) => ({
     pessoa: x.pessoa, total: x.total, primeira: x.primeira_data, ultima: x.ultima_data, atualizado: x.atualizado_em,
-    m: x.dados?.m ?? [], gn: x.dados?.gn ?? [], g: x.dados?.g ?? [], d: x.dados?.d ?? [], r: x.dados?.r ?? {},
+    m: x.dados?.m ?? [], gn: x.dados?.gn ?? [], g: x.dados?.g ?? [], d: x.dados?.d ?? [], r: x.dados?.r ?? {}, liberada: pode(x.pessoa),
   }));
 }
 const ymProd = (ano: number, mes: number) => ano * 12 + mes - 1;
@@ -623,7 +630,7 @@ async function carregarCalendario(db: any, matricula: string, ps: PessoaProd[]):
     const { data, error } = await db.from("producao_calendario").select("pessoa,dados");
     if (error) return out;
     const visiveis = new Set(ps.map((p) => p.pessoa));
-    for (const x of data ?? []) if (visiveis.has(x.pessoa) && podeVerProducao(matricula, x.pessoa) && x.dados?.m) out.set(x.pessoa, x.dados.m);
+    for (const x of data ?? []) if (visiveis.has(x.pessoa) && x.dados?.m) out.set(x.pessoa, x.dados.m);
   } catch { /* sem calendário */ }
   return out;
 }
@@ -651,10 +658,11 @@ function somaCal(meses: any[]) {
 function acharPessoasProd(ps: PessoaProd[], termo: unknown): { lista: PessoaProd[]; setor: boolean; erro?: any } {
   const t = norm(String(termo ?? "")).trim();
   if (!t || /^(setor|todos|todas|geral|secaj|equipe)$/.test(t)) return { lista: ps, setor: true };
+  const semAcesso = (p: PessoaProd) => ({ lista: [], setor: false, erro: { erro: `Esta matrícula não tem acesso à produção individual de ${p.pessoa}. Peça a liberação ao responsável pelo Cadastros. Os números do setor e o ranking continuam disponíveis.` } });
   const exato = ps.filter((p) => norm(p.pessoa) === t);
-  if (exato.length === 1) return { lista: exato, setor: false };
+  if (exato.length === 1) return exato[0].liberada ? { lista: exato, setor: false } : semAcesso(exato[0]);
   const parc = ps.filter((p) => norm(p.pessoa).includes(t) || t.includes(norm(p.pessoa)));
-  if (parc.length === 1) return { lista: parc, setor: false };
+  if (parc.length === 1) return parc[0].liberada ? { lista: parc, setor: false } : semAcesso(parc[0]);
   if (parc.length > 1) return { lista: [], setor: false, erro: { erro: "mais de uma pessoa corresponde ao nome informado", opcoes: parc.map((p) => p.pessoa) } };
   return { lista: [], setor: false, erro: { erro: "pessoa não encontrada na produção importada", pessoas_disponiveis: ps.map((p) => p.pessoa) } };
 }

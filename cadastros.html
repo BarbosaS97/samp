@@ -53,6 +53,13 @@
   @media (max-width: 720px) { .cad-nav { position: static; } .cad-nav .tl small { display: none; } .cad-nav .tab { padding: 11px 13px !important; } }
   @media (prefers-reduced-motion: reduce) { .cad-nav .tab.sujo::after { animation: none; } }
   .hidden { display: none !important; }
+  .u-prod { border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px 12px; margin: 6px 0 10px; max-width: 880px; }
+  .u-prod legend { font-size: .78rem; font-weight: 600; color: var(--navy); padding: 0 6px; }
+  .u-chk { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: .88rem; }
+  .u-prod-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 14px; margin: 10px 0 6px; max-height: 190px; overflow: auto; }
+  .u-prod-lista.off { opacity: .45; pointer-events: none; }
+  .u-prod-lista .u-chk { font-size: .84rem; }
+  .u-prod-ac { display: flex; align-items: center; gap: 12px; font-size: .8rem; }
   /* ---------- acesso restrito ---------- */
   .gate-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 20px; position: relative; overflow: hidden; }
   .gate-wrap::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(900px 420px at 15% 0%, rgba(18,53,91,.07), transparent 70%), radial-gradient(700px 360px at 100% 100%, rgba(166,138,78,.09), transparent 70%); }
@@ -386,11 +393,18 @@
       <button class="btn btn-primary" id="uSalvar">Cadastrar</button>
       <button class="btn hidden" id="uCancelar">Cancelar edição</button>
     </div>
+    <fieldset class="u-prod" id="uProd">
+      <legend>Produção individual: quem esta matrícula pode ver em detalhe</legend>
+      <p class="desc" style="margin:0 0 8px">A visão do Setor é de todos. Aqui você escolhe de quais pessoas esta matrícula poderá abrir a visão Individual.</p>
+      <label class="u-chk"><input type="checkbox" id="uProdTodas"> <b>Todas</b> (inclusive as pessoas importadas depois)</label>
+      <div class="u-prod-lista" id="uProdLista"></div>
+      <div class="u-prod-ac"><button type="button" class="lnk" id="uProdMarcar">Marcar todas</button> <button type="button" class="lnk" id="uProdLimpar">Limpar</button> <span class="chip" id="uProdQtd"></span></div>
+    </fieldset>
     <div class="msg" id="userMsg"></div>
     <div class="row"><div class="field"><label>Buscar</label><input type="text" id="uBusca" placeholder="Nome ou matrícula" style="min-width:260px"></div><span class="chip" id="uTotal"></span></div>
     <div class="grid-wrap" style="margin-top:0">
       <table class="usr">
-        <thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead>
+        <thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th><th>Produção individual</th><th>Último acesso</th><th></th></tr></thead>
         <tbody id="uLista"></tbody>
       </table>
     </div>
@@ -789,7 +803,7 @@
   let usuarios = [], editando = null;
   const escH = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   async function carregarUsuarios() {
-    try { usuarios = (await api('usuarios_listar')).data || []; desenharUsuarios(); }
+    try { usuarios = (await api('usuarios_listar')).data || []; desenharUsuarios(); await carregarPessoasProd(); }
     catch (e) { msg('userMsg', e.message, 'err'); }
   }
   function desenharUsuarios() {
@@ -800,16 +814,46 @@
     $('uLista').innerHTML = vis.length ? vis.map((u) => `<tr>
       <td>${escH(u.matricula)}</td><td>${escH(u.nome)}</td>
       <td><span class="${u.ativo ? 'tag-on' : 'tag-off'}">${u.ativo ? 'Autorizada' : 'Bloqueada'}</span></td>
+      <td>${u.producao_todas ? 'Todas' : (u.producao_pessoas || []).length ? `<span title="${escH(u.producao_pessoas.join(', '))}">${u.producao_pessoas.length} ${u.producao_pessoas.length === 1 ? 'pessoa' : 'pessoas'}</span>` : '<span style="color:var(--muted)">Nenhuma</span>'}</td>
       <td>${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : '-'}</td>
       <td><button class="lnk" data-a="ed" data-m="${escH(u.matricula)}">Editar</button>
           <button class="lnk" data-a="at" data-m="${escH(u.matricula)}">${u.ativo ? 'Bloquear' : 'Autorizar'}</button>
           ${u.tem_senha ? `<button class="lnk" data-a="rs" data-m="${escH(u.matricula)}">Redefinir senha</button>` : ''}
           <button class="lnk rm" data-a="ex" data-m="${escH(u.matricula)}">Excluir</button></td></tr>`).join('')
-      : '<tr><td colspan="5" style="text-align:center!important;color:var(--muted)">Nenhuma matrícula cadastrada.</td></tr>';
+      : '<tr><td colspan="6" style="text-align:center!important;color:var(--muted)">Nenhuma matrícula cadastrada.</td></tr>';
   }
+
+  /* produções individuais liberadas: "Todas" ou pessoas marcadas */
+  let pessoasProd = [];
+  function desenharProdAcesso(todas, marcadas) {
+    const sel = new Set(marcadas || []);
+    $('uProdTodas').checked = !!todas;
+    // pessoas liberadas que já não existem na produção importada continuam listadas, para o admin enxergar e poder desmarcar
+    const nomes = [...new Set([...pessoasProd, ...sel])].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    $('uProdLista').innerHTML = nomes.length
+      ? nomes.map((n) => `<label class="u-chk"><input type="checkbox" value="${escH(n)}"${sel.has(n) ? ' checked' : ''}> ${escH(n)}</label>`).join('')
+      : '<span class="desc" style="margin:0">Nenhuma produção importada ainda (aba Produção Individual).</span>';
+    atualizarProdAcesso();
+  }
+  function atualizarProdAcesso() {
+    const todas = $('uProdTodas').checked, caixas = [...$('uProdLista').querySelectorAll('input')];
+    $('uProdLista').classList.toggle('off', todas);
+    $('uProdQtd').textContent = todas ? 'Todas as pessoas' : `${caixas.filter((c) => c.checked).length} de ${caixas.length} pessoas`;
+  }
+  const lerProdAcesso = () => ({ producao_todas: $('uProdTodas').checked, producao_pessoas: [...$('uProdLista').querySelectorAll('input:checked')].map((c) => c.value) });
+  $('uProdTodas').onchange = atualizarProdAcesso;
+  $('uProdLista').onchange = atualizarProdAcesso;
+  $('uProdMarcar').onclick = () => { $('uProdLista').querySelectorAll('input').forEach((c) => { c.checked = true; }); atualizarProdAcesso(); };
+  $('uProdLimpar').onclick = () => { $('uProdLista').querySelectorAll('input').forEach((c) => { c.checked = false; }); atualizarProdAcesso(); };
+  async function carregarPessoasProd() {
+    try { pessoasProd = (await api('producao_pessoas')).pessoas || []; } catch (e) { pessoasProd = []; }
+    if (!editando) desenharProdAcesso(false, []);
+  }
+
   function limparFormUsuario() {
     editando = null; $('uMatricula').value = ''; $('uNome').value = ''; $('uMatricula').disabled = false;
     $('uSalvar').textContent = 'Cadastrar'; $('uCancelar').classList.add('hidden');
+    desenharProdAcesso(false, []);   // matrícula nova: nenhuma produção marcada até o admin escolher
   }
   $('uBusca').oninput = desenharUsuarios;
   $('uCancelar').onclick = () => { limparFormUsuario(); msg('userMsg', ''); };
@@ -817,7 +861,7 @@
     const matricula = $('uMatricula').value.trim(), nome = $('uNome').value.trim();
     if (!matricula || !nome) return msg('userMsg', 'Informe a matrícula e o nome.', 'err');
     try {
-      await api('usuarios_salvar', { matricula, nome });
+      await api('usuarios_salvar', { matricula, nome, ...lerProdAcesso() });
       toast(editando ? 'Cadastro atualizado.' : 'Matrícula cadastrada.', 'ok'); msg('userMsg', '');
       limparFormUsuario(); carregarUsuarios();
     } catch (e) { msg('userMsg', e.message, 'err'); }
@@ -828,6 +872,7 @@
     try {
       if (b.dataset.a === 'ed') {
         editando = u.matricula; $('uMatricula').value = u.matricula; $('uMatricula').disabled = true; $('uNome').value = u.nome;
+        desenharProdAcesso(u.producao_todas, u.producao_pessoas);
         $('uSalvar').textContent = 'Salvar alterações'; $('uCancelar').classList.remove('hidden'); $('uNome').focus();
       } else if (b.dataset.a === 'at') {
         await api('usuarios_ativar', { matricula: u.matricula, ativo: !u.ativo });
