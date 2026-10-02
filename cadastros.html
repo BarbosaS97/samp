@@ -803,6 +803,7 @@
       <td>${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : '-'}</td>
       <td><button class="lnk" data-a="ed" data-m="${escH(u.matricula)}">Editar</button>
           <button class="lnk" data-a="at" data-m="${escH(u.matricula)}">${u.ativo ? 'Bloquear' : 'Autorizar'}</button>
+          ${u.tem_senha ? `<button class="lnk" data-a="rs" data-m="${escH(u.matricula)}">Redefinir senha</button>` : ''}
           <button class="lnk rm" data-a="ex" data-m="${escH(u.matricula)}">Excluir</button></td></tr>`).join('')
       : '<tr><td colspan="5" style="text-align:center!important;color:var(--muted)">Nenhuma matrícula cadastrada.</td></tr>';
   }
@@ -831,6 +832,10 @@
       } else if (b.dataset.a === 'at') {
         await api('usuarios_ativar', { matricula: u.matricula, ativo: !u.ativo });
         toast(u.ativo ? 'Acesso bloqueado.' : 'Acesso autorizado.', 'ok'); carregarUsuarios();
+      } else if (b.dataset.a === 'rs') {
+        if (!confirm(`Redefinir a senha de ${u.nome} (${u.matricula})? No próximo acesso a pessoa precisará escolher uma nova senha.`)) return;
+        await api('usuarios_resetar_senha', { matricula: u.matricula });
+        toast('Senha redefinida.', 'ok'); carregarUsuarios();
       } else if (b.dataset.a === 'ex') {
         if (!confirm(`Excluir a matrícula ${u.matricula} (${u.nome})? A pessoa perderá o acesso ao SAMP.`)) return;
         await api('usuarios_excluir', { matricula: u.matricula });

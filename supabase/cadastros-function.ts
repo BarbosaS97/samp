@@ -55,11 +55,29 @@ async function lerToken(token: unknown): Promise<{ m: string; n: string } | null
   } catch { return null; }
 }
 
+/* ---------- senha (PBKDF2-SHA256 com sal individual) ---------- */
+const ITER_SENHA = 100000;
+const senhaValida = (s: unknown): s is string => typeof s === "string" && s.length >= 6 && s.length <= 100;
+async function derivar(senha: string, sal: Uint8Array, iter: number) {
+  const k = await crypto.subtle.importKey("raw", enc.encode(senha), "PBKDF2", false, ["deriveBits"]);
+  return b64u(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: sal, iterations: iter }, k, 256));
+}
+async function hashSenha(senha: string) {
+  const sal = crypto.getRandomValues(new Uint8Array(16));
+  return `pbkdf2$${ITER_SENHA}$${b64u(sal)}$${await derivar(senha, sal, ITER_SENHA)}`;
+}
+async function conferirSenha(senha: string, guardado: string) {
+  const [alg, iter, sal, h] = guardado.split("$");
+  if (alg !== "pbkdf2" || !iter || !sal || !h) return false;
+  return igual(await derivar(senha, deb64u(sal), Number(iter)), h);
+}
+
 /* ---------- leitura controlada ---------- */
 async function ler(db: any, q: any, admin: boolean) {
   const tabela = q.table;
   if (!(TABELAS.includes(tabela) || (admin && tabela === "usuarios"))) return json({ error: "Tabela não permitida" }, 400);
-  const cols = typeof q.select === "string" && /^[a-zA-Z_*, ]+$/.test(q.select) ? q.select : "*";
+  let cols = typeof q.select === "string" && /^[a-zA-Z_*, ]+$/.test(q.select) ? q.select : "*";
+  if (tabela === "usuarios") cols = "matricula, nome, ativo, criado_em, ultimo_acesso";   // nunca devolve o hash da senha
   let qb = db.from(tabela).select(cols, q.count ? { count: "exact", head: !!q.head } : undefined);
   for (const [k, v] of Object.entries(q.eq ?? {})) {
     if (!/^[a-zA-Z_]+$/.test(k) || !["string", "number", "boolean"].includes(typeof v)) return json({ error: "Filtro inválido" }, 400);
@@ -442,14 +460,32 @@ Deno.serve(async (req) => {
   const falha = (e: any) => json({ error: e?.message ?? String(e) }, 500);
 
   try {
-    /* ===== 1) Login por matrícula (sem senha) ===== */
-    if (b.action === "login") {
+    /* ===== 1) Login: matrícula autorizada + senha ===== */
+    if (b.action === "login_matricula" || b.action === "login" || b.action === "definir_senha") {
       const m = normMatricula(b.matricula);
       const { data: u } = matriculaValida(m)
-        ? await db.from("usuarios").select("matricula, nome, ativo").eq("matricula", m).maybeSingle()
+        ? await db.from("usuarios").select("matricula, nome, ativo, senha_hash").eq("matricula", m).maybeSingle()
         : { data: null };
       if (!u || !u.ativo) { await espera(900); return json({ error: "Matrícula não autorizada" }, 401); }
-      await db.from("usuarios").update({ ultimo_acesso: new Date().toISOString() }).eq("matricula", m);
+
+      // etapa 1: matrícula autorizada -> informa se já existe senha
+      if (b.action === "login_matricula") return json({ ok: true, nome: u.nome, tem_senha: !!u.senha_hash });
+
+      // etapa 2: senha (existente ou, no primeiro acesso, a nova senha escolhida)
+      const atualizar: Record<string, unknown> = { ultimo_acesso: new Date().toISOString() };
+      if (b.action === "definir_senha") {
+        if (u.senha_hash) return json({ error: "Esta matrícula já possui senha." }, 409);
+        if (!senhaValida(b.senha)) return json({ error: "A senha deve ter de 6 a 100 caracteres." }, 400);
+        atualizar.senha_hash = await hashSenha(b.senha);
+        atualizar.senha_definida_em = new Date().toISOString();
+      } else {
+        if (!u.senha_hash) return json({ error: "Esta matrícula ainda não tem senha.", sem_senha: true }, 409);
+        if (typeof b.senha !== "string" || !(await conferirSenha(b.senha, u.senha_hash))) {
+          await espera(1200); // atrasa tentativas erradas
+          return json({ error: "Senha incorreta" }, 401);
+        }
+      }
+      await db.from("usuarios").update(atualizar).eq("matricula", m);
       const t = await criarToken({ m: u.matricula, n: u.nome });
       return json({ ok: true, nome: u.nome, matricula: u.matricula, token: t.token, exp: t.exp });
     }
@@ -481,9 +517,16 @@ Deno.serve(async (req) => {
 
       /* ---- usuários (matrículas autorizadas) ---- */
       case "usuarios_listar": {
-        const { data, error } = await db.from("usuarios").select("*").order("nome");
+        const { data, error } = await db.from("usuarios").select("matricula, nome, ativo, criado_em, ultimo_acesso, senha_hash").order("nome");
         if (error) return falha(error);
-        return json({ ok: true, data });
+        // o hash nunca sai do servidor: o painel só recebe se a senha existe
+        return json({ ok: true, data: (data ?? []).map(({ senha_hash, ...u }: any) => ({ ...u, tem_senha: !!senha_hash })) });
+      }
+      case "usuarios_resetar_senha": {   // a pessoa escolherá uma nova senha no próximo acesso
+        const m = normMatricula(b.matricula);
+        const { error } = await db.from("usuarios").update({ senha_hash: null, senha_definida_em: null }).eq("matricula", m);
+        if (error) return falha(error);
+        return json({ ok: true });
       }
       case "usuarios_salvar": {
         const m = normMatricula(b.matricula);
