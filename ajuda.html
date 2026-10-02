@@ -15,8 +15,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>SAMP - O que tem no SAMP?</title>
-<script src="config.js?v=20261002a"></script>
-<link rel="stylesheet" href="theme.css?v=20261002a">
+<script src="config.js?v=20261003a"></script>
+<link rel="stylesheet" href="theme.css?v=20261003a">
 <style>
   .hero { padding: 36px 0 18px; }
   .hero .eyebrow { font-size: .72rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 700; }
@@ -81,6 +81,12 @@
   mark { background: #fbe9b0; color: inherit; border-radius: 2px; padding: 0 1px; }
   .gd-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: var(--navy); font-weight: 600; font-size: .88rem; text-decoration: none; }
   .gd-link:hover { text-decoration: underline; }
+  /* modo público (antes de entrar): sem links para os módulos, que exigem login */
+  .gd-publico { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 8px; padding: 14px 18px; background: var(--navy-soft); border: 1px solid #d5deea; border-left: 4px solid var(--navy); border-radius: var(--radius); color: var(--navy); font-size: .92rem; animation: th-sobe .5s .1s both; }
+  .gd-publico[hidden] { display: none; }
+  .gd-entrar { display: inline-flex; align-items: center; height: 40px; padding: 0 18px; background: var(--navy); color: #fff; border-radius: var(--radius); text-decoration: none; font-weight: 600; font-size: .9rem; transition: background .2s, transform .1s; }
+  .gd-entrar:hover { background: var(--navy-dark); } .gd-entrar:active { transform: scale(.98); }
+  body.publico .gd-link { display: none; }
   @media (max-width: 720px) {
     .gd-corpo { padding: 2px 16px 18px 16px; }
     .gd-sec > summary { padding: 14px; gap: 12px; }
@@ -90,13 +96,18 @@
 </style>
 </head>
 <body data-page="ajuda">
-<script src="layout.js?v=20261002a"></script>
+<script src="layout.js?v=20261003a"></script>
 <main class="page">
   <section class="hero">
-    <div class="eyebrow">Guia do sistema</div>
-    <h1>O que tem no SAMP?</h1>
+    <div class="eyebrow" id="gEyebrow">Guia do sistema</div>
+    <h1 id="gTitulo">O que tem no SAMP?</h1>
     <p>Aqui você encontra tudo o que o sistema oferece e aprende, passo a passo, a usar cada parte. Clique em um título para abrir, ou use a busca para achar um assunto rapidamente.</p>
   </section>
+
+  <div class="gd-publico" id="avisoPublico" hidden>
+    <div><b>Você ainda não entrou no SAMP.</b> Este guia mostra o que o sistema oferece. Para usar os módulos, acesse com a sua matrícula.</div>
+    <a class="gd-entrar" href="entrar.html">Entrar no SAMP &rarr;</a>
+  </div>
 
   <div class="gd-comece" aria-label="Comece por aqui">
     <div class="gd-passo"><b>Entre com a sua matrícula</b><span>Digite a matrícula, depois a sua senha. No primeiro acesso você cria a senha.</span></div>
@@ -135,7 +146,6 @@
           <li>Use <em>Lembrar neste computador</em> apenas em um computador seu: ele guarda só a matrícula, nunca a senha.</li>
           <li>A sessão dura algumas horas. Se ela expirar, o sistema leva você de volta à tela de acesso e depois retorna à página em que você estava.</li>
           <li>Em computador compartilhado, clique em <em>Sair</em> (canto superior direito) ao terminar.</li>
-          <li>Após várias tentativas erradas, o acesso é bloqueado por alguns minutos por segurança. Aguarde e tente de novo.</li>
         </ul>
         <div class="gd-dica"><b>Esqueceu a senha?</b> Peça ao responsável pelo sistema para redefinir. No próximo acesso você escolhe uma nova senha.</div>
       </div>
@@ -303,7 +313,7 @@
           <li><em>+ Nova</em>: começa uma conversa do zero.</li>
           <li><em>Ampliar</em>: aumenta a janela para ler tabelas maiores.</li>
         </ul>
-        <div class="gd-dica"><b>Dicas:</b> seja específico (vara, período, assunto). Se o pedido for ambíguo, a Sampinha faz uma pergunta antes de responder. Há um limite de perguntas por alguns minutos; se aparecer o aviso, aguarde um pouco.</div>
+        <div class="gd-dica"><b>Dicas:</b> seja específico (vara, período, assunto). Se o pedido for ambíguo, a Sampinha faz uma pergunta antes de responder.</div>
         <div class="gd-aviso"><b>Confira sempre:</b> a Sampinha é uma ferramenta de apoio. Ela só consegue falar do que está no sistema, e números usados oficialmente devem ser conferidos nas telas ou nas planilhas de origem.</div>
       </div>
     </details>
@@ -316,16 +326,15 @@
         <svg class="gd-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </summary>
       <div class="gd-corpo">
-        <p>É onde os dados entram no sistema e onde se controla quem acessa. Exige uma <em>senha de cadastro</em>, diferente da senha pessoal, que fica com o responsável pelo sistema. Se você não tem essa senha, não precisa deste módulo.</p>
-        <h4>As abas</h4>
+        <p>É o módulo do responsável pelo sistema: é por ele que os dados entram e que se controla quem tem acesso. Ele é protegido por uma senha própria, que fica apenas com o responsável. Se você precisar de um cadastro de matrícula, de uma liberação ou da atualização de algum dado, fale com ele.</p>
+        <h4>O que o responsável faz por lá</h4>
         <div class="gd-grade">
-          <div class="gd-item"><b>Base de processos</b><span>Importe a planilha (.xlsx) para substituir toda a base da Análise de Processos. O sistema mostra uma prévia da unificação de varas e assuntos.</span></div>
-          <div class="gd-item"><b>Prazos</b><span>Define os limites em dias que separam "No prazo", "Atenção" e "Atrasado".</span></div>
-          <div class="gd-item"><b>Metas</b><span>Grava um novo período de metas (recebidos, calculados, acervo e tempo). O módulo Metas mostra sempre o mais recente.</span></div>
-          <div class="gd-item"><b>Produção Individual</b><span>Envia as planilhas "PRODUÇÃO SECAJ - Nome" e o "CALENDÁRIO SECAJ", sempre após a virada do mês. Reenviar substitui os dados da pessoa, nunca duplica.</span></div>
-          <div class="gd-item"><b>Matrículas</b><span>Cadastra quem pode entrar, bloqueia ou autoriza, redefine senha e escolhe quais produções individuais cada pessoa pode ver.</span></div>
+          <div class="gd-item"><b>Base de processos</b><span>Atualiza a base que alimenta a Análise de Processos.</span></div>
+          <div class="gd-item"><b>Prazos</b><span>Define os limites que separam "No prazo", "Atenção" e "Atrasado".</span></div>
+          <div class="gd-item"><b>Metas</b><span>Cadastra os períodos exibidos em Metas Processuais.</span></div>
+          <div class="gd-item"><b>Produção Individual</b><span>Atualiza a produção de cada pessoa e o calendário de ausências, uma vez por mês.</span></div>
+          <div class="gd-item"><b>Matrículas</b><span>Cadastra quem pode entrar e escolhe quais produções individuais cada pessoa pode ver.</span></div>
         </div>
-        <a class="gd-link" href="cadastros.html">Abrir Cadastros &rarr;</a>
       </div>
     </details>
 
@@ -341,7 +350,6 @@
         <ul>
           <li>"Matrícula não autorizada": confira o número digitado (sem espaços) e, se persistir, peça o cadastro ao responsável.</li>
           <li>"Senha incorreta": confira o Caps Lock (a tela avisa) e use o olho para ver o que digitou.</li>
-          <li>"Muitas tentativas": aguarde o tempo informado e tente novamente.</li>
         </ul>
         <h4>Os dados parecem desatualizados</h4>
         <ul>
@@ -417,6 +425,19 @@
   });
 })();
 </script>
-<script src="sampinha.js?v=20261002a"></script>
+<script>
+(function () {
+  // sem sessão: versão pública ("Conheça o SAMP"); com sessão: guia normal e a Sampinha disponível
+  if (window.SAMP_USUARIO) {
+    const s = document.createElement('script'); s.src = 'sampinha.js?v=20261003a'; document.body.appendChild(s);
+  } else {
+    document.body.classList.add('publico');
+    document.getElementById('gEyebrow').textContent = 'Antes de entrar';
+    document.getElementById('gTitulo').textContent = 'Conheça o SAMP';
+    document.title = 'SAMP - Conheça o SAMP';
+    document.getElementById('avisoPublico').hidden = false;
+  }
+})();
+</script>
 </body>
 </html>

@@ -10,7 +10,7 @@
     { id: 'cadastros', href: 'cadastros.html', texto: 'Cadastros', restrito: true }
   ];
   const atual = document.body.dataset.page;
-  const publica = atual === 'entrar' || atual === 'cadastros';   // Cadastros tem a própria senha
+  const publica = atual === 'entrar' || atual === 'cadastros' || atual === 'ajuda';   // Cadastros tem a própria senha; o guia ("Conheça o SAMP") é aberto a todos
 
   // Sessão de matrícula (sessionStorage), lida direto para este arquivo não depender de outros.
   let sessao = null;
@@ -35,6 +35,7 @@
   bar.innerHTML =
     '<a class="brand" href="index.html"><img class="brand-ico" src="icon.svg" alt="" width="28" height="28">SAMP<small>Acompanhamento e Métricas Processuais</small></a>' +
     (atual === 'entrar' ? '' :
+      atual === 'ajuda' && !sessao ? '<nav aria-label="Navegação principal"><a href="ajuda.html" data-id="ajuda" class="active" aria-current="page">Conheça o SAMP</a><a href="entrar.html" data-id="entrar">Entrar</a></nav>' :
       '<nav aria-label="Navegação principal">' +
       ITENS.map(i =>
         `<a href="${i.href}" data-id="${i.id}"${i.id === atual ? ' class="active" aria-current="page"' : ''}>${i.texto}${i.restrito ? '<span class="lock" title="Acesso restrito"></span>' : ''}</a>`
@@ -114,7 +115,7 @@
   window.SAMP_USUARIO = sessao;   // { nome, matricula, token, exp } ou null
 
   // acabamento visual compartilhado (animações, abas, números); não é usado na tela de acesso
-  if (atual !== 'entrar') { const u = document.createElement('script'); u.src = 'ui.js?v=20261002a'; document.body.appendChild(u); }
+  if (atual !== 'entrar') { const u = document.createElement('script'); u.src = 'ui.js?v=20261003a'; document.body.appendChild(u); }
 
   // PWA: registra o service worker (só quando servido por http/https)
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
