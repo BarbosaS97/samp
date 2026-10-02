@@ -831,3 +831,14 @@ dialog.tn2-dlg { margin: auto; }
 /* marca com ícone na barra superior */
 .app-bar .brand { display: inline-flex; align-items: center; gap: 10px; }
 .app-bar .brand-ico { width: 28px; height: 28px; border-radius: 7px; box-shadow: 0 0 0 1px rgba(255,255,255,.14); flex: none; }
+
+/* ---------- Fundo do sistema: grade clara em deriva lenta, com brilho dourado perto do mouse (criado por ui.js) ---------- */
+.fundo-sistema { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; --mx: 50%; --my: 40%; }
+.fundo-sistema i { position: absolute; inset: 0; background-size: 44px 44px; }
+.fundo-sistema .g1 { background-image: linear-gradient(rgba(18,53,91,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(18,53,91,.07) 1px, transparent 1px); animation: fs-deriva 36s linear infinite; }
+.fundo-sistema .g2 { background-image: linear-gradient(rgba(166,138,78,.55) 1px, transparent 1px), linear-gradient(90deg, rgba(166,138,78,.55) 1px, transparent 1px); animation: fs-deriva 36s linear infinite; opacity: 0; transition: opacity .5s ease; -webkit-mask-image: radial-gradient(circle 170px at var(--mx) var(--my), #000 0%, transparent 100%); mask-image: radial-gradient(circle 170px at var(--mx) var(--my), #000 0%, transparent 100%); }
+.fundo-sistema .luz { background: radial-gradient(circle 260px at var(--mx) var(--my), rgba(166,138,78,.12), transparent 100%); opacity: 0; transition: opacity .5s ease; }
+.fundo-sistema.ativo .g2, .fundo-sistema.ativo .luz { opacity: 1; }
+@keyframes fs-deriva { to { background-position: 44px 44px, 44px 44px; } }
+@media (prefers-reduced-motion: reduce) { .fundo-sistema .g1, .fundo-sistema .g2 { animation: none; } }
+@media print { .fundo-sistema { display: none !important; } }

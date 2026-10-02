@@ -100,3 +100,25 @@
   document.addEventListener('DOMContentLoaded', () => { varrer(); observarSecoes(); });
   if (document.readyState !== 'loading') { varrer(); observarSecoes(); }
 })();
+
+/* ---------- fundo do sistema: grade clara sensível ao mouse (estilos em theme.css) ---------- */
+(function () {
+  if (document.querySelector('.fundo-sistema')) return;
+  const fundo = document.createElement('div');
+  fundo.className = 'fundo-sistema'; fundo.setAttribute('aria-hidden', 'true');
+  fundo.innerHTML = '<i class="g1"></i><i class="luz"></i><i class="g2"></i>';
+  document.body.prepend(fundo);
+  let alvoX = 0, alvoY = 0, x = 0, y = 0, rodando = false;
+  const passo = () => {
+    x += (alvoX - x) * 0.16; y += (alvoY - y) * 0.16;
+    fundo.style.setProperty('--mx', x.toFixed(1) + 'px'); fundo.style.setProperty('--my', y.toFixed(1) + 'px');
+    if (Math.abs(alvoX - x) > 0.4 || Math.abs(alvoY - y) > 0.4) requestAnimationFrame(passo); else rodando = false;
+  };
+  document.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') return;
+    alvoX = e.clientX; alvoY = e.clientY;   // a camada é fixa na janela: as coordenadas do mouse valem direto
+    if (!fundo.classList.contains('ativo')) { x = alvoX; y = alvoY; fundo.classList.add('ativo'); }
+    if (!rodando) { rodando = true; requestAnimationFrame(passo); }
+  }, { passive: true });
+  document.documentElement.addEventListener('pointerleave', () => fundo.classList.remove('ativo'));
+})();
