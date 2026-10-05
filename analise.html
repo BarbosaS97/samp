@@ -518,6 +518,37 @@
         }
         .sub-content.expanded { max-height: 50000px; }
 
+        /* aba Unidade: cada nível com a sua cor (unidade = dourado, vara = azul, assunto = verde, processos = âmbar) */
+        #unidadeContent .un-card { border: 1px solid #e0c98f; border-left: 5px solid #a68a4e; box-shadow: 0 2px 10px rgba(166,138,78,.1); }
+        #unidadeContent .un-card > .section-header { background: #fffaf0; border-bottom-color: #f0e4c4; }
+        #unidadeContent .un-card.aberto > .section-header { background: linear-gradient(90deg, #f8ecc8 0%, #fffaf0 70%); }
+        #unidadeContent .un-card > .section-header .section-name { color: #5b4a1f; }
+        #unidadeContent .un-card > .section-header .section-count { background: #a68a4e; color: #fff; font-weight: 600; }
+        #unidadeContent .un-card > .section-header .toggle-icon { color: #a68a4e; }
+
+        #unidadeContent .un-vara { border-bottom: 1px solid #cfe0f3; }
+        #unidadeContent .un-vara > .sub-header { padding-left: 34px; background: #eaf1fb; border-left: 5px solid #1a4a6e; transition: background .2s; }
+        #unidadeContent .un-vara > .sub-header:hover { background: #dde9f8; }
+        #unidadeContent .un-vara.aberto > .sub-header { background: #d6e5f6; }
+        #unidadeContent .un-vara .sub-name { color: #12355b; font-weight: 600; }
+        #unidadeContent .un-vara > .sub-header .sub-icon { background: #1a4a6e; width: 8px; height: 8px; border-radius: 2px; }
+        #unidadeContent .un-vara > .sub-header .sub-count { background: #1a4a6e; color: #fff; font-weight: 600; }
+        #unidadeContent .un-vara > .sub-header .sub-toggle { color: #1a4a6e; font-size: 16px; }
+        #unidadeContent .un-vara > .sub-content { background: #f6faff; border-left: 5px solid #b9d0ea; }
+
+        #unidadeContent .un-ass { border-bottom: 1px solid #d3eadf; }
+        #unidadeContent .un-ass > .sub-header { padding-left: 46px !important; background: #eaf6f0; border-left: 5px solid #2f7d5b; transition: background .2s; }
+        #unidadeContent .un-ass > .sub-header:hover { background: #dcf0e6; }
+        #unidadeContent .un-ass.aberto > .sub-header { background: #d3ecdf; }
+        #unidadeContent .un-ass > .sub-header .sub-info > span:first-child { color: #1f5c42; }
+        #unidadeContent .un-ass > .sub-header .sub-count { background: #2f7d5b; color: #fff; font-weight: 600; }
+        #unidadeContent .un-ass > .sub-header .sub-toggle { color: #2f7d5b; font-size: 16px; }
+        #unidadeContent .un-ass > .sub-content { background: #fcfefd; border-left: 5px solid #b4dcc8; }
+
+        #unidadeContent .un-ass .process-row { background: #fffdf6; border-left: 4px solid #e0c98f; border-bottom: 1px dashed #eadfbf; padding-left: 40px; }
+        #unidadeContent .un-ass .process-row:hover { background: #fff3d1; }
+        #unidadeContent .un-ass .process-number { color: #12355b; font-weight: 600; }
+
         .process-table { width: 100%; }
         .process-row {
             display: flex;
@@ -1265,15 +1296,15 @@ function renderAdvogadoAtivoTab() {
                     const unId = `un-${ui}`;
                     const isUnExp = busca || expandedUnidades.has(unId);
                     const nota = `<span style="font-size:12px;color:#5f6b7a;margin-left:12px;font-weight:400">${varasVis.length} ${varasVis.length === 1 ? 'vara' : 'varas'} &middot; ${sit.normal.toLocaleString('pt-BR')} no prazo &middot; ${sit.warning.toLocaleString('pt-BR')} em atenção &middot; ${sit.delayed.toLocaleString('pt-BR')} atrasados</span>`;
-                    html += `<div class="section-card"><div class="section-header" onclick="toggleUnidade('${unId}','un')"><div class="section-info"><div class="section-badge" style="background:#a68a4e"></div><span class="section-name">${escapeHtml(un)}${nota}</span><span class="section-count">${totalUn}</span></div><div class="toggle-icon" id="${unId}-icon">${isUnExp ? '−' : '+'}</div></div><div class="section-content ${isUnExp ? 'expanded' : ''}" id="${unId}-content">`;
+                    html += `<div class="section-card un-card${isUnExp ? ' aberto' : ''}"><div class="section-header" onclick="toggleUnidade('${unId}','un')"><div class="section-info"><div class="section-badge" style="background:#a68a4e"></div><span class="section-name">${escapeHtml(un)}${nota}</span><span class="section-count">${totalUn}</span></div><div class="toggle-icon" id="${unId}-icon">${isUnExp ? '−' : '+'}</div></div><div class="section-content ${isUnExp ? 'expanded' : ''}" id="${unId}-content">`;
                     varasVis.forEach(([vara, vi, assVis, totalVara]) => {
                         const varaId = `${unId}-v${vi}`;
                         const isVaraExp = busca || expandedUnidadeVaras.has(varaId);
-                        html += `<div class="sub-card"><div class="sub-header" onclick="toggleUnidade('${varaId}','vara')"><div class="sub-info"><div class="sub-icon"></div><span class="sub-name">${escapeHtml(vara)}</span><span class="sub-count">${totalVara}</span></div><div class="sub-toggle" id="${varaId}-icon">${isVaraExp ? '−' : '+'}</div></div><div class="sub-content ${isVaraExp ? 'expanded' : ''}" id="${varaId}-content">`;
+                        html += `<div class="sub-card un-vara${isVaraExp ? ' aberto' : ''}"><div class="sub-header" onclick="toggleUnidade('${varaId}','vara')"><div class="sub-info"><div class="sub-icon"></div><span class="sub-name">${escapeHtml(vara)}</span><span class="sub-count">${totalVara}</span></div><div class="sub-toggle" id="${varaId}-icon">${isVaraExp ? '−' : '+'}</div></div><div class="sub-content ${isVaraExp ? 'expanded' : ''}" id="${varaId}-content">`;
                         assVis.forEach(([ass, si, lista]) => {
                             const assId = `${varaId}-a${si}`;
                             const isAssExp = busca || expandedUnidadeAssuntos.has(assId);
-                            html += `<div class="sub-card"><div class="sub-header" style="padding-left:60px" onclick="toggleUnidade('${assId}','ass')"><div class="sub-info"><span style="font-weight:600">${escapeHtml(ass)}</span><span class="sub-count">${lista.length}</span></div><div class="sub-toggle" id="${assId}-icon">${isAssExp ? '−' : '+'}</div></div><div class="sub-content ${isAssExp ? 'expanded' : ''}" id="${assId}-content"><div class="process-table">`;
+                            html += `<div class="sub-card un-ass${isAssExp ? ' aberto' : ''}"><div class="sub-header" onclick="toggleUnidade('${assId}','ass')"><div class="sub-info"><span style="font-weight:600">${escapeHtml(ass)}</span><span class="sub-count">${lista.length}</span></div><div class="sub-toggle" id="${assId}-icon">${isAssExp ? '−' : '+'}</div></div><div class="sub-content ${isAssExp ? 'expanded' : ''}" id="${assId}-content"><div class="process-table">`;
                             lista.forEach(p => {
                                 html += `<div class="process-row"><div class="process-number"><span>${escapeHtml(p.numeroProcesso)}</span><button class="copy-btn" onclick="copyToClipboard('${escapeHtml(p.numeroProcesso)}', this)">⎘</button></div><div class="process-days"><span class="days-badge ${getDaysBadgeClass(p.diasChegada)}">${getDaysLabel(p.diasChegada)}</span></div><div class="process-orgao">${escapeHtml(p.poloPassivo)}</div></div>`;
                             });
@@ -1493,8 +1524,8 @@ function renderAdvogadoAtivoTab() {
                 const c = document.getElementById(`${id}-content`), i = document.getElementById(`${id}-icon`);
                 if (!c || !i) return;
                 const set = nivel === 'un' ? expandedUnidades : nivel === 'vara' ? expandedUnidadeVaras : expandedUnidadeAssuntos;
-                if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; set.delete(id); }
-                else { c.classList.add('expanded'); i.textContent = '−'; set.add(id); }
+                if (c.classList.contains('expanded')) { c.classList.remove('expanded'); i.textContent = '+'; set.delete(id); c.parentElement.classList.remove('aberto'); }
+                else { c.classList.add('expanded'); i.textContent = '−'; set.add(id); c.parentElement.classList.add('aberto'); }
             };
             window.copyToClipboard = function(t, btn) { navigator.clipboard.writeText(t).then(() => { const orig = btn.textContent; btn.textContent = '✓'; btn.classList.add('copied'); showToast(`Copiado: ${t}`, 'success'); setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500); }); };
             window.switchTab = function(tab) { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); event.target.classList.add('active'); document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.getElementById(`tab-${tab}`).classList.add('active'); if (tab === 'assuntos' && currentData) renderAssuntosTab(); else if (tab === 'poloPassivo' && currentPoloData) renderPoloPassivoTab(); else if (tab === 'advogadoAtivo' && currentAdvogadoData) renderAdvogadoAtivoTab(); else if (tab === 'unidade' && currentUnidadeData) renderUnidadeTab(); else if (tab === 'analises' && currentData) renderAnalisesTab(); else if (tab === 'tendencia' && currentData) renderTendenciaTab(); };
