@@ -106,8 +106,23 @@ async function conferirSenha(senha: string, guardado: string) {
   return igual(await derivar(senha, deb64u(sal), Number(iter)), h);
 }
 
+/* ---------- ausências: sem a permissão, o detalhe (tipo, períodos, observações) nem sai do servidor ---------- */
+async function podeDetalharAusencias(db: any, matricula: string): Promise<boolean> {
+  const { data } = await db.from("usuarios").select("ausencias_detalhe").eq("matricula", matricula).maybeSingle();
+  return data?.ausencias_detalhe === true;
+}
+// fica só o total de dias úteis de ausência (férias + licença + falta + recesso; treinamento não conta como ausência por padrão)
+function resumirCalendario(dados: any) {
+  const m: Record<string, any> = {};
+  for (const [k, v] of Object.entries<any>(dados?.m ?? {})) {
+    const aus = (Number(v?.f) || 0) + (Number(v?.l) || 0) + (Number(v?.x) || 0) + (Number(v?.r) || 0);
+    m[k] = { u: Number(v?.u) || 0, f: 0, l: 0, t: 0, x: 0, r: 0, p: [], n: [], tot: aus, aus };
+  }
+  return { m, resumido: true };
+}
+
 /* ---------- leitura controlada ---------- */
-async function ler(db: any, q: any, admin: boolean) {
+async function ler(db: any, q: any, admin: boolean, matricula = "") {
   const tabela = q.table;
   if (!(TABELAS.includes(tabela) || (admin && tabela === "usuarios"))) return json({ error: "Tabela não permitida" }, 400);
   let cols = typeof q.select === "string" && /^[a-zA-Z_*, ]+$/.test(q.select) ? q.select : "*";
@@ -134,6 +149,10 @@ async function ler(db: any, q: any, admin: boolean) {
   if (q.single) qb = qb.single();
   const { data, count, error } = await qb;
   if (error) { console.error("ler:", error.message); return json({ error: admin ? error.message : "Não foi possível consultar os dados." }, 500); }
+  if (!admin && tabela === "producao_calendario" && data && !(await podeDetalharAusencias(db, matricula))) {
+    const reduz = (r: any) => ({ ...r, dados: resumirCalendario(r?.dados) });
+    return json({ data: Array.isArray(data) ? data.map(reduz) : reduz(data), count });
+  }
   return json({ data, count });
 }
 
@@ -541,13 +560,14 @@ Deno.serve(async (req) => {
       // conferência a cada pedido: se a matrícula for desativada/excluída, ou a senha for redefinida depois do login, o acesso cai na hora
       const s = await sessaoAtiva(db, b.token);
       if (!s) return json({ error: "Sessão inválida ou expirada" }, 401);
-      if (b.action === "ler") return await ler(db, b, false);
+      if (b.action === "ler") return await ler(db, b, false, s.m);
 
-      // quais produções individuais esta matrícula pode abrir em detalhe (a visão do Setor é de todos)
-      const { data: u } = await db.from("usuarios").select("producao_todas").eq("matricula", s.m).maybeSingle();
-      if (u?.producao_todas) return json({ ok: true, todas: true, pessoas: [] });
+      // quais produções individuais esta matrícula pode abrir em detalhe (a visão do Setor é de todos) e se vê o detalhe das ausências
+      const { data: u } = await db.from("usuarios").select("producao_todas, ausencias_detalhe").eq("matricula", s.m).maybeSingle();
+      const ausencias_detalhe = u?.ausencias_detalhe === true;
+      if (u?.producao_todas) return json({ ok: true, todas: true, pessoas: [], ausencias_detalhe });
       const { data } = await db.from("usuarios_producao").select("pessoa").eq("matricula", s.m);
-      return json({ ok: true, todas: false, pessoas: (data ?? []).map((x: any) => x.pessoa) });
+      return json({ ok: true, todas: false, pessoas: (data ?? []).map((x: any) => x.pessoa), ausencias_detalhe });
     }
 
     /* ===== 3) Daqui em diante: exige SENHA_CADASTRO ===== */
@@ -570,7 +590,7 @@ Deno.serve(async (req) => {
 
       /* ---- usuários (matrículas autorizadas) ---- */
       case "usuarios_listar": {
-        const { data, error } = await db.from("usuarios").select("matricula, nome, ativo, criado_em, ultimo_acesso, senha_hash, producao_todas").order("nome");
+        const { data, error } = await db.from("usuarios").select("matricula, nome, ativo, criado_em, ultimo_acesso, senha_hash, producao_todas, ausencias_detalhe").order("nome");
         if (error) return falha(error);
         const { data: lib, error: eLib } = await db.from("usuarios_producao").select("matricula, pessoa").order("pessoa");
         if (eLib) return falha(eLib);
@@ -610,6 +630,8 @@ Deno.serve(async (req) => {
         // matrícula nova nasce SEM nenhuma produção liberada, a menos que o cadastro diga o contrário
         const campos: Record<string, unknown> = { matricula: m, nome };
         if (todas !== undefined) campos.producao_todas = todas; else if (!ja) campos.producao_todas = false;
+        // detalhe das ausências: matrícula nova nasce sem a permissão, a menos que o cadastro diga o contrário
+        if (b.ausencias_detalhe !== undefined) campos.ausencias_detalhe = b.ausencias_detalhe === true; else if (!ja) campos.ausencias_detalhe = false;
         const { error } = await db.from("usuarios").upsert(campos, { onConflict: "matricula" });
         if (error) return falha(error);
         if (nomes !== null) {

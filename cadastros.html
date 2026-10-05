@@ -400,11 +400,16 @@
       <div class="u-prod-lista" id="uProdLista"></div>
       <div class="u-prod-ac"><button type="button" class="lnk" id="uProdMarcar">Marcar todas</button> <button type="button" class="lnk" id="uProdLimpar">Limpar</button> <span class="chip" id="uProdQtd"></span></div>
     </fieldset>
+    <fieldset class="u-prod" id="uAus">
+      <legend>Ausências: o que esta matrícula pode ver</legend>
+      <label class="u-chk"><input type="checkbox" id="uAusDet"> <b>Pode ver o detalhe das ausências</b></label>
+      <p class="desc" style="margin:6px 0 0">Com a opção marcada: tipo (férias, licença, treinamento, falta, recesso), períodos, observações e quem se ausentou. Sem ela, só aparece o total de dias úteis de ausência.</p>
+    </fieldset>
     <div class="msg" id="userMsg"></div>
     <div class="row"><div class="field"><label>Buscar</label><input type="text" id="uBusca" placeholder="Nome ou matrícula" style="min-width:260px"></div><span class="chip" id="uTotal"></span></div>
     <div class="grid-wrap" style="margin-top:0">
       <table class="usr">
-        <thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th><th>Produção individual</th><th>Último acesso</th><th></th></tr></thead>
+        <thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th><th>Produção individual</th><th>Detalhe das ausências</th><th>Último acesso</th><th></th></tr></thead>
         <tbody id="uLista"></tbody>
       </table>
     </div>
@@ -815,12 +820,13 @@
       <td>${escH(u.matricula)}</td><td>${escH(u.nome)}</td>
       <td><span class="${u.ativo ? 'tag-on' : 'tag-off'}">${u.ativo ? 'Autorizada' : 'Bloqueada'}</span></td>
       <td>${u.producao_todas ? 'Todas' : (u.producao_pessoas || []).length ? `<span title="${escH(u.producao_pessoas.join(', '))}">${u.producao_pessoas.length} ${u.producao_pessoas.length === 1 ? 'pessoa' : 'pessoas'}</span>` : '<span style="color:var(--muted)">Nenhuma</span>'}</td>
+      <td>${u.ausencias_detalhe ? 'Detalhado' : '<span style="color:var(--muted)">Só o total</span>'}</td>
       <td>${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : '-'}</td>
       <td><button class="lnk" data-a="ed" data-m="${escH(u.matricula)}">Editar</button>
           <button class="lnk" data-a="at" data-m="${escH(u.matricula)}">${u.ativo ? 'Bloquear' : 'Autorizar'}</button>
           ${u.tem_senha ? `<button class="lnk" data-a="rs" data-m="${escH(u.matricula)}">Redefinir senha</button>` : ''}
           <button class="lnk rm" data-a="ex" data-m="${escH(u.matricula)}">Excluir</button></td></tr>`).join('')
-      : '<tr><td colspan="6" style="text-align:center!important;color:var(--muted)">Nenhuma matrícula cadastrada.</td></tr>';
+      : '<tr><td colspan="7" style="text-align:center!important;color:var(--muted)">Nenhuma matrícula cadastrada.</td></tr>';
   }
 
   /* produções individuais liberadas: "Todas" ou pessoas marcadas */
@@ -840,7 +846,7 @@
     $('uProdLista').classList.toggle('off', todas);
     $('uProdQtd').textContent = todas ? 'Todas as pessoas' : `${caixas.filter((c) => c.checked).length} de ${caixas.length} pessoas`;
   }
-  const lerProdAcesso = () => ({ producao_todas: $('uProdTodas').checked, producao_pessoas: [...$('uProdLista').querySelectorAll('input:checked')].map((c) => c.value) });
+  const lerProdAcesso = () => ({ producao_todas: $('uProdTodas').checked, producao_pessoas: [...$('uProdLista').querySelectorAll('input:checked')].map((c) => c.value), ausencias_detalhe: $('uAusDet').checked });
   $('uProdTodas').onchange = atualizarProdAcesso;
   $('uProdLista').onchange = atualizarProdAcesso;
   $('uProdMarcar').onclick = () => { $('uProdLista').querySelectorAll('input').forEach((c) => { c.checked = true; }); atualizarProdAcesso(); };
@@ -854,6 +860,7 @@
     editando = null; $('uMatricula').value = ''; $('uNome').value = ''; $('uMatricula').disabled = false;
     $('uSalvar').textContent = 'Cadastrar'; $('uCancelar').classList.add('hidden');
     desenharProdAcesso(false, []);   // matrícula nova: nenhuma produção marcada até o admin escolher
+    $('uAusDet').checked = false;    // e sem o detalhe das ausências
   }
   $('uBusca').oninput = desenharUsuarios;
   $('uCancelar').onclick = () => { limparFormUsuario(); msg('userMsg', ''); };
@@ -872,7 +879,7 @@
     try {
       if (b.dataset.a === 'ed') {
         editando = u.matricula; $('uMatricula').value = u.matricula; $('uMatricula').disabled = true; $('uNome').value = u.nome;
-        desenharProdAcesso(u.producao_todas, u.producao_pessoas);
+        desenharProdAcesso(u.producao_todas, u.producao_pessoas); $('uAusDet').checked = !!u.ausencias_detalhe;
         $('uSalvar').textContent = 'Salvar alterações'; $('uCancelar').classList.remove('hidden'); $('uNome').focus();
       } else if (b.dataset.a === 'at') {
         await api('usuarios_ativar', { matricula: u.matricula, ativo: !u.ativo });

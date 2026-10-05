@@ -624,13 +624,26 @@ function periodoProd(a: any) {
 
 // Calendário de ausências (planilha CALENDÁRIO SECAJ): por pessoa e mês, dias úteis e dias úteis de férias (f), licença (l, inclui
 // licença médica, sempre tratada de forma genérica), treinamento/licença (t), falta (x) e recesso/eleitoral (r).
+// Sem a permissão "detalhe das ausências", o calendário vira só o total de dias úteis de ausência (tot/aus), sem tipo, períodos nem observações.
 async function carregarCalendario(db: any, matricula: string, ps: PessoaProd[]): Promise<Map<string, any>> {
   const out = new Map<string, any>();
   try {
     const { data, error } = await db.from("producao_calendario").select("pessoa,dados");
     if (error) return out;
+    const { data: u } = await db.from("usuarios").select("ausencias_detalhe").eq("matricula", matricula).maybeSingle();
+    const detalhe = u?.ausencias_detalhe === true;
+    (out as any).resumido = !detalhe;
     const visiveis = new Set(ps.map((p) => p.pessoa));
-    for (const x of data ?? []) if (visiveis.has(x.pessoa) && x.dados?.m) out.set(x.pessoa, x.dados.m);
+    for (const x of data ?? []) {
+      if (!visiveis.has(x.pessoa) || !x.dados?.m) continue;
+      if (detalhe) { out.set(x.pessoa, x.dados.m); continue; }
+      const m: Record<string, any> = {};
+      for (const [k, v] of Object.entries<any>(x.dados.m)) {
+        const aus = (Number(v?.f) || 0) + (Number(v?.l) || 0) + (Number(v?.x) || 0) + (Number(v?.r) || 0);
+        m[k] = { u: Number(v?.u) || 0, f: 0, l: 0, t: 0, x: 0, r: 0, p: [], n: [], tot: aus, aus };
+      }
+      out.set(x.pessoa, m);
+    }
   } catch { /* sem calendário */ }
   return out;
 }
@@ -645,7 +658,7 @@ function mesesCal(p: PessoaProd, cal: Map<string, any>, ini: number, fim: number
   for (const [chave, it] of Object.entries<any>(c)) {
     const k = ymProd(+chave.slice(0, 4), +chave.slice(5, 7));
     if (k < Math.max(k0, ini) || k > Math.min(k1, fim)) continue;
-    const marc = it.f + it.l + it.t + it.x + it.r, aus = it.f + it.l + it.x + it.r + (descontaTrein ? it.t : 0);
+    const marc = it.tot ?? (it.f + it.l + it.t + it.x + it.r), aus = it.aus ?? (it.f + it.l + it.x + it.r + (descontaTrein ? it.t : 0));
     lista.push({ k, u: it.u, marc, aus, disp: Math.max(0, it.u - aus), f: it.f, l: it.l, t: it.t, x: it.x, r: it.r, prod: prod.get(k) ?? 0, per: it.p ?? [] });
   }
   return lista;
@@ -680,6 +693,8 @@ function agregarProd(lista: PessoaProd[], ini: number, fim: number) {
 }
 const NOME_CAT: Record<string, string> = { f: "Férias", l: "Licença", t: "Treinamento/licença", x: "Falta", r: "Recesso/eleitoral" };
 const AVISO_AUS = "Ausências vêm do calendário (dias úteis). Licença médica aparece só como licença. Dias disponíveis = dias úteis menos ausências; treinamento/licença NÃO é descontado, a menos que descontar_treinamento seja true. O calendário não registra meio período.";
+const AVISO_AUS_TOTAL = "Esta matrícula NÃO tem permissão para ver o detalhe das ausências: informe somente o total de dias úteis de ausência e os dias disponíveis. NÃO diga o tipo (férias, licença, treinamento, falta, recesso), as datas dos períodos, observações nem quem se ausentou; se perguntarem, explique que o detalhe depende de liberação do responsável pelo Cadastros.";
+const NOTA_AUS_TOTAL = "Ausências: apenas o total de dias úteis, sem detalhamento. Dias disponíveis = dias úteis menos as ausências.";
 const totMes = (a?: number[]) => (a ? a[0] + a[1] + a[2] : 0);
 function calcProducao(a: any, ps: PessoaProd[], cal: Map<string, any> = new Map()): any {
   if (!ps.length) return { erro: "Nenhuma produção foi importada ainda (Cadastros > Produção Individual)." };
@@ -719,10 +734,11 @@ function calcProducao(a: any, ps: PessoaProd[], cal: Map<string, any> = new Map(
       if (!alvo.setor) for (const q of m.per) if (q[3] > 0) o.per.push(`${NOME_CAT[q[0]]} ${q[1].slice(8)}/${q[1].slice(5, 7)}${q[1] !== q[2] ? " a " + q[2].slice(8) + "/" + q[2].slice(5, 7) : ""}`);
       cm.set(m.k, o);
     }
-    return { ...base, ...(cm.size ? { aviso_ausencias: AVISO_AUS } : {}), meses: cheio.slice(-120).map((k) => {
+    const resumido = !!(cal as any).resumido;   // matrícula sem permissão para o detalhe das ausências
+    return { ...base, ...(cm.size ? { aviso_ausencias: resumido ? AVISO_AUS_TOTAL : AVISO_AUS } : {}), meses: cheio.slice(-120).map((k) => {
       const v = ag.porMes.get(k) ?? [0, 0, 0], o = cm.get(k);
       return { mes: isoYM(k), total: totMes(v), meta: v[0], acervo: v[1], sem_classificacao: v[2],
-        ...(o ? { dias_uteis: o.u, dias_uteis_de_ausencia: o.marc, ferias: o.f, licenca: o.l, treinamento_licenca: o.t, falta: o.x, recesso: o.r, dias_disponiveis: o.disp, producao_por_dia_disponivel: o.disp > 0 && o.prod ? r1(o.prod / o.disp) : null, ...(o.per.length ? { periodos: o.per.slice(0, 5) } : {}) } : {}) };
+        ...(o ? { dias_uteis: o.u, dias_uteis_de_ausencia: o.marc, ...(resumido ? {} : { ferias: o.f, licenca: o.l, treinamento_licenca: o.t, falta: o.x, recesso: o.r }), dias_disponiveis: o.disp, producao_por_dia_disponivel: o.disp > 0 && o.prod ? r1(o.prod / o.disp) : null, ...(!resumido && o.per.length ? { periodos: o.per.slice(0, 5) } : {}) } : {}) };
     }) };
   }
   if (visao === "anos") {
@@ -763,8 +779,10 @@ function calcProducao(a: any, ps: PessoaProd[], cal: Map<string, any> = new Map(
       const ms = calMeses(alvo.lista);
       if (!ms.length) return {};
       const c = somaCal(ms), pes = new Set(alvo.lista.filter((p) => cal.has(p.pessoa)).map((p) => p.pessoa));
-      return { ausencias: { pessoas_com_calendario: pes.size, meses_considerados: new Set(ms.map((m) => m.k)).size, dias_uteis: c.u, dias_uteis_de_ausencia: c.marc, ferias: c.f, licenca: c.l, treinamento_licenca: c.t, falta: c.x, recesso_eleitoral: c.r,
-        dias_disponiveis: c.disp, producao_por_dia_util: c.u ? r1(c.prod / c.u) : null, producao_por_dia_disponivel: c.disp > 0 ? r1(c.prod / c.disp) : null, aviso: AVISO_AUS } };
+      const resumido = !!(cal as any).resumido;   // matrícula sem permissão para o detalhe das ausências: só o total
+      return { ausencias: { pessoas_com_calendario: pes.size, meses_considerados: new Set(ms.map((m) => m.k)).size, dias_uteis: c.u, dias_uteis_de_ausencia: c.marc,
+        ...(resumido ? {} : { ferias: c.f, licenca: c.l, treinamento_licenca: c.t, falta: c.x, recesso_eleitoral: c.r }),
+        dias_disponiveis: c.disp, producao_por_dia_util: c.u ? r1(c.prod / c.u) : null, producao_por_dia_disponivel: c.disp > 0 ? r1(c.prod / c.disp) : null, aviso: resumido ? AVISO_AUS_TOTAL : AVISO_AUS } };
     })(),
     ...(alvo.setor ? { pessoas_com_producao: alvo.lista.filter((p) => agregarProd([p], ini, fim).total > 0).length } : { processos_refeitos: alvo.lista[0].r?.refeitos ?? 0, primeiro_lancamento: alvo.lista[0].primeira, ultimo_lancamento: alvo.lista[0].ultima }) };
 }
@@ -802,7 +820,7 @@ async function secaoProducao(sec: any, db: any, ctx: Ctx | undefined, ehGrafico:
     const comCal = r.meses.some((x: any) => x.dias_uteis !== undefined);
     return { tipo: "tabela", titulo: sec.titulo ?? `Produção mensal: ${escopo(r)}`, colunas: ["Mês", "Total", "Meta", "Acervo", "Sem classificação", ...(comCal ? ["Dias úteis de ausência", "Por dia disponível"] : [])],
       linhas: r.meses.map((x: any) => [rotulo(x.mes), fmtN(x.total), fmtN(x.meta), fmtN(x.acervo), fmtN(x.sem_classificacao), ...(comCal ? [x.dias_uteis === undefined ? "-" : fmtN(x.dias_uteis_de_ausencia), x.producao_por_dia_disponivel == null ? "-" : fmtN(x.producao_por_dia_disponivel)] : [])]).slice(0, 200),
-      nota: r.observacao + (comCal ? " " + AVISO_AUS : "") };
+      nota: r.observacao + (comCal ? " " + ((cal as any).resumido ? NOTA_AUS_TOTAL : AVISO_AUS) : "") };
   }
   if (fonte === "producao_ranking") {
     const r = calcProducao({ ...pedido, visao: "ranking" }, ps, cal);
@@ -812,7 +830,7 @@ async function secaoProducao(sec: any, db: any, ctx: Ctx | undefined, ehGrafico:
     return { tipo: "tabela", titulo: sec.titulo ?? "Produção por pessoa", colunas: ["Pessoa", "Processos", "Média/mês", `Último mês (${r.mes_do_ultimo})`, "% meta", "Prioritários", "Tempo médio (dias)", ...(comCal ? ["Dias úteis de ausência", "Por dia disponível"] : [])],
       linhas: r.ranking.map((x: any) => [x.pessoa, fmtN(x.processos), fmtN(x.media_mensal), fmtN(x.ultimo_mes), x.pct_meta === null ? "-" : fmtN(x.pct_meta) + "%", fmtN(x.prioritarios), x.tempo_medio_dias === null ? "-" : fmtN(x.tempo_medio_dias),
         ...(comCal ? [x.dias_uteis_de_ausencia === undefined ? "-" : fmtN(x.dias_uteis_de_ausencia), x.producao_por_dia_disponivel == null ? "-" : fmtN(x.producao_por_dia_disponivel)] : [])]),
-      nota: r.aviso + (comCal ? " " + AVISO_AUS : "") };
+      nota: r.aviso + (comCal ? " " + ((cal as any).resumido ? NOTA_AUS_TOTAL : AVISO_AUS) : "") };
   }
   if (fonte === "producao_assuntos") {
     const r = calcProducao({ ...pedido, visao: "assuntos", top: sec.top ?? 10 }, ps, cal);

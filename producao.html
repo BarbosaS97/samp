@@ -159,7 +159,7 @@
 
   let pessoas = [];          // [{ nome, m, g, gn, d, r, total, primeira, ultima }]
   let modo = 'setor', pessoaSel = '', anoSel = '';
-  let acesso = { todas: false, pessoas: [] };   // produções individuais que esta matrícula pode abrir em detalhe
+  let acesso = { todas: false, pessoas: [], detalheAus: false };   // produções individuais que esta matrícula pode abrir em detalhe e se vê o detalhe das ausências
   const pode = (nome) => acesso.todas || acesso.pessoas.includes(nome);
   const SEM_ACESSO = 'Você não tem acesso à produção individual desta pessoa. Peça a liberação ao responsável pelo Cadastros.';
   let graficos = [];
@@ -181,7 +181,7 @@
     try {
       const s = window.SAMP_AUTH.get();
       const a = await window.chamarSAMP({ action: 'producao_acesso', token: s && s.token });
-      acesso = { todas: !!a.todas, pessoas: Array.isArray(a.pessoas) ? a.pessoas : [] };
+      acesso = { todas: !!a.todas, pessoas: Array.isArray(a.pessoas) ? a.pessoas : [], detalheAus: a.ausencias_detalhe === true };
     } catch (e) { if (e.status === 401) window.SAMP_AUTH.sair(); }
     pessoaSel = (pessoas.find((p) => pode(p.nome)) || {}).nome || '';
     montarEstrutura(); desenhar();
@@ -234,9 +234,10 @@
   let cal = new Map(), contaTrein = false, calIdx = new Map();
   const CAT_NOME = { f: 'Férias', l: 'Licença', t: 'Treinamento/licença', x: 'Falta', r: 'Recesso/eleitoral' };
   const CAT_COR = { f: '#3b9ac4', l: '#cf3b5a', t: '#8e5fc0', x: '#374151', r: '#e08a2c' };
-  const ausDe = (it) => it.f + it.l + it.x + it.r + (contaTrein ? it.t : 0);   // treinamento só é descontado se o usuário marcar
+  // sem permissão para o detalhe, o servidor manda só o total (aus/tot) e zera os tipos, períodos e observações
+  const ausDe = (it) => (it.aus !== undefined ? it.aus : it.f + it.l + it.x + it.r + (contaTrein ? it.t : 0));   // treinamento só é descontado se o usuário marcar
   const dispDe = (it) => Math.max(0, it.u - ausDe(it));
-  const marcDe = (it) => it.f + it.l + it.t + it.x + it.r;
+  const marcDe = (it) => (it.tot !== undefined ? it.tot : it.f + it.l + it.t + it.x + it.r);
   const ddmm = (iso) => iso.slice(8) + '/' + iso.slice(5, 7);
   function prodPorMes(p) {
     if (!p._pm) { p._pm = new Map(); for (const x of p.m) { const k = ym(x[0], x[1]); p._pm.set(k, (p._pm.get(k) || 0) + x[5]); } }
@@ -288,7 +289,11 @@
     if (!o || !o.marc) return cab + '<div class="t-nada">Nenhuma ausência registrada neste mês.</div>' + (o && o.disp > 0 && o.prod ? `<div class="t-rod"><b>${n1(o.prod / o.disp)}</b> processos por dia disponível</div>` : '');
     const cats = ['f', 'l', 't', 'x', 'r'].filter((c) => o[c] > 0);
     let h = cab;
-    if (indiv) {
+    if (!acesso.detalheAus) {   // sem permissão para o detalhe: só o total de dias úteis de ausência
+      const dias = `${o.marc} ${o.marc === 1 ? 'dia útil' : 'dias úteis'} de ausência`;
+      if (indiv) h += `<div class="t-sec"><small>Ausências neste mês</small><div class="t-chips"><span class="t-chip" style="--c:#7a8aa0">${dias}</span></div></div>`;
+      else h += `<div class="t-sec"><small>Peso na capacidade do setor</small><div><b>${(o.marc / Math.max(1, o.u) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</b> dos dias úteis foram de ausência (${o.marc} d) · ${o.nAus} de ${o.nPes} pessoas</div></div>`;
+    } else if (indiv) {
       h += `<div class="t-sec"><small>Ausências neste mês</small><div class="t-chips">${cats.map((c) => chipCat(c, `${CAT_NOME[c]} · ${o[c]} ${o[c] === 1 ? 'dia' : 'dias'}`)).join('')}</div></div>`;
       if (o.per.length) h += `<div class="t-sec"><small>Períodos</small>${o.per.slice(0, 6).map((q) => `<div class="t-lin"><b style="color:${CAT_COR[q.c]}">${CAT_NOME[q.c]}</b><span>${periodoTxt(q)} · ${q.u} ${q.u === 1 ? 'dia útil' : 'dias úteis'}</span></div>`).join('')}</div>`;
       if (o.notas.length) h += `<div class="t-sec"><small>Observações</small>${o.notas.slice(0, 3).map((n) => `<div class="t-obs">Dia ${n.d}: ${esc(n.t)}</div>`).join('')}</div>`;
@@ -340,12 +345,12 @@
       '<div class="field"><label>Visão</label><div class="pr-modo"><button type="button" data-m="setor" class="on">Setor</button><button type="button" data-m="pessoa"' + (pessoaSel ? '' : ' disabled title="' + esc(SEM_ACESSO) + '"') + '>Individual</button></div></div>' +
       '<div class="field" id="fPessoa" style="display:none"><label for="selPessoa">Pessoa</label><select id="selPessoa">' + pessoas.filter((p) => pode(p.nome)).map((p) => `<option>${esc(p.nome)}</option>`).join('') + '</select></div>' +
       '<div class="field"><label for="selAno">Ano</label><select id="selAno"><option value="">Todos os anos</option>' + anos.slice().reverse().map((a) => `<option>${a}</option>`).join('') + '</select></div>' +
-      (cal.size ? '<label class="pr-chk" title="Por padrão, treinamento e licença capacitação não são descontados dos dias disponíveis, pois há quem trabalhe nesses dias"><input type="checkbox" id="chkTrein"> Descontar treinamento/licença</label>' : '') +
+      (cal.size && acesso.detalheAus ? '<label class="pr-chk" title="Por padrão, treinamento e licença capacitação não são descontados dos dias disponíveis, pois há quem trabalhe nesses dias"><input type="checkbox" id="chkTrein"> Descontar treinamento/licença</label>' : '') +
       '<button type="button" class="pr-info-btn" id="btnInfo" aria-expanded="false"><i>i</i>Como ler estes números</button></div>' +
       '<div class="pr-info" id="prInfo"><b>De onde vêm:</b> das planilhas individuais, enviadas após a virada de cada mês; o mês em andamento não aparece. ' +
       '<b>Meta e acervo</b> vêm da coluna TIPO que cada pessoa preenche (em branco = sem classificação, comum em 2019). ' +
       '<b>Assuntos</b> escritos de várias formas são agrupados automaticamente. <b>Tempo até calcular</b> é a média entre a data de recebimento e a do cálculo, só onde a data de recebimento foi preenchida. ' +
-      (cal.size ? '<b>Ausências:</b> vêm do CALENDÁRIO SECAJ (férias, licença, treinamento/licença, falta e recesso, contados em dias úteis). Licença médica aparece apenas como "licença". ' +
+      (cal.size && !acesso.detalheAus ? '<b>Ausências:</b> vêm do calendário e aparecem em dias úteis, somente com o total. <b>Dias disponíveis</b> = dias úteis do mês menos as ausências; <b>produção por dia disponível</b> = processos do mês ÷ dias disponíveis. ' : cal.size ? '<b>Ausências:</b> vêm do CALENDÁRIO SECAJ (férias, licença, treinamento/licença, falta e recesso, contados em dias úteis). Licença médica aparece apenas como "licença". ' +
         '<b>Dias disponíveis</b> = dias úteis do mês menos as ausências; <b>produção por dia disponível</b> = processos do mês ÷ dias disponíveis. Treinamento/licença só é descontado se a opção estiver marcada. O calendário não registra meio período. ' : '') +
       'Em caso de dúvida, confira com a planilha de origem.</div><div id="corpo"></div>';
     if ($('chkTrein')) $('chkTrein').onchange = (e) => { contaTrein = e.target.checked; desenhar(); };
@@ -458,11 +463,12 @@
     const pDisp = a.disp > 0 ? a.prod / a.disp : null, pUtil = a.u > 0 ? a.prod / a.u : null;
     const ajuste = pDisp !== null && pUtil ? ((pDisp - pUtil) / pUtil) * 100 : 0;
     const part = (c) => ({ rot: CAT_NOME[c], v: a[c], cor: CAT_COR[c] });
+    const detAus = acesso.detalheAus;
     return '<div class="pk-grid tres">' +
       `<div class="pk gold" style="animation-delay:.38s"><span class="pk-l">Produção por dia disponível</span><span class="pk-t">${pDisp === null ? '-' : n1(pDisp)} <small>por dia</small></span>` +
         `<span class="pk-s">${pUtil === null ? '' : n1(pUtil) + ' por dia útil, sem descontar ausências'}</span>${pDisp !== null && Math.abs(ajuste) > 0.5 ? badge(ajuste, pct(ajuste) + ' ao descontar as ausências') : ''}</div>` +
       `<div class="pk" style="animation-delay:.42s"><span class="pk-l">Dias úteis de ausência</span><span class="pk-v">${n0(a.marc)}</span><span class="pk-s">${a.u ? (a.marc / a.u * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '% dos dias úteis' : ''}</span>` +
-        comp(['f', 'l', 't', 'x', 'r'].map(part)) + (contaTrein ? '' : '<span class="pk-nota">Treinamento/licença aparece à parte e não é descontado dos dias disponíveis.</span>') + '</div>' +
+        (detAus ? comp(['f', 'l', 't', 'x', 'r'].map(part)) + (contaTrein ? '' : '<span class="pk-nota">Treinamento/licença aparece à parte e não é descontado dos dias disponíveis.</span>') : '') + '</div>' +
       `<div class="pk" style="animation-delay:.46s"><span class="pk-l">Dias úteis disponíveis</span><span class="pk-v">${n0(a.disp)}</span><span class="pk-s">de ${n0(a.u)} dias úteis (${a.u ? Math.round(a.disp / a.u * 100) : 0}%)</span>` +
         `<span class="pk-nota">Calendário cobre ${a.meses} ${a.meses === 1 ? 'mês' : 'meses'} no período.</span></div>` +
       '</div>';
@@ -502,6 +508,7 @@
     const indiv = lista.length === 1;
     // ponto = mês com ausências; as cores mostram a composição (tipo e proporção) e o tamanho, o peso no mês
     const conic = (o) => {
+      if (!acesso.detalheAus) return 'conic-gradient(#7a8aa0 0% 100%)';   // sem o detalhe, o ponto não mostra os tipos (cor única)
       const cs = ['f', 'l', 't', 'x', 'r'].filter((c) => o[c] > 0); let acc = 0;
       return 'conic-gradient(' + cs.map((c) => { const ini = acc; acc += (o[c] / o.marc) * 100; return `${CAT_COR[c]} ${ini.toFixed(1)}% ${acc.toFixed(1)}%`; }).join(', ') + ')';
     };
@@ -512,8 +519,10 @@
       const dot = marcado ? `<b class="dot" tabindex="0" role="button" aria-label="Ver as ausências de ${rotLongo(k)}" style="--d:${(9 + 5 * peso).toFixed(1)}px;--g:${conic(o)}"></b>` : '';
       return `<td class="h${marcado ? ' aus' : ''}${v ? '' : ' zero'}" data-k="${k}" data-v="${v}" style="${v ? `--bg:rgba(18,53,91,${(0.08 + 0.55 * (v / mx)).toFixed(2)});--fg:${v / mx > .55 ? '#fff' : 'var(--ink)'}` : ''}">${v ? n0(v) : '-'}${dot}</td>`;
     };
-    const leg = calIdx.size ? '<div class="pr-leg-aus">' + ['f', 'l', 't', 'x', 'r'].map((c) => `<span style="--c:${CAT_COR[c]}">${CAT_NOME[c]}</span>`).join('') +
-      `<span style="--c:#9aa6b4">${indiv ? 'O ponto marca meses com ausências' : 'O ponto marca meses em que 10% ou mais dos dias úteis do setor foram de ausência'}; as cores mostram o tipo. Passe o mouse (ou toque) no ponto para ver os detalhes.</span></div>` : '';
+    const leg = !calIdx.size ? '' : !acesso.detalheAus
+      ? `<div class="pr-leg-aus"><span style="--c:#7a8aa0">${indiv ? 'O ponto marca meses com ausências' : 'O ponto marca meses em que 10% ou mais dos dias úteis do setor foram de ausência'}. Passe o mouse (ou toque) no ponto para ver o total de dias úteis de ausência.</span></div>`
+      : '<div class="pr-leg-aus">' + ['f', 'l', 't', 'x', 'r'].map((c) => `<span style="--c:${CAT_COR[c]}">${CAT_NOME[c]}</span>`).join('') +
+      `<span style="--c:#9aa6b4">${indiv ? 'O ponto marca meses com ausências' : 'O ponto marca meses em que 10% ou mais dos dias úteis do setor foram de ausência'}; as cores mostram o tipo. Passe o mouse (ou toque) no ponto para ver os detalhes.</span></div>`;
     return '<div class="pr-tab pr-heat" data-indiv="' + (indiv ? 1 : 0) + '"><table><thead><tr><th>Ano</th>' + MES.map((m) => `<th>${m}</th>`).join('') + '<th>Total</th></tr></thead><tbody>' +
       anos.map((a) => { let s = 0; const cs = MES.map((_, i) => { const v = t.get(a + '|' + (i + 1)) || 0; s += v; return cel(v, a, i + 1); }).join(''); return `<tr><td><b>${a}</b></td>${cs}<td><b>${n0(s)}</b></td></tr>`; }).join('') + '</tbody></table></div>' + leg;
   }
@@ -522,6 +531,12 @@
     const meses = [...calIdx.values()].filter((o) => doAno(o.k) && (lista.length === 1 ? o.marc > 0 || o.notas.length : o.marc > 0)).sort((a, b) => b.k - a.k);
     if (!meses.length) return '<div class="sub" style="margin:0">Nenhuma ausência registrada no calendário para este período.</div>';
     const indiv = lista.length === 1;
+    if (!acesso.detalheAus) {   // sem permissão para o detalhe: só os totais de cada mês
+      if (indiv) return '<div class="pr-tab"><table><thead><tr><th>Mês</th><th>Dias úteis</th><th>Disponíveis</th><th>Dias de ausência</th><th>Processos</th><th>Por dia disp.</th></tr></thead><tbody>' +
+        meses.map((o) => `<tr><td><b>${rotYM(o.k)}</b></td><td>${o.u}</td><td>${o.disp}</td><td>${o.marc || '-'}</td><td>${n0(o.prod)}</td><td>${o.disp > 0 && o.prod ? n1(o.prod / o.disp) : '-'}</td></tr>`).join('') + '</tbody></table></div>';
+      return '<div class="pr-tab"><table><thead><tr><th>Mês</th><th>Pessoas com ausência</th><th>Dias úteis de ausência</th><th>% da capacidade</th><th>Processos</th><th>Por dia disponível</th></tr></thead><tbody>' +
+        meses.slice(0, 36).map((o) => `<tr><td><b>${rotYM(o.k)}</b></td><td>${o.nAus} de ${o.nPes}</td><td>${o.marc}</td><td>${(o.marc / Math.max(1, o.u) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</td><td>${n0(o.prod)}</td><td>${o.disp > 0 && o.prod ? n1(o.prod / o.disp) : '-'}</td></tr>`).join('') + '</tbody></table></div>';
+    }
     if (indiv) {
       return '<div class="pr-tab"><table><thead><tr><th>Mês</th><th>Dias úteis</th><th>Disponíveis</th><th>Férias</th><th>Licença</th><th>Trein./lic.</th><th>Falta</th><th>Recesso</th><th>Processos</th><th>Por dia disp.</th><th>Períodos e observações</th></tr></thead><tbody>' +
         meses.map((o) => `<tr><td><b>${rotYM(o.k)}</b></td><td>${o.u}</td><td>${o.disp}</td>` + ['f', 'l', 't', 'x', 'r'].map((c) => `<td${o[c] ? '' : ' class="mut"'}>${o[c] || '-'}</td>`).join('') +
@@ -567,7 +582,9 @@
         '<div class="pr-box"><h3>Assuntos mais calculados</h3><div class="sub">Assuntos agrupados</div><div class="pr-ch alto"><canvas id="g4"></canvas></div></div>' +
         '<div class="pr-box"><h3>Dia da semana</h3><div class="sub">Média de processos por dia trabalhado</div><div class="pr-ch"><canvas id="g5"></canvas></div></div>' +
         '<div class="pr-box larga"><h3>Quadro mensal</h3><div class="sub">Mesmo quadro da planilha: processos por mês e ano</div>' + quadroMensal(lista) + '</div>' +
-        (calIdx.size ? `<div class="pr-box larga"><h3>Ausências e observações de ${esc(p.nome)}</h3><div class="sub">Meses com férias, licença, treinamento, falta ou recesso no calendário, com os períodos e as observações registradas. Licença médica aparece só como "licença".</div>` + tabelaAusencias(lista) + '</div>' : '') +
+        (calIdx.size ? (acesso.detalheAus
+          ? `<div class="pr-box larga"><h3>Ausências e observações de ${esc(p.nome)}</h3><div class="sub">Meses com férias, licença, treinamento, falta ou recesso no calendário, com os períodos e as observações registradas. Licença médica aparece só como "licença".</div>`
+          : `<div class="pr-box larga"><h3>Ausências de ${esc(p.nome)}</h3><div class="sub">Meses com ausências no calendário, somente com o total de dias úteis. O detalhe depende de liberação do responsável pelo Cadastros.</div>`) + tabelaAusencias(lista) + '</div>' : '') +
         `<div class="pr-box larga"><h3>Observações sobre os dados</h3><div class="sub">Processos refeitos: ${n0(p.r.refeitos)} lançamentos repetidos do mesmo número (${n0(p.r.repetidos)} processos aparecem mais de uma vez). Primeiro lançamento: ${p.primeira ? p.primeira.split('-').reverse().join('/') : '-'}; último: ${p.ultima ? p.ultima.split('-').reverse().join('/') : '-'}. Importado em ${new Date(p.atualizado).toLocaleString('pt-BR')}.</div></div>` +
         '</div>';
     }
