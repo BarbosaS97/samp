@@ -518,36 +518,62 @@
         }
         .sub-content.expanded { max-height: 50000px; }
 
-        /* aba Unidade: cada nível com a sua cor (unidade = dourado, vara = azul, assunto = verde, processos = âmbar) */
-        #unidadeContent .un-card { border: 1px solid #e0c98f; border-left: 5px solid #a68a4e; box-shadow: 0 2px 10px rgba(166,138,78,.1); }
-        #unidadeContent .un-card > .section-header { background: #fffaf0; border-bottom-color: #f0e4c4; }
-        #unidadeContent .un-card.aberto > .section-header { background: linear-gradient(90deg, #f8ecc8 0%, #fffaf0 70%); }
-        #unidadeContent .un-card > .section-header .section-name { color: #5b4a1f; }
-        #unidadeContent .un-card > .section-header .section-count { background: #a68a4e; color: #fff; font-weight: 600; }
-        #unidadeContent .un-card > .section-header .toggle-icon { color: #a68a4e; }
 
-        #unidadeContent .un-vara { border-bottom: 1px solid #cfe0f3; }
-        #unidadeContent .un-vara > .sub-header { padding-left: 34px; background: #eaf1fb; border-left: 5px solid #1a4a6e; transition: background .2s; }
-        #unidadeContent .un-vara > .sub-header:hover { background: #dde9f8; }
-        #unidadeContent .un-vara.aberto > .sub-header { background: #d6e5f6; }
-        #unidadeContent .un-vara .sub-name { color: #12355b; font-weight: 600; }
-        #unidadeContent .un-vara > .sub-header .sub-icon { background: #1a4a6e; width: 8px; height: 8px; border-radius: 2px; }
-        #unidadeContent .un-vara > .sub-header .sub-count { background: #1a4a6e; color: #fff; font-weight: 600; }
-        #unidadeContent .un-vara > .sub-header .sub-toggle { color: #1a4a6e; font-size: 16px; }
-        #unidadeContent .un-vara > .sub-content { background: #f6faff; border-left: 5px solid #b9d0ea; }
+        /* abas Assuntos, Polo Passivo, Advogado e Unidade: cada nível com a sua cor
+           1º nível = dourado, 2º (vara) = azul, 3º (assunto) = verde, linha "Acima de X dias" = rosa, processos = âmbar */
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) {
+            /* 1º nível */
+            --c1: #a68a4e; --c1-bg: #fffaf0; --c1-on: #f8ecc8; --c1-tx: #5b4a1f; --c1-bd: #e0c98f;
+            /* 2º nível */
+            --c2: #1a4a6e; --c2-bg: #eaf1fb; --c2-on: #d6e5f6; --c2-hv: #dde9f8; --c2-area: #f6faff; --c2-guia: #b9d0ea; --c2-tx: #12355b;
+            /* 3º nível */
+            --c3: #2f7d5b; --c3-bg: #eaf6f0; --c3-on: #d3ecdf; --c3-hv: #dcf0e6; --c3-area: #fcfefd; --c3-guia: #b4dcc8; --c3-tx: #1f5c42;
+        }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card { border: 1px solid var(--c1-bd); border-left: 5px solid var(--c1); box-shadow: 0 2px 10px rgba(166,138,78,.1); }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card > .section-header { background: var(--c1-bg); border-bottom-color: #f0e4c4; }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card:has(> .section-content.expanded) > .section-header { background: linear-gradient(90deg, var(--c1-on) 0%, var(--c1-bg) 70%); }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card > .section-header .section-name { color: var(--c1-tx); }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card > .section-header .section-count { background: var(--c1); color: #fff; font-weight: 600; }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card > .section-header .toggle-icon { color: var(--c1); }
 
-        #unidadeContent .un-ass { border-bottom: 1px solid #d3eadf; }
-        #unidadeContent .un-ass > .sub-header { padding-left: 46px !important; background: #eaf6f0; border-left: 5px solid #2f7d5b; transition: background .2s; }
-        #unidadeContent .un-ass > .sub-header:hover { background: #dcf0e6; }
-        #unidadeContent .un-ass.aberto > .sub-header { background: #d3ecdf; }
-        #unidadeContent .un-ass > .sub-header .sub-info > span:first-child { color: #1f5c42; }
-        #unidadeContent .un-ass > .sub-header .sub-count { background: #2f7d5b; color: #fff; font-weight: 600; }
-        #unidadeContent .un-ass > .sub-header .sub-toggle { color: #2f7d5b; font-size: 16px; }
-        #unidadeContent .un-ass > .sub-content { background: #fcfefd; border-left: 5px solid #b4dcc8; }
+        /* 2º nível: vara */
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-content > .sub-card { border-bottom: 1px solid #cfe0f3; }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-content > .sub-card > .sub-header { padding-left: 34px; background: var(--c2-bg); border-left: 5px solid var(--c2); }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-content > .sub-card > .sub-header:hover { background: var(--c2-hv); }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-content > .sub-card:has(> .sub-content.expanded) > .sub-header { background: var(--c2-on); }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-content > .sub-card > .sub-header .sub-name { color: var(--c2-tx); font-weight: 600; }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-content > .sub-card > .sub-header .sub-icon { background: var(--c2); width: 8px; height: 8px; border-radius: 2px; }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-content > .sub-card > .sub-header .sub-count { background: var(--c2); color: #fff; font-weight: 600; }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-content > .sub-card > .sub-header .sub-toggle { color: var(--c2); font-size: 16px; }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-content > .sub-card > .sub-content { background: var(--c2-area); border-left: 5px solid var(--c2-guia); }
 
-        #unidadeContent .un-ass .process-row { background: #fffdf6; border-left: 4px solid #e0c98f; border-bottom: 1px dashed #eadfbf; padding-left: 40px; }
-        #unidadeContent .un-ass .process-row:hover { background: #fff3d1; }
-        #unidadeContent .un-ass .process-number { color: #12355b; font-weight: 600; }
+        /* 3º nível: assunto (dentro da vara) */
+        :is(#advogadoAtivoContent, #unidadeContent) .sub-content > .sub-card { border-bottom: 1px solid #d3eadf; }
+        :is(#advogadoAtivoContent, #unidadeContent) .sub-content > .sub-card > .sub-header { padding-left: 46px !important; background: var(--c3-bg); border-left: 5px solid var(--c3); }
+        :is(#advogadoAtivoContent, #unidadeContent) .sub-content > .sub-card > .sub-header:hover { background: var(--c3-hv); }
+        :is(#advogadoAtivoContent, #unidadeContent) .sub-content > .sub-card:has(> .sub-content.expanded) > .sub-header { background: var(--c3-on); }
+        :is(#advogadoAtivoContent, #unidadeContent) .sub-content > .sub-card > .sub-header .sub-info > span:first-child { color: var(--c3-tx); }
+        :is(#advogadoAtivoContent, #unidadeContent) .sub-content > .sub-card > .sub-header .sub-count { background: var(--c3); color: #fff; font-weight: 600; }
+        :is(#advogadoAtivoContent, #unidadeContent) .sub-content > .sub-card > .sub-header .sub-toggle { color: var(--c3); font-size: 16px; }
+        :is(#advogadoAtivoContent, #unidadeContent) .sub-content > .sub-card > .sub-content { background: var(--c3-area); border-left: 5px solid var(--c3-guia); }
+
+        /* linha "Acima de X dias" (aba Assuntos): rosa, para chamar a atenção */
+        #assuntosContent .sub-card.sub-acima > .sub-header { background: #fdeeee; border-left-color: #b3261e; }
+        #assuntosContent .sub-card.sub-acima > .sub-header:hover { background: #fbe0de; }
+        #assuntosContent .sub-card.sub-acima:has(> .sub-content.expanded) > .sub-header { background: #f9d6d3; }
+        #assuntosContent .sub-card.sub-acima > .sub-header .sub-name { color: #8a1c15; }
+        #assuntosContent .sub-card.sub-acima > .sub-header .sub-icon { background: #b3261e; }
+        #assuntosContent .sub-card.sub-acima > .sub-header .sub-count { background: #b3261e; }
+        #assuntosContent .sub-card.sub-acima > .sub-header .sub-toggle { color: #b3261e; }
+        #assuntosContent .sub-card.sub-acima > .sub-content { background: #fffafa; border-left-color: #eab4af; }
+        #assuntosContent .sub-card.sub-acima .process-row { background: #fffafa; border-left-color: #e8a09a; border-bottom-color: #f3d3d0; }
+        #assuntosContent .sub-card.sub-acima .process-row:hover { background: #fde8e6; }
+        #assuntosContent .sub-card.sub-acima.vazio > .sub-header { background: #faf3f3; border-left-color: #e3bcb8; opacity: .8; cursor: default; }
+
+        /* processos: linhas em âmbar */
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .process-row { background: #fffdf6; border-left: 4px solid #e0c98f; border-bottom: 1px dashed #eadfbf; padding-left: 40px; }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .process-row:hover { background: #fff3d1; }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .process-number { color: #12355b; font-weight: 600; }
 
         .process-table { width: 100%; }
         .process-row {
