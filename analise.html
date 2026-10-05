@@ -519,6 +519,16 @@
         .sub-content.expanded { max-height: 50000px; }
 
 
+        /* lista "Análise Completa por Vara" (aba Análises): linhas clicáveis e aviso do filtro de vara na aba Unidade */
+        .un-dica { margin: 0 0 10px; font-size: 13px; color: #5f6b7a; }
+        .ranking-item.vara-link { cursor: pointer; border-radius: 6px; transition: background .2s, transform .15s; }
+        .ranking-item.vara-link:hover { background: #eaf1fb; transform: translateX(3px); }
+        .ranking-item.vara-link:focus-visible { outline: 2px solid #1a4a6e; outline-offset: -2px; }
+        .ranking-item.vara-link:hover .ranking-name { color: #12355b; font-weight: 600; }
+        .un-filtro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 14px; padding: 10px 14px; background: #eaf1fb; border: 1px solid #b9d0ea; border-left: 5px solid #1a4a6e; border-radius: 6px; color: #12355b; font-size: 14px; animation: fadeIn .3s ease; }
+        .un-filtro button { background: #1a4a6e; color: #fff; border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s; }
+        .un-filtro button:hover { background: #12355b; }
+
         /* abas Assuntos, Polo Passivo, Advogado e Unidade: cada nível com a sua cor
            1º nível = dourado, 2º (vara) = azul, 3º (assunto) = verde, linha "Acima de X dias" = rosa, processos = âmbar */
         :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) {
@@ -937,7 +947,7 @@
             const supabaseClient = window.criarClienteLeitura();
             
             let currentData = null, currentPoloData = null, currentAdvogadoData = null, currentUnidadeData = null;
-            let searchTerm = '', poloSearchTerm = '', advogadoSearchTerm = '', unidadeSearchTerm = '';
+            let searchTerm = '', poloSearchTerm = '', advogadoSearchTerm = '', unidadeSearchTerm = '', unidadeFiltroVara = '';
             const expandedUnidades = new Set(), expandedUnidadeVaras = new Set(), expandedUnidadeAssuntos = new Set();
             let expandedSubjects = new Set(), expandedPolos = new Set(), expandedAdvogados = new Set();
             let expandedPoloCourts = new Set(), expandedAdvogadoCourts = new Set();
@@ -1295,13 +1305,22 @@ function renderAdvogadoAtivoTab() {
         });
     }
 }
+            // abre a aba Unidade já filtrada por uma vara (usado pela lista da aba Análises)
+            function irParaVara(vara) {
+                unidadeFiltroVara = vara; unidadeSearchTerm = '';
+                const aba = document.querySelector('.tab[data-tab="unidade"]');
+                if (aba) aba.click();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
             function renderUnidadeTab() {
                 const container = document.getElementById('unidadeContent');
                 if (!currentUnidadeData || !currentUnidadeData.total) { container.innerHTML = `<div class="empty-state"><div class="empty-icon"></div><div>Nenhum processo encontrado</div></div>`; return; }
                 const termo = unidadeSearchTerm.toLowerCase();
-                const bate = (p) => !termo || [p.numeroProcesso, p.orgaoJulgador, p.assuntoPrincipal, p.poloPassivo, p.advogadoAtivo].some(v => String(v || '').toLowerCase().includes(termo));
+                const bate = (p) => (!unidadeFiltroVara || p.orgaoJulgador === unidadeFiltroVara) && (!termo || [p.numeroProcesso, p.orgaoJulgador, p.assuntoPrincipal, p.poloPassivo, p.advogadoAtivo].some(v => String(v || '').toLowerCase().includes(termo)));
                 let html = `<div class="search-container"><input type="text" class="search-input" id="unidadeSearchInput" placeholder="Buscar por número, vara, assunto, polo passivo ou advogado..." autocomplete="off"></div>`;
-                const busca = !!termo;   // com busca ativa, os níveis já aparecem abertos
+                if (unidadeFiltroVara) html += `<div class="un-filtro"><span>Mostrando só os processos de <b>${escapeHtml(unidadeFiltroVara)}</b></span><button type="button" id="unLimparVara">Mostrar todas as varas</button></div>`;
+                const busca = !!termo || !!unidadeFiltroVara;   // com busca ou filtro de vara ativos, os níveis já aparecem abertos
                 let achou = false;
                 // Hierarquia: Unidade > Vara > Assunto > Processos
                 currentUnidadeData.sortedUnidades.forEach((un, ui) => {
@@ -1342,6 +1361,8 @@ function renderAdvogadoAtivoTab() {
                 });
                 if (!achou) html += `<div class="empty-state"><div>Nenhum resultado para a busca.</div></div>`;
                 container.innerHTML = html;
+                const limparVara = document.getElementById('unLimparVara');
+                if (limparVara) limparVara.addEventListener('click', () => { unidadeFiltroVara = ''; renderUnidadeTab(); });
                 const inp = document.getElementById('unidadeSearchInput');
                 if (inp) {
                     inp.value = unidadeSearchTerm;
@@ -1362,18 +1383,28 @@ function renderAdvogadoAtivoTab() {
                 if (!currentData || !currentData.totalProcesses) { container.innerHTML = `<div class="empty-state"><div class="empty-icon"></div><div>Nenhum dado disponível</div></div>`; return; }
                 const subjectEntries = Object.entries(currentData.subjectCounts).sort((a,b) => b[1] - a[1]);
                 const courtEntries = Object.entries(currentData.courtCounts).sort((a,b) => b[1] - a[1]);
-                const filteredCourtEntries = currentData.sortedCourtEntries.filter(([c]) => !courtSearchTerm || c.toLowerCase().includes(courtSearchTerm.toLowerCase()));
+                const attr = (t) => escapeHtml(t).replace(/"/g, '&quot;');
+                // lista "Análise Completa por Vara": montada à parte para a busca atualizar só a lista (sem redesenhar a aba e perder o cursor)
+                const listaVarasHtml = () => {
+                    const termo = courtSearchTerm.trim().toLowerCase();
+                    const lista = currentData.sortedCourtEntries.filter(([c]) => !termo || c.toLowerCase().includes(termo));
+                    if (!lista.length) return `<div class="no-results">Nenhuma vara encontrada</div>`;
+                    return lista.map(([v, c]) => `<div class="ranking-item vara-link" data-vara="${attr(v)}" role="button" tabindex="0" title="Ver os processos desta vara na aba Unidade"><div><span class="ranking-position" style="background:#eef2f7;">${extractVaraNumber(v) === 999 ? '-' : extractVaraNumber(v)}</span><span class="ranking-name">${escapeHtml(v)}</span></div><div><span class="ranking-value">${c}</span><span style="font-size:11px;color:#8a9bb0;margin-left:8px;">${((c / currentData.totalProcesses) * 100).toFixed(1)}%</span></div></div>`).join('');
+                };
                 let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:16px;"><button class="print-btn" id="printReportBtn" onclick="printAnalysisReport()">Imprimir Relatório</button></div><div class="charts-container"><div class="chart-card"><div class="chart-title">Distribuição por Assunto</div><div class="chart-wrapper"><canvas id="subjectChart"></canvas></div><div class="ranking-list"><div style="font-weight:600;margin-bottom:12px;">RANKING DE ASSUNTOS</div>`;
                 subjectEntries.slice(0,5).forEach(([s,c],i) => { html += `<div class="ranking-item"><div><span class="ranking-position ${i===0?'top1':i===1?'top2':i===2?'top3':''}">${i+1}</span><span class="ranking-name">${escapeHtml(s.length>40?s.substring(0,37)+'...':s)}</span></div><span class="ranking-value">${c}</span></div>`; });
                 html += `</div></div><div class="chart-card"><div class="chart-title">Distribuição por Vara</div><div class="chart-wrapper"><canvas id="courtChart"></canvas></div><div class="ranking-list"><div style="font-weight:600;margin-bottom:12px;">RANKING DE VARAS</div>`;
                 courtEntries.slice(0,5).forEach(([v,c],i) => { html += `<div class="ranking-item"><div><span class="ranking-position ${i===0?'top1':i===1?'top2':i===2?'top3':''}">${i+1}</span><span class="ranking-name">${escapeHtml(v.length>40?v.substring(0,37)+'...':v)}</span></div><span class="ranking-value">${c}</span></div>`; });
-                html += `</div></div></div><div class="chart-card"><div class="chart-title">Análise Completa por Vara</div><div class="analysis-search"><input type="text" id="courtSearchInput" placeholder="Buscar vara..."></div><div class="ranking-list">`;
-                if (!filteredCourtEntries.length) html += `<div class="no-results">Nenhuma vara encontrada</div>`;
-                else filteredCourtEntries.forEach(([v,c],i) => { html += `<div class="ranking-item"><div><span class="ranking-position" style="background:#eef2f7;">${i+1}</span><span class="ranking-name">${escapeHtml(v)}</span></div><div><span class="ranking-value">${c}</span><span style="font-size:11px;color:#8a9bb0;margin-left:8px;">${((c/currentData.totalProcesses)*100).toFixed(1)}%</span></div></div>`; });
-                html += `</div></div>`;
+                html += `</div></div></div><div class="chart-card"><div class="chart-title">Análise Completa por Vara</div><p class="un-dica">Clique em uma vara para ver os processos dela na aba Unidade.</p><div class="analysis-search"><input type="text" id="courtSearchInput" placeholder="Buscar vara..." autocomplete="off"></div><div class="ranking-list" id="courtListaCompleta">${listaVarasHtml()}</div></div>`;
                 container.innerHTML = html;
                 const cs = document.getElementById('courtSearchInput');
-                if (cs) { cs.value = courtSearchTerm; cs.addEventListener('input', (e) => { courtSearchTerm = e.target.value; renderAnalisesTab(); }); }
+                const lista = document.getElementById('courtListaCompleta');
+                if (cs) { cs.value = courtSearchTerm; cs.addEventListener('input', (e) => { courtSearchTerm = e.target.value; if (lista) lista.innerHTML = listaVarasHtml(); }); }
+                if (lista) {   // clicar (ou Enter) em uma vara abre os processos dela na aba Unidade
+                    const abrir = (el) => { const it = el.closest('[data-vara]'); if (it) irParaVara(it.dataset.vara); };
+                    lista.addEventListener('click', (e) => abrir(e.target));
+                    lista.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(e.target); } });
+                }
                 setTimeout(() => {
                     if (subjectChart) subjectChart.destroy();
                     if (courtChart) courtChart.destroy();
