@@ -533,13 +533,14 @@
            1º nível = dourado, 2º (vara) = azul, 3º (assunto) = verde, linha "Acima de X dias" = rosa, processos = âmbar */
         :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) {
             /* 1º nível */
-            --c1: #a68a4e; --c1-bg: #fffaf0; --c1-on: #f8ecc8; --c1-tx: #5b4a1f; --c1-bd: #e0c98f;
+            --c1: #85682a; --c1-bg: #fbf5e6; --c1-on: #f0e0b4; --c1-tx: #4a3a14; --c1-bd: #cdb67a;
             /* 2º nível */
             --c2: #1a4a6e; --c2-bg: #eaf1fb; --c2-on: #d6e5f6; --c2-hv: #dde9f8; --c2-area: #f6faff; --c2-guia: #b9d0ea; --c2-tx: #12355b;
             /* 3º nível */
             --c3: #2f7d5b; --c3-bg: #eaf6f0; --c3-on: #d3ecdf; --c3-hv: #dcf0e6; --c3-area: #fcfefd; --c3-guia: #b4dcc8; --c3-tx: #1f5c42;
         }
-        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card { border: 1px solid var(--c1-bd); border-left: 5px solid var(--c1); box-shadow: 0 2px 10px rgba(166,138,78,.1); }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card { border: 1px solid var(--c1-bd); border-left: 5px solid var(--c1); box-shadow: 0 2px 10px rgba(133,104,42,.14); }
+        :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card > .section-header .section-badge { background: var(--c1) !important; }
         :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card > .section-header { background: var(--c1-bg); border-bottom-color: #f0e4c4; }
         :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card:has(> .section-content.expanded) > .section-header { background: linear-gradient(90deg, var(--c1-on) 0%, var(--c1-bg) 70%); }
         :is(#assuntosContent, #poloPassivoContent, #advogadoAtivoContent, #unidadeContent) .section-card > .section-header .section-name { color: var(--c1-tx); }
