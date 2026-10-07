@@ -72,3 +72,15 @@ window.criarClienteLeitura = function (opcoes) {
   }
   return Object.freeze({ from });
 };
+
+/* ---------- Data e hora no horário de Brasília ----------
+   O banco guarda os instantes em UTC e, em algumas colunas, sem indicar o fuso ("2026-10-07T18:43:00"). Se o navegador lesse isso
+   como hora local, mostraria 3 horas a mais. Esta função trata o valor sem fuso como UTC e exibe sempre em America/Sao_Paulo. */
+window.formatarDataHora = function (valor, curto) {
+  if (!valor) return '-';
+  let t = String(valor);
+  if (!/[zZ]|[+-]\d\d:?\d\d$/.test(t)) t += 'Z';
+  const d = new Date(t);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleString('pt-BR', curto ? { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' } : { timeZone: 'America/Sao_Paulo' });
+};

@@ -16,8 +16,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>SAMP - Cadastros</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js" integrity="sha384-gx12pQMMYnabkTgbCHqqrT65RwDnXI/f/dU2H9JUmT0KUeiMF5bf+yroQBmX0Nuk" crossorigin="anonymous"></script>
-<script src="config.js?v=20261006a"></script>
-<link rel="stylesheet" href="theme.css?v=20261006a">
+<script src="config.js?v=20261007a"></script>
+<link rel="stylesheet" href="theme.css?v=20261007a">
 <style>
   .btn { padding: 9px 18px; cursor: pointer; display: inline-flex; align-items: center; font-size: .85rem; }
   .tabs { display: flex; }
@@ -204,7 +204,7 @@
 </style>
 </head>
 <body data-page="cadastros">
-<script src="layout.js?v=20261006a"></script>
+<script src="layout.js?v=20261007a"></script>
 
 <!-- Acesso restrito -->
 <div class="gate-wrap" id="gateWrap">
@@ -528,7 +528,7 @@
     const { data } = await sb.from('processos').select('data_importacao').order('data_importacao', { ascending: false }).limit(1);
     selo('tbProc', count || 0);
     $('procInfo').textContent = count
-      ? `${count} processos cadastrados. Última importação: ${new Date(data[0].data_importacao).toLocaleString('pt-BR')}.`
+      ? `${count} processos cadastrados. Última importação: ${window.formatarDataHora(data[0].data_importacao)}.`
       : 'Nenhum processo cadastrado.';
   }
   /* ---------- unificação dos assuntos (planilha e base atual) ---------- */
@@ -821,7 +821,7 @@
       <td><span class="${u.ativo ? 'tag-on' : 'tag-off'}">${u.ativo ? 'Autorizada' : 'Bloqueada'}</span></td>
       <td>${u.producao_todas ? 'Todas' : (u.producao_pessoas || []).length ? `<span title="${escH(u.producao_pessoas.join(', '))}">${u.producao_pessoas.length} ${u.producao_pessoas.length === 1 ? 'pessoa' : 'pessoas'}</span>` : '<span style="color:var(--muted)">Nenhuma</span>'}</td>
       <td>${u.ausencias_detalhe ? 'Detalhado' : '<span style="color:var(--muted)">Só o total</span>'}</td>
-      <td>${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : '-'}</td>
+      <td>${u.ultimo_acesso ? window.formatarDataHora(u.ultimo_acesso) : '-'}</td>
       <td><button class="lnk" data-a="ed" data-m="${escH(u.matricula)}">Editar</button>
           <button class="lnk" data-a="at" data-m="${escH(u.matricula)}">${u.ativo ? 'Bloquear' : 'Autorizar'}</button>
           ${u.tem_senha ? `<button class="lnk" data-a="rs" data-m="${escH(u.matricula)}">Redefinir senha</button>` : ''}
@@ -1064,7 +1064,7 @@
       ? `${jaImportados.length} pessoa(s) com produção importada, ${total.toLocaleString('pt-BR')} processos no total.`
       : 'Nenhuma produção importada ainda.';
     $('prodLista').innerHTML = jaImportados.length ? jaImportados.map((x) => `<tr><td>${escH(x.pessoa)}</td><td>${x.total.toLocaleString('pt-BR')}</td>` +
-      `<td>${dataBR(x.primeira_data)} a ${dataBR(x.ultima_data)}</td><td>${new Date(x.atualizado_em).toLocaleString('pt-BR')}</td>` +
+      `<td>${dataBR(x.primeira_data)} a ${dataBR(x.ultima_data)}</td><td>${window.formatarDataHora(x.atualizado_em)}</td>` +
       `<td><button class="lnk rm" data-p="${escH(x.pessoa)}">Excluir</button></td></tr>`).join('')
       : '<tr><td colspan="5" style="text-align:center!important;color:var(--muted)">Nenhuma pessoa importada.</td></tr>';
     desenharFila();
@@ -1237,7 +1237,7 @@
     calApelidos = a.data || [];
     const ls = c.data || [];
     $('calInfo').textContent = ls.length
-      ? `Calendário importado para ${ls.length} pessoa(s) em ${new Date(ls.reduce((m, x) => (x.atualizado_em > m ? x.atualizado_em : m), '')).toLocaleString('pt-BR')} (${ls[0].arquivo || 'arquivo'}).`
+      ? `Calendário importado para ${ls.length} pessoa(s) em ${window.formatarDataHora(ls.reduce((m, x) => (x.atualizado_em > m ? x.atualizado_em : m), ''))} (${ls[0].arquivo || 'arquivo'}).`
       : 'Nenhum calendário importado ainda.';
   }
 

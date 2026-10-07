@@ -15,8 +15,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>SAMP - Sistema de Acompanhamento e Métricas Processuais</title>
-<script src="config.js?v=20261006a"></script>
-<link rel="stylesheet" href="theme.css?v=20261006a">
+<script src="config.js?v=20261007a"></script>
+<link rel="stylesheet" href="theme.css?v=20261007a">
 <style>
   .hero { padding: 40px 0 28px; }
   .hero .eyebrow { font-size: .72rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 700; }
@@ -62,7 +62,7 @@
 </style>
 </head>
 <body data-page="inicio">
-<script src="layout.js?v=20261006a"></script>
+<script src="layout.js?v=20261007a"></script>
 <main class="page">
   <section class="hero">
     <div class="eyebrow" id="saudacao">SAMP</div>
@@ -141,13 +141,13 @@
   ]).then(([tot, ult, per]) => {
     $('rTotal').textContent = tot.count != null ? tot.count.toLocaleString('pt-BR') : '-';
     const d = ult.data && ult.data[0] && ult.data[0].data_importacao;
-    $('rSync').textContent = d ? new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+    $('rSync').textContent = d ? window.formatarDataHora(d, true) : '-';
     const p = per.data && per.data[0];
     if (p && p.meses && p.meses.length) { $('rPeriodo').textContent = rot(p.meses[0]) + ' a ' + rot(p.meses[p.meses.length - 1]); $('rMeses').textContent = p.meses.length + ' meses'; }
     else $('rPeriodo').textContent = '-';
   }).catch(() => { ['rTotal', 'rSync', 'rPeriodo'].forEach((i) => { $(i).textContent = '-'; }); });
 })();
 </script>
-<script src="sampinha.js?v=20261006a"></script>
+<script src="sampinha.js?v=20261007a"></script>
 </body>
 </html>
