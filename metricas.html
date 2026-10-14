@@ -887,17 +887,14 @@
             infoDiv.style.display = 'block';
         }
         
-        const newLength = currentMonths.length;
+        // O filtro só escolhe QUAIS meses aparecem: os valores de cada mês são sempre os do período completo (as cópias originais),
+        // nunca recalculados nem cortados de um filtro anterior.
+        const filtrado = activeFilter.startIndex !== null;
         for (let field of ['recebidos', 'calculados', 'acervo', 'tempo']) {
-            if (varasData[field].length > newLength) {
-                varasData[field] = varasData[field].slice(0, newLength);
-                jefData[field] = jefData[field].slice(0, newLength);
-            } else if (varasData[field].length < newLength) {
-                while (varasData[field].length < newLength) { varasData[field].push(0); }
-                while (jefData[field].length < newLength) { jefData[field].push(0); }
-            }
+            varasData[field] = filtrado ? varasDataOriginal[field].slice(activeFilter.startIndex, activeFilter.endIndex + 1) : [...varasDataOriginal[field]];
+            jefData[field] = filtrado ? jefDataOriginal[field].slice(activeFilter.startIndex, activeFilter.endIndex + 1) : [...jefDataOriginal[field]];
         }
-        
+
         atualizarGeral();
         renderizarTabelaVaras();
         renderizarTabelaJef();
