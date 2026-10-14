@@ -113,6 +113,9 @@
   /* ---------- passo da senha ---------- */
   [hidden] { display: none !important; }
   .campo input.senha { text-transform: none; letter-spacing: .3px; padding-right: 48px; }
+  /* esconde o olho/limpar nativo do navegador (Edge e outros): o sistema já tem o seu próprio botão de mostrar a senha */
+  .campo input.senha::-ms-reveal, .campo input.senha::-ms-clear { display: none !important; }
+  .campo input.senha::-webkit-credentials-auto-fill-button, .campo input.senha::-webkit-contacts-auto-fill-button { visibility: hidden; display: none !important; pointer-events: none; position: absolute; right: 0; }
   .campo .olho { position: absolute; right: 6px; top: 50%; width: 40px; height: 40px; margin-top: -20px; display: grid; place-items: center; background: none; border: 0; border-radius: 4px; cursor: pointer; color: var(--muted); }
   .campo .olho:hover, .campo .olho:focus-visible { color: var(--navy); }
   .campo .olho svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
